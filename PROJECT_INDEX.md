@@ -1,6 +1,6 @@
 # Open Roundtable — 项目入口
 
-工作名：开放圆桌。v0.0.2 提供 SQLite 内核、本地模型与排班专家会诊、离线复核和固定样例。验证方法见 README。
+工作名：开放圆桌。v0.0.3 新增[三组自动对照、逐表指标与复现说明](examples/paired_benchmark.md)。内核和会诊验证方法见 README。
 
 ## 读取顺序
 

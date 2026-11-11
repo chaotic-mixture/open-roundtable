@@ -4,7 +4,7 @@
 
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
 
-**v0.0.2 提供 SQLite 离线内核和可选的本地 Ollama 自动排班会诊。**
+**v0.0.3 支持在同一批随机排班表上自动比较单模型、单工具和专家加模型的圆桌。** [实测结果与复现命令](examples/paired_benchmark.md)
 
 ## 从这里开始
 
@@ -56,7 +56,15 @@ python -m examples.auto_consult verify reports/my-consult
 
 输出目录保存模型及其摘要、输入、时间、源码指纹、完整模型请求与原始响应，以及 SQLite 消息、投票、余额和评分。模型返回的 token 计数与内核 credits 分开记录。失败时已写入的材料保留在该目录，再次运行使用新目录。
 
-### 比较三种方式
+### 自动比较三种方式
+
+```bash
+python -m examples.benchmark_consult reports/paired-reproduction --model qwen3.5:9b --first-seed 501 --repetitions 3
+```
+
+每档三张表，全程使用本机 Ollama。逐组指标写入输出目录的 `results.csv`。参考运行中，专家提案改善了九张表的模型答案；单工具已逐张正确，模型复核在三张表上引入了错误。
+
+### 手动记录外部模型对照
 
 在仓库根目录运行 `python -m examples.phase1_consult consult.sqlite3 init`，使用新的数据库文件名。程序为单模型、单工具和圆桌建立三个议题，分别调用单工具组和圆桌组的排班专家，并打印圆桌专家意见。专家按区间检测人员、房间重叠并合并连续工时。
 
