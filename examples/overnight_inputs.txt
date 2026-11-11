@@ -1,0 +1,13 @@
+Absolute hours from day 1 midnight; 24 = day 2 midnight. Each token is shift ID, worker, room, start-end. Intervals are half-open. Output four sets per table:
+P worker overlaps and V room overlaps: list every unordered pair alphabetically.
+R rest: independently per worker merge all overlapping OR touching shifts into maximal uninterrupted blocks. For each two consecutive blocks with positive gap < 8 hours, report worker@firstBlockEnd-nextBlockStart.
+L long work: for each such merged block with length > 8 hours report worker@start-end. Exactly 8 passes both thresholds. No assumed shifts beyond table.
+1 Axv:22-26 Bxu:18-22 Cxu:38-43 Dxu:37-40 Eyv:17-25 Fzv:19-23 Gzv:29-35
+2 Axv:23-27 Byv:28-35 Cyv:23-26 Dxv:40-43 Eyu:34-42 Fyu:32-36 Gxv:32-38
+3 Azu:21-27 Byv:38-45 Cyv:19-22 Dyu:18-26 Exu:40-48 Fzu:16-20 Gyv:18-25
+4 Azu:22-28 Byu:31-36 Cyv:38-41 Dzv:41-48 Ezv:22-29 Fxv:18-21 Gxu:28-33 Hyv:18-24 Ixu:29-34 Jxu:24-28 Kzu:28-32
+5 Azu:22-30 Bzu:34-39 Cxv:40-48 Dzu:33-40 Ezu:41-49 Fyv:24-27 Gyu:41-46 Hzv:40-44 Iyv:23-27 Jzu:20-23 Kzu:19-24
+6 Azu:22-30 Byv:17-22 Czu:23-28 Dzv:37-45 Eyv:17-21 Fzv:16-23 Gxv:22-28 Hzu:37-43 Iyv:24-29 Jxv:37-42 Kzv:41-48
+7 Axv:23-28 Bzu:37-45 Czv:23-27 Dzv:19-27 Eyu:37-43 Fxu:34-37 Gyv:41-44 Hyu:22-28 Izv:34-38 Jxv:22-29 Kxv:33-40 Lzv:19-23 Mzv:23-26 Nyv:31-34 Oxu:16-20 Pxv:19-25 Qzv:38-41 Rxu:16-23 Szv:37-43 Tzv:32-39 Uxu:26-31 Vyv:30-36
+8 Axu:23-29 Bxv:41-45 Czv:26-30 Dxu:18-25 Eyu:26-31 Fzu:23-27 Gzv:40-48 Hxu:28-35 Iyv:17-23 Jyu:27-31 Kzv:40-43 Lzu:22-26 Myv:39-44 Nxu:19-27 Ozv:39-45 Pxv:27-30 Qyv:25-29 Ryu:35-38 Szv:21-24 Tyu:25-30 Uxv:33-39 Vyv:30-35
+9 Axu:22-25 Bxu:27-30 Czu:20-25 Dxv:35-41 Ezu:31-39 Fxv:19-24 Gzv:18-26 Hyu:27-30 Iyv:27-34 Jzv:34-38 Kzv:21-28 Lzv:21-27 Mxu:30-38 Nzv:26-32 Oxv:39-42 Pyv:20-25 Qzu:29-35 Rzv:21-24 Sxu:27-33 Txv:22-25 Uxv:22-25 Vxu:22-27

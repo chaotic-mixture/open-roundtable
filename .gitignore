@@ -1,0 +1,24 @@
+# Private source discussions are never part of the public source tree.
+/references/private/
+/.hermes.md
+/reports/
+/runtime/
+/dist/
+/build/
+/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.pytest_cache/
+.coverage
+.DS_Store

@@ -1,0 +1,23 @@
+[build-system]
+# No installer/build dependency downloads. Publishing is intentionally blocked.
+requires = []
+build-backend = "open_roundtable._build_disabled"
+backend-path = ["."]
+
+[project]
+name = "open-roundtable"
+version = "0.0.1"
+description = "Offline SQLite mechanical reference kernel; no real model integrations"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+# Explicit whitelist for a future, separately audited packaging backend.
+# This configuration does not claim that sdist/wheel publication is supported.
+packages = ["open_roundtable"]
+include-package-data = false
+
+[tool.open-roundtable]
+phase = "phase-0-offline"
+publication-supported = false
+budget-unit = "local test credits"
