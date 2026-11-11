@@ -1,6 +1,6 @@
 # Open Roundtable — 项目入口
 
-工作名：开放圆桌。v0.0.3 新增[三组自动对照、逐表指标与复现说明](examples/paired_benchmark.md)。内核和会诊验证方法见 README。
+工作名：开放圆桌。v0.0.4 新增[排班修复、候选选择与逐表比较](examples/repair_results.md)。上一版的[排班检查对照](examples/paired_benchmark.md)仍可独立运行。
 
 ## 读取顺序
 
