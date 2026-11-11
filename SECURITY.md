@@ -4,6 +4,8 @@ Phase 0 is an offline research prototype, not a sandbox, authorization service, 
 
 ## Current defaults
 
+The optional Phase 1 consultation sends the synthetic schedule and expert proposal to the local Ollama service on loopback port 11434. Its local evidence directory contains the full request and reply. The synthetic example runs entirely offline.
+
 - No API keys, network listeners, paid calls, account sharing, blockchain transactions, or shell execution on behalf of a participant.
 - No automatic source-code changes and no self-improvement daemon.
 - A passed vote is a procedural result, not proof of truth or permission to execute.

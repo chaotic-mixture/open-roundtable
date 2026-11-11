@@ -6,8 +6,8 @@ backend-path = ["."]
 
 [project]
 name = "open-roundtable"
-version = "0.0.1"
-description = "Offline SQLite mechanical reference kernel; no real model integrations"
+version = "0.0.2"
+description = "SQLite roundtable kernel with local Ollama schedule consultation"
 requires-python = ">=3.11"
 dependencies = []
 
@@ -18,6 +18,6 @@ packages = ["open_roundtable"]
 include-package-data = false
 
 [tool.open-roundtable]
-phase = "phase-0-offline"
+phase = "phase-1-local-consult"
 publication-supported = false
 budget-unit = "local test credits"

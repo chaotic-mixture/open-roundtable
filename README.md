@@ -4,7 +4,7 @@
 
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
 
-**当前是 Phase 0 离线参考内核，不是已经上线的专家网络。** 工作名未做商标或公开包名占用确认。
+**v0.0.2 提供 SQLite 离线内核和可选的本地 Ollama 自动排班会诊。**
 
 ## 从这里开始
 
@@ -32,6 +32,44 @@ python -m open_roundtable demo --db demo.sqlite3
 
 仓库提供固定随机种子的合成排班表、计分规则和独立评分程序。运行 `python -m examples.generate_overnight` 可重建九张跨天排班表，与 [实验输入](examples/overnight_inputs.txt) 对照。成员调用由实验主持者在内核之外派发。SQLite 运行记录默认保存在本地。
 
+## Phase 1 排班会诊实验
+
+### 可复现的离线示例
+
+以下示例使用固定种子 47 和标为 synthetic 的预置回复，无需 Ollama。预期结果为 7 项违规、0 漏报、0 误报、两票同意、扣除 2 credits，状态为 `RESOLVED`。运行标识和耗时每次会变化。请选择新的输出目录。
+
+```bash
+python -m examples.synthetic_consult reports/repro-47
+python -m examples.auto_consult verify reports/repro-47
+```
+
+### 自动运行一次本机会诊
+
+启动本机 Ollama，准备好支持 JSON 回复的模型（默认 `qwen3.5:9b`）。从仓库根目录执行以下命令。第一次命令需要新的输出目录，第二次可以在模型服务关闭后重复执行。
+
+```bash
+python -m examples.auto_consult run reports/my-consult --seed 47
+python -m examples.auto_consult verify reports/my-consult
+```
+
+程序生成七个班次，请区间规则专家提案，再把排班和提案提交到本机 Ollama 的 11434 端口。模型返回最终清单、理由和表决；专家根据最终清单与自身结果是否一致投票。两票同意时内核结案。独立逐小时评分器将标准答案、漏报和误报写入反馈。一次专家返回和一次模型返回分别扣 1 credit。
+
+输出目录保存模型及其摘要、输入、时间、源码指纹、完整模型请求与原始响应，以及 SQLite 消息、投票、余额和评分。模型返回的 token 计数与内核 credits 分开记录。失败时已写入的材料保留在该目录，再次运行使用新目录。
+
+### 比较三种方式
+
+在仓库根目录运行 `python -m examples.phase1_consult consult.sqlite3 init`，使用新的数据库文件名。程序为单模型、单工具和圆桌建立三个议题，分别调用单工具组和圆桌组的排班专家，并打印圆桌专家意见。专家按区间检测人员、房间重叠并合并连续工时。
+
+向外部模型提供 `examples.phase1_consult.CASES` 中的三张表和 [四项规则](examples/overnight_inputs.txt) 的说明。先记录独立答案，再把圆桌专家意见交给同一个模型复核。两份文本均按每表一行的格式填写：表号、人员重叠、房间重叠、休息不足、连续超时，以竖线分隔，空集填 `-`。
+
+```bash
+python -m examples.phase1_consult consult.sqlite3 record model independent.txt
+python -m examples.phase1_consult consult.sqlite3 record roundtable reviewed.txt
+python -m examples.phase1_consult consult.sqlite3 score
+```
+
+每条成功返回扣一个本地 credit。圆桌复用单模型答案时，完整会诊成本包含这次共享调用。评分器逐小时计算标准答案，按表和规则报告差集。
+
 ## Phase 0 验证对象
 
 - 本地SQLite中的议题、异构成员类型、消息与预算状态。
@@ -44,7 +82,7 @@ python -m open_roundtable demo --db demo.sqlite3
 
 ## 没有实现的部分
 
-真实LLM/专家工具适配、公开发现、跨终端通信、匿名机制、自动工具执行、活圆桌嵌套、真实贡献计价/信誉结算、订阅共享、区块链以及后台自修改。它们保留在路线图中，没有被原型的简化设计取消。
+路线图仍包括通用模型和专家插件接口、公开发现、跨终端通信、匿名机制、活圆桌嵌套及贡献结算。
 
 本地整数 credits 是测试预算单位，不是跨模型 token 等价、可兑现余额或货币。原始的贡献回馈机制尚未写死为一个公式。
 
