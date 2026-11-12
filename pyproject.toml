@@ -6,7 +6,7 @@ backend-path = ["."]
 
 [project]
 name = "open-roundtable"
-version = "0.0.4"
+version = "0.0.5"
 description = "SQLite roundtable kernel with local Ollama schedule consultation"
 requires-python = ">=3.11"
 dependencies = []

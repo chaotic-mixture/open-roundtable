@@ -1,6 +1,6 @@
 # 公开发布边界
 
-v0.0.4 以 Git 源码快照发行。wheel 和 sdist 构建由后端禁用。
+v0.0.5 以 Git 源码快照发行。wheel 和 sdist 构建由后端禁用。
 
 ## 可公开候选（仍须审查）
 
@@ -11,6 +11,7 @@ v0.0.4 以 Git 源码快照发行。wheel 和 sdist 构建由后端禁用。
 - examples/ 中的原创实验程序、合成排班数据与演示说明
 - v0.0.3 的公开结果为 examples/paired_benchmark.md 及仅含排班种子、组别和数值指标的 examples/paired_501_metrics.csv。
 - v0.0.4 公开 examples/repair_results.md、repair_501_metrics.csv 和 select_501_metrics.csv（后两者同属 examples/），只发布合成实验的说明和指标。
+- v0.0.5 公开 examples/preference_results.md 和 examples/preference_501_metrics.csv，只含合成需求说明和经过核对的指标。
 - docs/ARCHITECTURE.md、DECISIONS_AND_OPEN_QUESTIONS.md、ROADMAP.md、OPEN_SOURCE_LANDSCAPE.md、PUBLIC_RELEASE_CHECKLIST.md
 - references/README.md（仅索引说明，不包含原文）
 

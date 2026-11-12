@@ -4,7 +4,7 @@
 
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
 
-**v0.0.4 支持排班修复和已验证候选选择。** 模型可以在可行方案中按偏好选择；回复失败时交付专家默认方案。[逐表结果与复现命令](examples/repair_results.md) · [排班检查实验](examples/paired_benchmark.md)
+**v0.0.5 在已验证的排班候选上比较带优先级、冲突和例外的自然语言需求。** [逐表结果、评分方法与复现命令](examples/preference_results.md) · [排班修复实验](examples/repair_results.md) · [排班检查实验](examples/paired_benchmark.md)
 
 ## 从这里开始
 

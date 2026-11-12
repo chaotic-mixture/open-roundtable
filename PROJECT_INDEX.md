@@ -1,6 +1,6 @@
 # Open Roundtable — 项目入口
 
-工作名：开放圆桌。v0.0.4 新增[排班修复、候选选择与逐表比较](examples/repair_results.md)。上一版的[排班检查对照](examples/paired_benchmark.md)仍可独立运行。
+工作名：开放圆桌。v0.0.5 新增[自然语言排班偏好对照](examples/preference_results.md)。[排班修复](examples/repair_results.md)和[排班检查](examples/paired_benchmark.md)可独立运行。
 
 ## 读取顺序
 
