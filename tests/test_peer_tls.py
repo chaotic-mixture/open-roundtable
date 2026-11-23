@@ -17,7 +17,7 @@ from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.peer_node import digest, ledger, packed, transfer
 from examples.two_node_demo import audit, cli, run, start
-from open_roundtable.data import initialize
+from open_roundtable.data import initialize, share_public
 
 
 class PeerTLSTests(unittest.TestCase):
@@ -97,6 +97,15 @@ class PeerTLSTests(unittest.TestCase):
             _, new_port = start(stack,receiver,0)
             with closing(ledger(folder/'A')) as db, db:
                 db.execute('UPDATE peers SET url=? WHERE name=?',(f'https://127.0.0.1:{new_port}','B'))
+            source = 'https://b.example/offers/repair'
+            draft = json.loads(cli(receiver,'offer',source,'repair','Repair weekly shifts').stdout)
+            def lookup():
+                return json.loads(cli(folder/'A','find-capability','repair').stdout)
+            self.assertEqual(lookup(), dict(matches=[],unavailable=[]))
+            share_public(receiver,source,True,draft['sha256'])
+            self.assertEqual(lookup()['matches'], [dict(node='B',source=source,description='Repair weekly shifts')])
+            share_public(receiver,source,False)
+            self.assertEqual(lookup()['matches'], [])
             self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
                              dict(matched=1,differences=[]))
             with closing(ledger(folder/'A')) as db:

@@ -14,7 +14,7 @@ import ssl
 from urllib.parse import urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
-from open_roundtable.data import catalog, connect, NoRedirect
+from open_roundtable.data import catalog, connect, ingest, NoRedirect
 from examples.user_consult import consult
 
 
@@ -157,6 +157,35 @@ def set_permission(db, peer, allow, remaining=None):
         if remaining is not None:
             db.execute('INSERT INTO grant_limits VALUES (?,?)', (peer, remaining))
     return dict(peer=peer, allowed=allow, remaining=remaining)
+
+
+def offer(root, source, tag, description):
+    node = json.loads((root/'node.json').read_text())['name']
+    if not tag.strip() or not description.strip():
+        raise ValueError('provide a capability tag and description')
+    body = packed(dict(kind='capability', node=node, tag=tag.strip(), description=description.strip())).decode()
+    ingest(root,'public',[dict(source=source,body=body)])
+    return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
+
+
+def find_capability(root, db, tag):
+    node = json.loads((root/'node.json').read_text())['name']
+    matches, unavailable = [], []
+    for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
+        try:
+            records = transfer(db,url+'/catalog',peer_name=peer)
+        except (OSError,ValueError):
+            unavailable.append(peer)
+            continue
+        for record in records:
+            try:
+                item = json.loads(record['body'])
+            except (KeyError,TypeError,ValueError):
+                continue
+            if (isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == peer
+                    and item.get('tag') == tag and isinstance(item.get('description'),str)):
+                matches.append(dict(node=peer,source=record['source'],description=item['description']))
+    return dict(matches=matches, unavailable=unavailable)
 
 
 def envelope(root,recipient,source):
@@ -510,6 +539,11 @@ if __name__=='__main__':
     server.add_argument('--interrupt-after-commit',action='store_true')
     server.add_argument('--interrupt-before-receipt',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
+    capability = commands.add_parser('offer')
+    capability.add_argument('source')
+    capability.add_argument('tag')
+    capability.add_argument('description')
+    commands.add_parser('find-capability').add_argument('tag')
     commands.add_parser('resume')
     commands.add_parser('account')
     commands.add_parser('reconcile-online').add_argument('partner')
@@ -538,7 +572,11 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:
-            if args.action == 'feedback':
+            if args.action == 'offer':
+                result = offer(args.directory,args.source,args.tag,args.description)
+            elif args.action == 'find-capability':
+                result = find_capability(args.directory,db,args.tag)
+            elif args.action == 'feedback':
                 result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',
                                            observation=args.observation_file.read_text(encoding='utf-8-sig'))
             elif args.action == 'quality':

@@ -213,3 +213,7 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 私有库可按来源进一步收紧维护权限。运行 `python -m open_roundtable.data NODE_DIR record-limit SOURCE sealed`，该来源今后的更新也只在库内处理。选 `local --model MODEL` 可指定本机模型；整库切换为 sealed 时，这些记录也停止调用模型。用 `inherit` 恢复跟随整库设置。已有数据库在首次打开私有库时自动支持该命令。
 
 运行 `python -m open_roundtable.data NODE_DIR preview-private SOURCE` 可在维护前查看整库权限、该来源的限制、实际生效方式、模型和目的服务地址。预览只显示地址的协议与主机（含显式端口），无需读取正文或调用模型。实际维护会在执行时重新读取并锁定权限。
+
+### 按能力发现候选议员
+
+提供方在本机运行 `python -m examples.peer_node NODE_B offer https://b.example/offers/repair repair "修复每周排班"`，审核后用 `python -m open_roundtable.data NODE_B share-public https://b.example/offers/repair --if-sha256 HASH` 发布。已经发现 B 的节点 A 运行 `python -m examples.peer_node NODE_A find-capability repair` 即可按标签查询。查询直接读取各节点最新公开目录，同时返回未能查询的节点。结果表示服务方当前公开声明的能力；实际受理仍取决于授权与剩余额度。
