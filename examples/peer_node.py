@@ -8,6 +8,7 @@ from http.client import HTTPException, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import ssl
@@ -453,12 +454,30 @@ def partner_statement(root, db, partner, *, after='', limit=None):
     return dict(format=1, node=node, partner=partner, entries=entries)
 
 
-def reconcile(local, remote):
-    if (remote.get('format'),remote.get('node'),remote.get('partner')) != (1,local['partner'],local['node']):
+def statement_entries(remote, provider, partner):
+    if (not isinstance(remote, dict) or type(remote.get('format')) is not int
+            or (remote['format'], remote.get('node'), remote.get('partner')) != (1, provider, partner)):
         raise ValueError('statement parties or format mismatch')
+    entries = remote.get('entries')
+    if not isinstance(entries, list):
+        raise ValueError('invalid statement entries')
+    for entry in entries:
+        if (not isinstance(entry, dict) or set(entry) != {'job', 'provider', 'credits', 'receipt'}
+                or not isinstance(entry['job'], str) or not re.fullmatch('[0-9a-f]{64}', entry['job'])
+                or entry['provider'] not in (provider, partner)
+                or type(entry['credits']) is not int or not 0 <= entry['credits'] <= 2
+                or (entry['receipt'] is None and entry['credits'] != 0)
+                or (entry['receipt'] is not None and (not isinstance(entry['receipt'], str)
+                                                      or not re.fullmatch('[0-9a-f]{64}', entry['receipt'])))):
+            raise ValueError('invalid statement entry')
+    return entries
+
+
+def reconcile(local, remote):
+    entries = statement_entries(remote, local['partner'], local['node'])
     expected = {entry['job']:entry for entry in local['entries']}
-    reported = {entry['job']:entry for entry in remote['entries']}
-    if len(reported) != len(remote['entries']):
+    reported = {entry['job']:entry for entry in entries}
+    if len(reported) != len(entries):
         raise ValueError('duplicate statement job')
     differences = []
     for key in sorted(expected.keys() | reported.keys()):
@@ -565,9 +584,7 @@ def reconcile_online(root, db, partner):
     entries = []
     while True:
         remote = transfer(db,row[0]+'/statement',request,peer_name=partner)
-        batch = remote['entries']
-        if remote['node'] != partner or remote['partner'] != config['name'] or remote['format'] != 1:
-            raise ValueError('statement parties or format mismatch')
+        batch = statement_entries(remote, partner, config['name'])
         revision = remote.get('revision')
         if request['revision'] is not None and revision != request['revision']:
             raise ValueError('statement changed during reconciliation')

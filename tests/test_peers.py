@@ -18,6 +18,14 @@ from open_roundtable.data import connect, ingest, initialize
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_malformed_statement_is_rejected_before_matching(self):
+        local = dict(node='A', partner='B', entries=[])
+        entry = dict(job='1'*64, provider='B', credits=0, receipt=None)
+        for entries in (None, [{}], [dict(entry, credits=True)], [dict(entry, credits=1)],
+                        [dict(entry, provider='C')], [dict(entry, receipt=[])], [dict(entry, receipt='short')]):
+            with self.subTest(entries=entries), self.assertRaisesRegex(ValueError, 'invalid statement'):
+                reconcile(local, dict(format=1, node='B', partner='A', entries=entries))
+
     def test_search_limit_returns_replayable_zero_charge(self):
         self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
 
@@ -236,7 +244,7 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(json.loads(cli(folder/'A','reconcile','B',str(statement)).stdout),
                              dict(matched=1,differences=[]))
             for entries in ([], [dict(exported['entries'][0],credits=1)],
-                            [dict(exported['entries'][0],receipt='changed')]):
+                            [dict(exported['entries'][0],receipt='0'*64)]):
                 statement.write_text(json.dumps(dict(exported,entries=entries)))
                 checked = cli(folder/'A','reconcile','B',str(statement),ok=False)
                 self.assertNotEqual(checked.returncode,0)
