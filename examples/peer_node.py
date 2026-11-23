@@ -129,7 +129,22 @@ def discover(db,bootstrap):
     feed = fetch_public_subset(db, bootstrap, None, '/nodes')
     if not isinstance(feed, list):
         raise ValueError('invalid public directory snapshot')
-    registrations = [(r['source'], json.loads(r['body'])) for r in feed if r['source'].endswith('/node')]
+    registrations = []
+    sources = set()
+    for record in feed:
+        if not isinstance(record, dict) or not isinstance(record.get('source'), str):
+            raise ValueError('invalid public directory record')
+        source = record['source']
+        if not source.endswith('/node'):
+            continue
+        if source in sources or not isinstance(record.get('body'), str):
+            raise ValueError('invalid public node registration')
+        peer = json.loads(record['body'])
+        if not isinstance(peer, dict) or not all(isinstance(peer.get(k), str) and peer[k].strip()
+                                                 for k in ('name', 'url')):
+            raise ValueError('invalid public node registration')
+        sources.add(source)
+        registrations.append((source, peer))
     descriptors = [peer for source, peer in registrations]
     if len({p['name'] for p in descriptors})!=len(descriptors):
         raise ValueError('invalid public directory snapshot')

@@ -186,6 +186,13 @@ class PeerRecoveryTests(unittest.TestCase):
                 discover(db, 'directory')
             set_permission(db, 'A', True, 1)
             other_source = [dict(feed[0], source='https://other.example/node')]
+            same_source = dict(feed[0], body=json.dumps(dict(name='B', url='http://127.0.0.1:8002')))
+            for malformed in ([None], [dict(feed[0], body='null')], [feed[0], same_source]):
+                with patch('examples.peer_node.transfer', return_value=malformed) as fetch:
+                    with self.assertRaises(ValueError):
+                        discover(db, 'directory')
+                    self.assertEqual(fetch.call_count, 1)
+                    self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))
             with patch('examples.peer_node.transfer', side_effect=[feed,other_source]), self.assertRaises(ValueError):
                 discover(db, 'directory')
             with patch('examples.peer_node.transfer', side_effect=[feed,[]]), self.assertRaises(ValueError):
