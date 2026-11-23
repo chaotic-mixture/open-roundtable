@@ -15,7 +15,7 @@ import unittest
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
-from examples.peer_node import ledger, transfer
+from examples.peer_node import digest, ledger, packed, transfer
 from examples.two_node_demo import audit, cli, run, start
 from open_roundtable.data import initialize
 
@@ -104,3 +104,25 @@ class PeerTLSTests(unittest.TestCase):
                     transfer(db,f'https://127.0.0.1:{new_port}/statement',dict(sender='C'),peer_name='B')
                 denied.exception.close()
                 self.assertEqual(denied.exception.code,403)
+
+            synthetic = []
+            for i in range(6000):
+                request = dict(sender='A', recipient='B', source='synthetic', spec=dict(case=i))
+                key = digest(request)
+                receipt = dict(id=key,sender='B',recipient='A',credits=2,outcome=dict(state='RESOLVED'))
+                synthetic.append((key,packed(dict(request,id=key)).decode(),packed(receipt).decode(),2))
+            for root in (folder/'A',receiver):
+                with closing(ledger(root)) as db, db:
+                    db.executemany('INSERT INTO jobs VALUES (?,?,?,?)', synthetic)
+            self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
+                             dict(matched=6001,differences=[]))
+            endpoint = f'https://127.0.0.1:{new_port}/statement'
+            with closing(ledger(folder/'A')) as db:
+                page = transfer(db,endpoint,dict(sender='A',after='',revision=None),peer_name='B')
+                self.assertEqual(len(page['entries']),256)
+                with closing(ledger(receiver)) as writer, writer:
+                    writer.execute('DELETE FROM jobs WHERE id=?',(synthetic[0][0],))
+                with self.assertRaises(HTTPError) as stale:
+                    transfer(db,endpoint,dict(sender='A',after=page['next'],revision=page['revision']),peer_name='B')
+                stale.exception.close()
+                self.assertEqual(stale.exception.code,409)

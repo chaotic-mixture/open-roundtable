@@ -34,6 +34,11 @@ def ledger(root):
     db.execute('CREATE TABLE IF NOT EXISTS consult_grants (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS grant_limits (name TEXT PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining>=0))')
     db.execute('CREATE TABLE IF NOT EXISTS traffic (direction TEXT, route TEXT, body TEXT)')
+    db.execute('CREATE TABLE IF NOT EXISTS job_revision (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL)')
+    db.execute('INSERT OR IGNORE INTO job_revision VALUES (1,0)')
+    for event in ('INSERT','UPDATE','DELETE'):
+        db.execute(f"""CREATE TRIGGER IF NOT EXISTS jobs_revision_{event} AFTER {event} ON jobs
+                       BEGIN UPDATE job_revision SET revision=revision+1 WHERE id=1; END""")
     db.commit()
     return db
 
@@ -276,12 +281,12 @@ def service_account(root, db):
     return account
 
 
-def partner_statement(root, db, partner):
+def partner_statement(root, db, partner, *, after='', limit=None):
     node = json.loads((root/'node.json').read_text())['name']
     if node == partner or not partner.strip():
         raise ValueError('choose a distinct partner')
     entries = []
-    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
+    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs WHERE id>? ORDER BY id',(after,)):
         request = json.loads(raw)
         if {request['sender'], request['recipient']} != {node,partner}:
             continue
@@ -297,6 +302,8 @@ def partner_statement(root, db, partner):
         elif credits:
             raise ValueError('pending job has a posted charge')
         entries.append(dict(job=key, provider=request['recipient'], credits=credits, receipt=receipt_hash))
+        if limit is not None and len(entries) >= limit:
+            break
     return dict(format=1, node=node, partner=partner, entries=entries)
 
 
@@ -391,8 +398,25 @@ def reconcile_online(root, db, partner):
     row = db.execute('SELECT url FROM peers WHERE name=?', (partner,)).fetchone()
     if not row:
         raise ValueError('discover partner before reconciling')
-    remote = transfer(db,row[0]+'/statement',dict(sender=config['name']),peer_name=partner)
-    return reconcile(partner_statement(root,db,partner), remote)
+    request = dict(sender=config['name'], after='', revision=None)
+    entries = []
+    while True:
+        remote = transfer(db,row[0]+'/statement',request,peer_name=partner)
+        batch = remote['entries']
+        if remote['node'] != partner or remote['partner'] != config['name'] or remote['format'] != 1:
+            raise ValueError('statement parties or format mismatch')
+        revision = remote.get('revision')
+        if request['revision'] is not None and revision != request['revision']:
+            raise ValueError('statement changed during reconciliation')
+        entries.extend(batch)
+        cursor = remote.get('next')
+        if cursor is None:
+            break
+        if revision is None or not batch or cursor != batch[-1]['job'] or cursor <= request['after']:
+            raise ValueError('invalid statement continuation')
+        request.update(after=cursor, revision=revision)
+    return reconcile(partner_statement(root,db,partner), dict(remote,entries=entries))
+
 
 
 def serve(root,port,interrupt,interrupt_before_receipt=False):
@@ -433,7 +457,18 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                         permitted = config.get('statement_partners', [])
                         if not isinstance(permitted,list) or partner not in permitted:
                             return self.reply(403, {'error':'statement sharing not enabled'})
-                        return self.reply(200,partner_statement(root,db,partner))
+                        if 'after' not in request:
+                            return self.reply(200,partner_statement(root,db,partner))
+                        db.execute('BEGIN')
+                        revision = db.execute('SELECT revision FROM job_revision WHERE id=1').fetchone()[0]
+                        if request['revision'] is not None and request['revision'] != revision:
+                            return self.reply(409, {'error':'statement changed; retry reconciliation'})
+                        page = partner_statement(root,db,partner,after=request['after'],limit=257)
+                        more = len(page['entries']) == 257
+                        if more:
+                            page['entries'].pop()
+                        page.update(revision=revision, next=page['entries'][-1]['job'] if more else None)
+                        return self.reply(200,page)
                     trace(db,'accept',self.path,request)
                     result,fresh=deliver(root,db,request,interrupt_before_receipt=interrupt_before_receipt)
                     if fresh and interrupt:
