@@ -466,6 +466,10 @@ def reconcile(local, remote):
             reason = 'missing locally'
         elif key not in reported:
             reason = 'missing at partner'
+        elif expected[key]['receipt'] is None and reported[key].get('receipt') is not None:
+            reason = 'pending locally, settled at partner'
+        elif expected[key]['receipt'] is not None and 'receipt' in reported[key] and reported[key]['receipt'] is None:
+            reason = 'settled locally, pending at partner'
         elif packed(expected[key]) != packed(reported[key]):
             reason = 'receipt or charge differs'
         elif expected[key]['receipt'] is None:

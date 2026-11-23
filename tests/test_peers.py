@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
+from examples.peer_node import partner_statement, reconcile, service_account
 from open_roundtable.data import connect, ingest, initialize
 
 
@@ -45,6 +46,22 @@ class PeerRecoveryTests(unittest.TestCase):
                 self.assertEqual(deliver(root, db, request), (receipt, False))
                 self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
                 model.assert_not_called()
+            provider = partner_statement(root, db, 'A')
+            sender = root/'A'
+            sender.mkdir()
+            (sender/'node.json').write_text('{"name":"A"}')
+            with closing(ledger(sender)) as consumer, patch('examples.peer_node.envelope', return_value=request):
+                consumer.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8002')")
+                with patch('examples.peer_node.transfer', side_effect=ConnectionError), self.assertRaises(ConnectionError):
+                    send(sender, consumer, 'B', 'public')
+                pending = partner_statement(sender, consumer, 'B')
+                self.assertEqual(reconcile(pending, provider)['differences'][0]['reason'], 'pending locally, settled at partner')
+                self.assertEqual(reconcile(provider, pending)['differences'][0]['reason'], 'settled locally, pending at partner')
+                with patch('examples.peer_node.transfer', return_value=receipt):
+                    send(sender, consumer, 'B', 'public')
+                self.assertEqual(reconcile(partner_statement(sender, consumer, 'B'), provider), dict(matched=1, differences=[]))
+                account = service_account(sender, consumer)
+                self.assertEqual((account['pending'], account['consumed'], account['entries'][0]['state']), (0, 0, 'NO_PLAN'))
 
     def test_simultaneous_consultations_and_duplicate(self):
         both_started = threading.Event()
