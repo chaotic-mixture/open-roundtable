@@ -4,10 +4,27 @@ from contextlib import closing
 import json
 from pathlib import Path
 
-from examples.meta_consult import prepare, rule_choice
+from examples.meta_consult import design, evaluate, grade, prepare, rule_choice
 from examples.overnight_score import expected
 from examples.repair_benchmark import schedule
 from open_roundtable.core import Kernel
+
+
+def verify_experiment(snapshot):
+    proposal = design()
+    votes = {v['member']:v['agree'] for v in snapshot['votes']}
+    if (snapshot['state'] != 'RESOLVED' or snapshot['current_version'] != 1
+            or json.loads(snapshot['proposals'][0]['body']) != proposal
+            or votes != {'proposer':1, 'evaluator':1}):
+        raise ValueError('expected the approved priority-rule experiment')
+    rows = [evaluate(seed, i) for i, seed in enumerate(proposal['seeds'])]
+    passed, gains = grade(rows)
+    evidence = [(m['member'], json.loads(m['body'])) for m in snapshot['messages']]
+    feedback = dict(passed=passed, gains=gains)
+    if (not passed or evidence != [('proposer', proposal), ('evaluator', rows)]
+            or not any(f['member']=='evaluator' and f['source']=='independent schedule and preference checks'
+                       and json.loads(f['body']) == feedback for f in snapshot['feedback'])):
+        raise ValueError('recorded evidence differs from the repeated experiment')
 
 
 def policy(kernel, topic, action=None):
@@ -28,11 +45,7 @@ def policy(kernel, topic, action=None):
                 raise ValueError('unknown policy action')
             desired = action == 'enable'
             if desired:
-                proposal = json.loads(snapshot['proposals'][-1]['body']) if version else {}
-                if (snapshot['state'] != 'RESOLVED' or version != 1 or proposal.get('candidate') != 'priority rules'
-                        or not any(f['member']=='evaluator' and json.loads(f['body']).get('passed') is True
-                                   for f in snapshot['feedback'])):
-                    raise ValueError('a passed priority-rule experiment is required')
+                verify_experiment(snapshot)
             if desired != enabled:
                 db.execute('INSERT INTO selector_decisions(topic,version,enabled) VALUES (?,?,?)',
                            (topic,version,desired))

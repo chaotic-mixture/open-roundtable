@@ -43,3 +43,14 @@ class MetaConsultTests(unittest.TestCase):
                 self.assertEqual(select(kernel, topic, 1, shifts), baseline)
                 self.assertEqual(kernel.db.execute('SELECT enabled FROM selector_decisions ORDER BY id').fetchall()[0][0], 1)
                 self.assertEqual(kernel.db.execute('SELECT count(*) FROM selector_decisions').fetchone()[0], 2)
+
+    def test_changed_evidence_cannot_activate_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / 'experiment.sqlite3'
+            topic = run(database)['topic']
+            with closing(Kernel(database)) as kernel:
+                with kernel.db:
+                    kernel.db.execute("UPDATE messages SET body='[]' WHERE topic=? AND member='evaluator'", (topic,))
+                with self.assertRaisesRegex(ValueError, 'recorded evidence'):
+                    policy(kernel, topic, 'enable')
+                self.assertEqual(policy(kernel, topic), 'default')

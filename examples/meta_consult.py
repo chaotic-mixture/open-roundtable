@@ -54,6 +54,18 @@ def evaluate(seed, index):
     return record
 
 
+def design():
+    return dict(baseline='first feasible candidate', candidate='priority rules',
+                        seeds=list(range(601,610)), weights=[4,2,1],
+                        gate='both feasible on every case, no preference loss, at least one gain')
+
+
+def grade(rows):
+    gains = [r['rules']['preference']-r['default']['preference'] for r in rows]
+    passed = all(r[arm]['hard_pass'] for r in rows for arm in ('default','rules')) and min(gains)>=0 and max(gains)>0
+    return passed, gains
+
+
 def run(path):
     path.touch(exist_ok=False)
     with closing(Kernel(path)) as k:
@@ -61,14 +73,11 @@ def run(path):
         k.join(topic, 'proposer', kind='expert')
         k.join(topic, 'evaluator', kind='expert')
         k.start(topic)
-        proposal = dict(baseline='first feasible candidate', candidate='priority rules',
-                        seeds=list(range(601,610)), weights=[4,2,1],
-                        gate='both feasible on every case, no preference loss, at least one gain')
+        proposal = design()
         version = k.propose(topic, json.dumps(proposal), previous_version=0)
         k.post(topic, 'proposer', json.dumps(proposal))
         rows = [evaluate(seed, i) for i,seed in enumerate(proposal['seeds'])]
-        gains = [r['rules']['preference']-r['default']['preference'] for r in rows]
-        passed = all(r[arm]['hard_pass'] for r in rows for arm in ('default','rules')) and min(gains)>=0 and max(gains)>0
+        passed, gains = grade(rows)
         k.post(topic, 'evaluator', json.dumps(rows))
         k.feedback(topic, 'evaluator', json.dumps(dict(passed=passed, gains=gains)), source='independent schedule and preference checks')
         k.vote(topic, 'proposer', True, version=version)
