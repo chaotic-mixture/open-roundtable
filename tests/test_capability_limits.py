@@ -7,11 +7,42 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import find_capability, ledger, match_offers, verify_offer
+from examples.peer_node import deliver, digest, find_capability, ledger, match_offers, send, set_permission, verify_offer
 from examples.capability_execution import execute_selection
+from open_roundtable.data import initialize, ingest, share_public
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_read_only_offer_creates_no_repair_job_at_either_node(self):
+        spec = json.loads((Path(__file__).resolve().parents[1]/'examples'/'consult_input.json').read_bytes())
+        topic = dict(source='https://a.example/topic',body=json.dumps(spec))
+        offer = dict(source='https://b.example/audit',body=json.dumps(dict(kind='capability',node='B',tag='audit',
+                                                                description='Report overlapping shifts')))
+        ref = [offer['source'],hashlib.sha256(offer['body'].encode()).hexdigest()]
+        with tempfile.TemporaryDirectory() as tmp:
+            a,b = Path(tmp)/'A',Path(tmp)/'B'
+            for root,record in [(a,topic),(b,offer)]:
+                initialize(root)
+                (root/'node.json').write_text(json.dumps(dict(name=root.name)))
+                ingest(root,'public',[record])
+                share_public(root,record['source'],True)
+            with closing(ledger(a)) as sender, closing(ledger(b)) as receiver:
+                sender.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8002')")
+                receiver.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+                set_permission(receiver,'A',True,1)
+                with patch('examples.peer_node.fetch_public_subset',return_value=[offer]), patch('examples.peer_node.transfer') as wire:
+                    with self.assertRaisesRegex(ValueError,'does not declare schedule repair'):
+                        send(a,sender,'B',topic['source'],offer_ref=ref)
+                    wire.assert_not_called()
+                body = dict(sender='A',recipient='B',source=topic['source'],spec=spec,offer=ref)
+                with patch('examples.peer_node.fetch_public_subset',return_value=[topic]), patch('examples.peer_node.consult') as consult:
+                    with self.assertRaisesRegex(ValueError,'does not declare schedule repair'):
+                        deliver(b,receiver,dict(body,id=digest(body)))
+                    consult.assert_not_called()
+                for db in (sender,receiver):
+                    self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(),(0,))
+                self.assertEqual(receiver.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(),(1,))
+
     def test_mixed_recommendation_never_runs_either_provider(self):
         with patch('examples.capability_execution.prepare') as repair, patch('examples.capability_execution.check') as audit:
             for requested in ('audit', 'repair'):
