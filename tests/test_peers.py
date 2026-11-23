@@ -150,6 +150,29 @@ class PeerRecoveryTests(unittest.TestCase):
             with self.subTest(entries=entries), self.assertRaisesRegex(ValueError, 'invalid statement'):
                 reconcile(local, dict(format=1, node='B', partner='A', entries=entries))
 
+    def test_local_pair_changes_invalidate_online_comparison(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A","transport":"mtls"}')
+            with db:
+                db.execute("INSERT INTO peers VALUES ('B','https://b.example')")
+            page = dict(format=1, node='B', partner='A', entries=[], next=None, revision='r')
+
+            def change_account(partner):
+                with closing(sqlite3.connect(root/'network.sqlite3')) as other, other:
+                    request = json.dumps(dict(sender='A',recipient=partner))
+                    other.execute('INSERT INTO jobs(id,request) VALUES (?,?)',(partner,request))
+                    other.execute('DELETE FROM jobs WHERE id=?',(partner,))
+                return page
+
+            for partner in ('C','B'):
+                with patch('examples.peer_node.transfer',side_effect=lambda *a, **kw: change_account(partner)):
+                    if partner == 'C':
+                        self.assertEqual(reconcile_online(root,db,'B'),dict(matched=0,differences=[]))
+                    else:
+                        with self.assertRaisesRegex(ValueError,'local statement changed'):
+                            reconcile_online(root,db,'B')
+
     def test_search_limit_returns_replayable_zero_charge(self):
         self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
 

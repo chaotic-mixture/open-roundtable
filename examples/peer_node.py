@@ -658,6 +658,12 @@ def admission(root, db, partner):
     return dict(node=partner,accepting=response['accepting'])
 
 
+def statement_revision(db, node, partner):
+    row = db.execute('SELECT token FROM statement_revisions WHERE first_node=? AND second_node=?',
+                     sorted((node, partner))).fetchone()
+    return row[0] if row else 'initial'
+
+
 def reconcile_online(root, db, partner):
     config = json.loads((root/'node.json').read_text())
     if config.get('transport') != 'mtls':
@@ -666,6 +672,7 @@ def reconcile_online(root, db, partner):
     if not row:
         raise ValueError('discover partner before reconciling')
     request = dict(sender=config['name'], after='', revision=None)
+    local_revision = statement_revision(db, config['name'], partner)
     entries = []
     while True:
         remote = transfer(db,row[0]+'/statement',request,peer_name=partner)
@@ -688,7 +695,10 @@ def reconcile_online(root, db, partner):
         if revision is None or not batch or cursor != batch[-1]['job'] or cursor <= request['after']:
             raise ValueError('invalid statement continuation')
         request.update(after=cursor, revision=revision)
-    return reconcile(partner_statement(root,db,partner), dict(remote,entries=entries))
+    local = partner_statement(root,db,partner)
+    if statement_revision(db, config['name'], partner) != local_revision:
+        raise ValueError('local statement changed during reconciliation')
+    return reconcile(local, dict(remote,entries=entries))
 
 
 
@@ -749,10 +759,7 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                         if 'after' not in request:
                             return self.reply(200,partner_statement(root,db,partner))
                         db.execute('BEGIN')
-                        pair = sorted((config['name'],partner))
-                        row = db.execute('SELECT token FROM statement_revisions WHERE first_node=? AND second_node=?',
-                                         pair).fetchone()
-                        revision = row[0] if row else 'initial'
+                        revision = statement_revision(db, config['name'], partner)
                         if request['revision'] is not None and request['revision'] != revision:
                             return self.reply(409, {'error':'statement changed; retry reconciliation'})
                         page = partner_statement(root,db,partner,after=request['after'],limit=257)
