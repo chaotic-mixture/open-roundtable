@@ -85,6 +85,11 @@ def read_receipt(path, nested, expected_input=None):
                       input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
         result['can_meet_all'] = any(all(score) for score in scores)
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='benchmark_timing'").fetchone():
+            [(position, duration)] = db.execute('SELECT position,seconds FROM benchmark_timing').fetchall()
+            if position not in (1, 2) or not isinstance(duration, (int,float)) or not math.isfinite(duration) or duration < seconds:
+                raise ValueError('invalid consultation timing')
+            result.update(position=position, consultation_seconds=duration)
         changes = [sum(shift['start'] != before['start'] for shift, before in zip(candidate, original, strict=True))
                    for candidate in candidates]
         result['changed_shifts'] = changes[selected]
@@ -113,6 +118,9 @@ def compare(direct, nested, *, expected_input=None):
     other_request, other_schedule, panel = read_receipt(nested, True, expected_input)
     if request != other_request:
         raise ValueError('model requests differ across paired consultations')
+    if 'position' in flat or 'position' in panel:
+        if {flat.get('position'), panel.get('position')} != {1, 2}:
+            raise ValueError('inconsistent consultation order')
     return dict(same_schedule=schedule == other_schedule, direct=flat, nested=panel)
 
 

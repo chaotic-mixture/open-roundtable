@@ -1,7 +1,10 @@
 """Compare direct and delegated repair consultations on the nine seeded rosters."""
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
+import sqlite3
+from time import perf_counter
 
 from examples.compare_panel_receipts import compare
 from examples.generate_overnight import generate
@@ -31,8 +34,14 @@ def run(directory, model, *, verify_only=False, reverse_order=False):
         else:
             source.write_text(json.dumps(spec), encoding='utf8')
             nested_first = bool(index % 2) != reverse_order
-            for nested in (nested_first, not nested_first):
-                consult(source, paths[int(nested)], model, nested=nested)
+            for position, nested in enumerate((nested_first, not nested_first), start=1):
+                path = paths[int(nested)]
+                start = perf_counter()
+                consult(source, path, model, nested=nested)
+                seconds = perf_counter() - start
+                with closing(sqlite3.connect(path)) as db, db:
+                    db.execute('CREATE TABLE benchmark_timing (position INTEGER, seconds REAL)')
+                    db.execute('INSERT INTO benchmark_timing VALUES (?,?)', (position, seconds))
         yield dict(seed=seed, shifts=size, **compare(*paths, expected_input=spec))
 
 
