@@ -58,6 +58,8 @@ python -m open_roundtable.data runtime/customer-a maintain-pending --limit 10
 python -m open_roundtable.data runtime/customer-a public-feed
 ```
 
+本机 `qwen3.5:9b` 混合批次实测使用两条合成记录。一条记录描述虚构协调员偏好周二上午开会，另一条仅允许封闭整理。预览得到 sealed 1、local 1、api 0；执行后完成 2 条，再次执行选中 0 条。SQLite 中的模型摘要保留了周二上午和协调员角色，省略了“虚构”这一限定；封闭记录的结果只合并了多余空白。此例验证本机维护流程，摘要保真度仍需按用途核对。
+
 导入文件是 UTF-8 JSON 数组，例如 `[{"source":"profile","body":"偏好上午开会"}]`。默认 sealed 模式允许写入和无网络的本地文本整理，结果只写回私库。选择 `policy local --model qwen3.5:9b` 后可用本机 Ollama 摘要；选择 `policy api --model MODEL --endpoint HTTPS_URL` 后，维护命令会将该条正文发给指定的兼容聊天接口。可通过环境变量 `ROUNDTABLE_API_KEY` 配置密钥，通过 `policy sealed` 撤销后续调用。已发送的数据由接收方处理。
 
 公开库支持 `fetch-public URL` 采集指定的 UTF-8 文本、`import public FILE` 批量导入、`import-feed URL` 拉取选定节点的 JSON 目录。资料默认仅本机使用。`share-public URL` 允许该条进入 `public-feed`，加 `--off` 可撤下。内容变更后需要重新选择共享。节点运营者自行托管导出的目录；来源字段由提供方声明。
