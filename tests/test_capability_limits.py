@@ -29,6 +29,19 @@ class CapabilityLimitsTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     verify_offer([record], 'B', reference)
 
+    def test_repair_admission_checks_tag_of_selected_revision(self):
+        records = []
+        for tag in ('audit', 'repair', 'reschedule'):
+            body = json.dumps(dict(kind='capability', node='B', tag=tag, description='roster service'))
+            records.append(dict(source=tag,body=body))
+        for record in records:
+            ref = record['source'], hashlib.sha256(record['body'].encode()).hexdigest()
+            if record['source'] == 'audit':
+                with self.assertRaisesRegex(ValueError,'does not declare schedule repair'):
+                    verify_offer(records,'B',ref,repair_only=True)
+            else:
+                verify_offer(records,'B',ref,repair_only=True)
+
     def test_model_receives_only_allowed_tags(self):
         offers = [dict(tag='repair',description='change shifts'),dict(tag='audit',description='check conflicts')]
         reply = dict(done=True,done_reason='stop',message=dict(content='{"ids":[0]}'),prompt_eval_count=12,eval_count=4)

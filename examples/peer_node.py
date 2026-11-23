@@ -324,12 +324,14 @@ def match_offers(need, offers, model, *, allowed_tags=None):
                 input_tokens=usage[0], output_tokens=usage[1])
 
 
-def verify_offer(records, node, reference):
+def verify_offer(records, node, reference, *, repair_only=False):
     source, checksum = reference
     for record in records:
         if record['source'] == source and hashlib.sha256(record['body'].encode()).hexdigest() == checksum:
             item = json.loads(record['body'])
             if valid_offer(item, node):
+                if repair_only and item['tag'] not in ('repair', 'reschedule'):
+                    raise ValueError('selected offer does not declare schedule repair')
                 return
     raise ValueError('selected offer is no longer published at the requested revision')
 
@@ -400,7 +402,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
             db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
             return result, False
         if 'offer' in request:
-            verify_offer(catalog(root),config['name'],request['offer'])
+            verify_offer(catalog(root),config['name'],request['offer'],repair_only=True)
         limit = db.execute('SELECT remaining FROM grant_limits WHERE name=?', (request['sender'],)).fetchone()
         if limit is not None:
             if limit[0] == 0:
@@ -457,7 +459,7 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
     if not peer:
         raise ValueError('discover recipient first')
     if offer_ref is not None and original is None:
-        verify_offer(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref)
+        verify_offer(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref,repair_only=True)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
         stored, saved, credits = db.execute('SELECT request,result,credits FROM jobs WHERE id=?',
