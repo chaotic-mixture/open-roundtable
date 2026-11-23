@@ -50,6 +50,10 @@ class GapTests(unittest.TestCase):
                         db.execute('UPDATE delegations SET spent=2 WHERE parent=?', (panel['parent'],))
                         db.execute('UPDATE messages SET cost=2 WHERE topic=?', (panel['parent'],))
                         db.commit()
+                db.execute("UPDATE attempts SET response=json_set(response,'$.eval_count',999)")
+                db.commit()
+                with self.assertRaisesRegex(ValueError, 'differs from dispatch receipt'):
+                    compare(direct, nested)
 
     def test_weekly_worker_rest_capacity_boundary(self):
         rows = [(chr(65+i)+'xu', 16*i, 8) for i in range(11)]

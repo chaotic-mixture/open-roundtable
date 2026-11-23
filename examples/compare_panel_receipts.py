@@ -17,7 +17,15 @@ def read_receipt(path, nested):
         links = db.execute('SELECT parent,child,spent,member FROM delegations').fetchall()
         if (nested and (len(links) != 1 or links[0][1] != topic)) or (not nested and links):
             raise ValueError('unexpected delegation structure')
-        credits = db.execute('SELECT sum(cost) FROM messages WHERE topic=?', (topic,)).fetchone()[0]
+        charges = db.execute('SELECT member,cost,body FROM messages WHERE topic=? ORDER BY id', (topic,)).fetchall()
+        if [(member, cost) for member, cost, _ in charges] != [('expert', 1), ('model', 1)]:
+            raise ValueError('expected one expert charge and one model charge')
+        if json.loads(charges[1][2]) != response:
+            raise ValueError('posted model response differs from dispatch receipt')
+        if any(type(response.get(field)) is not int or response[field] < 0
+               for field in ('prompt_eval_count', 'eval_count')):
+            raise ValueError('invalid model token counts')
+        credits = sum(cost for _, cost, _ in charges)
         state = db.execute('SELECT state FROM topics WHERE id=?', (topic,)).fetchone()[0]
         body = db.execute('SELECT body FROM proposals WHERE topic=? ORDER BY version DESC LIMIT 1', (topic,)).fetchone()
         if body is None:
