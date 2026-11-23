@@ -94,6 +94,14 @@ class PeerTLSTests(unittest.TestCase):
                 result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual(result['private_stores_checked'], ['A', 'B', 'directory'])
+            self.assertEqual((result['remaining_at_disconnect'], result['remaining_after_replay']), (0, 0))
+            with closing(ledger(folder/'B')) as db:
+                with db:
+                    db.execute("UPDATE grant_limits SET remaining=1 WHERE name='A'")
+                with self.assertRaisesRegex(ValueError, 'receiver allowance mismatch'):
+                    audit(folder)
+                with db:
+                    db.execute("UPDATE grant_limits SET remaining=0 WHERE name='A'")
             with closing(ledger(folder/'A')) as db:
                 db.execute("UPDATE traffic SET route=replace(route,'/offers','/other') WHERE direction='receive' AND route LIKE '%/offers'")
                 db.commit()

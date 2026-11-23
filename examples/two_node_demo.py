@@ -83,6 +83,11 @@ def audit(folder):
         endpoint_traffic[root]=read(root,'network.sqlite3','SELECT direction,route,body FROM traffic ORDER BY rowid')
     traffic = endpoint_traffic[a] + endpoint_traffic[b]
     fault=json.loads((folder/'interruption.json').read_text())
+    allowance = {}
+    if 'remaining_at_disconnect' in fault:
+        remaining = read(b, 'network.sqlite3', "SELECT remaining FROM grant_limits WHERE name='A'")
+        require(fault['remaining_at_disconnect'] == 0 and remaining == [(0,)], 'receiver allowance mismatch')
+        allowance = dict(remaining_at_disconnect=fault['remaining_at_disconnect'], remaining_after_replay=remaining[0][0])
     directory_snapshot = json.loads((folder/'directory.json').read_text())
     registrations = [json.loads(r['body']) for r in directory_snapshot]
     recipient = req['recipient']
@@ -147,7 +152,7 @@ def audit(folder):
                 receiver_credits_at_disconnect=fault['receiver_credits'],
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
                 state=state,private_markers_found=0,private_stores_checked=[root.name for root in marker_roots],
-                request_id=key)
+                request_id=key, **allowance)
 
 
 def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False):
@@ -207,6 +212,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
             receipt=db.execute('SELECT result FROM jobs').fetchone()[0]
         with closing(sqlite3.connect(b/'network.sqlite3')) as db:
             key,credits=db.execute('SELECT id,credits FROM jobs').fetchone()
+            remaining, = db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone()
         with closing(sqlite3.connect((b/(key+'.sqlite3')).resolve().as_uri()+'?mode=ro',uri=True)) as db:
             checkpoint = json.loads(db.execute('SELECT result FROM peer_receipt WHERE id=?',(key,)).fetchone()[0])
         if bind_offer:
@@ -214,7 +220,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
                 after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits,directory_ledger=True,
-                directory_private_control=True,
+                directory_private_control=True,remaining_at_disconnect=remaining,
                 kernel_receipt_sha256=digest(checkpoint))))
         cli(a,'resume')
         if json.loads(cli(a,'resume').stdout) != {}:
