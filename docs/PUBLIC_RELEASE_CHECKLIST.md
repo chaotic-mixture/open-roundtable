@@ -31,3 +31,18 @@ references/private/、reports/、.hermes.md、runtime/、数据库、.env、密�
 7. 用户明确授权后才创建远程仓库/上传；公开路径与私有研究工作区分开。
 
 首次公开发布已获项目发起者授权。
+
+### Windows 上复跑含证书测试的核心验收
+
+若使用 Git for Windows 的标准目录布局，可在 PowerShell 中执行下列命令。环境变量仅对当前会话生效。若使用独立安装的 OpenSSL，可将变量指向该程序。
+
+```powershell
+$gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source)
+$env:ROUNDTABLE_TEST_OPENSSL = Join-Path $gitRoot 'usr/bin/openssl.exe'
+if (!(Test-Path -LiteralPath $env:ROUNDTABLE_TEST_OPENSSL -PathType Leaf)) {
+    throw 'Set ROUNDTABLE_TEST_OPENSSL to the installed OpenSSL executable.'
+}
+python tests/verify_core.py
+```
+
+在本地报告 `reports/core_verification.md` 中核对完整测试结果、双向证书测试的执行状态和 SQLite 独立回读。回环网络连接与临时文件替换需要在测试环境中可用。
