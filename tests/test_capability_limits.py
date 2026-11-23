@@ -1,8 +1,12 @@
+from contextlib import closing
+from http.client import IncompleteRead
 import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import match_offers
+from examples.peer_node import find_capability, ledger, match_offers
 
 
 class CapabilityLimitsTests(unittest.TestCase):
@@ -18,3 +22,16 @@ class CapabilityLimitsTests(unittest.TestCase):
             empty = match_offers('check only',offers,'fixture',allowed_tags=['review'])
             self.assertEqual((empty['matches'],empty['calls']), ([],0))
             api.assert_not_called()
+
+    def test_partial_discovery_survives_invalid_peers(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A"}')
+            for node in ('B','C','D'):
+                db.execute('INSERT INTO peers VALUES (?,?)',(node,'http://example.invalid'))
+            body = json.dumps(dict(kind='capability',node='D',tag='audit',description='check only'))
+            replies = [None, IncompleteRead(b''), [dict(body=body),dict(source='published',body=body)]]
+            with patch('examples.peer_node.transfer',side_effect=replies):
+                result = find_capability(root,db,'audit')
+            self.assertEqual(result,dict(matches=[dict(node='D',source='published',description='check only')],
+                                         unavailable=['B','C']))

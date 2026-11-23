@@ -4,7 +4,7 @@ from contextlib import closing
 import hashlib
 from ipaddress import IPv4Address
 from functools import partial
-from http.client import HTTPSConnection
+from http.client import HTTPException, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -174,10 +174,14 @@ def find_capability(root, db, tag=None):
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
         try:
             records = transfer(db,url+'/catalog',peer_name=peer)
-        except (OSError,ValueError):
+            if not isinstance(records,list):
+                raise ValueError('expected a catalog list')
+        except (HTTPException,OSError,ValueError):
             unavailable.append(peer)
             continue
         for record in records:
+            if not isinstance(record,dict) or not isinstance(record.get('source'),str) or not record['source'].strip():
+                continue
             try:
                 item = json.loads(record['body'])
             except (KeyError,TypeError,ValueError):
