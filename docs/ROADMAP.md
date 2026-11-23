@@ -107,3 +107,5 @@ python -m examples.compare_panel_receipts direct.sqlite3 nested.sqlite3
 两份带顺序与整场计时的九表账本可直接离线汇总：`python -m examples.paired_panel_benchmark reports/timed-forward --compare-round reports/timed-reverse`。将路径换为实际两轮目录。命令逐表核对原始模型请求摘要、两轮相反的执行位置和双方回执，再输出 18 对结果的一致数、分组耗时、tokens 及 credits 总数。
 
 正反顺序两轮的 36 份提案均有模型赞成票和专家反对票，状态均为 PAUSED。专家按逐项偏好及改动班次数判断是否与默认方案并列；503 虽满足两项偏好，仍比同分候选多改一班。离线核验逐份重算应有的表决并核对状态。上述排班一致数统计的是已提出的方案；两轮中实际结案数均为零。
+
+要在独立副本中续议，可运行 `python -m examples.revise_panel_proposal reports/timed-forward/503-direct.sqlite3 reports/503-revised.sqlite3`。目标文件须尚不存在。脚本核验原始回执，从已验证候选中按偏好顺序、再按最少改动选取方案，提交第二版并记录专家票。原版两票归档，模型对第二版的票仍待取得。501–509 的直接及委派账本各复核一次：18 个修订提案均满足两项偏好，均保持 PAUSED，各保留一次历史模型调用及 2 credits，修订本身没有新调用。
