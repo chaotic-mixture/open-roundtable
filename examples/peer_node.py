@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
 from open_roundtable.data import catalog, connect, ingest, NoRedirect
-from examples.user_consult import consult
+from examples.user_consult import consult, validate_roster
 
 
 def packed(value):
@@ -332,6 +332,8 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         if limit is not None:
             if limit[0] == 0:
                 raise ValueError('consultation allowance exhausted')
+        validate_roster(request['spec'])
+        if limit is not None:
             db.execute('UPDATE grant_limits SET remaining=remaining-1 WHERE name=?', (request['sender'],))
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))

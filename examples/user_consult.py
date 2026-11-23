@@ -11,8 +11,7 @@ from open_roundtable.core import Kernel
 from open_roundtable.run_journal import initialize, dispatch
 
 
-def consult(source, database, model):
-    spec=json.loads(source.read_text(encoding='utf-8-sig'))
+def validate_roster(spec):
     if not isinstance(spec,dict) or any(not isinstance(spec.get(k),str) or not spec[k].strip()
                                        for k in ('title','preference')):
         raise ValueError('provide title, preference and shifts')
@@ -41,8 +40,17 @@ def consult(source, database, model):
         for field, mapping in labels.items():
             key+=mapping.setdefault(item[field],chr(0x10000+len(mapping)))
         rows.append((key,start,end-start))
-    plans=candidates(rows)
+    if type(spec.get('search_nodes', 10000)) != int or spec.get('search_nodes', 10000) < 1:
+        raise ValueError('search_nodes must be a positive integer')
     rules=compile_criteria(spec.get('criteria',[]),[s['id'] for s in shifts])
+    return rows, rules
+
+
+def consult(source, database, model):
+    spec=json.loads(source.read_text(encoding='utf-8-sig'))
+    rows, rules = validate_roster(spec)
+    shifts = spec['shifts']
+    plans=candidates(rows)
     if not plans:
         attempt=feasibility(rows,lambda p:True,spec.get('search_nodes',10000))
         if attempt['plan'] is None:

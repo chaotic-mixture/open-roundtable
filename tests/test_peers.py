@@ -86,6 +86,11 @@ class PeerRecoveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'allowance exhausted'):
                     deliver(root, db, request)
                 self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+                set_permission(db, 'A', True, 1)
+                with self.assertRaisesRegex(ValueError, 'provide title'):
+                    deliver(root, db, request)
+                self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+                self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))
 
     def test_sender_preserves_first_valid_receipt(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
