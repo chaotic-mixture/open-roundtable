@@ -168,7 +168,7 @@ def offer(root, source, tag, description):
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
 
 
-def find_capability(root, db, tag=None):
+def find_capability(root, db, tag=None, *, accepting_only=False):
     node = json.loads((root/'node.json').read_text())['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
@@ -193,6 +193,23 @@ def find_capability(root, db, tag=None):
                 if tag is None:
                     match['tag'] = item['tag']
                 matches.append(match)
+    if accepting_only:
+        if json.loads((root/'node.json').read_text()).get('transport') != 'mtls':
+            raise ValueError('admission filtering requires mutual TLS')
+        accepting = set()
+        declined = []
+        for peer in sorted({match['node'] for match in matches}):
+            try:
+                status = admission(root,db,peer)
+            except (HTTPException,OSError,ValueError):
+                unavailable.append(peer)
+                continue
+            if status['accepting']:
+                accepting.add(peer)
+            else:
+                declined.append(peer)
+        return dict(matches=[m for m in matches if m['node'] in accepting],
+                    unavailable=sorted(unavailable), declined=declined)
     return dict(matches=matches, unavailable=unavailable)
 
 
@@ -587,9 +604,12 @@ if __name__=='__main__':
     capability.add_argument('source')
     capability.add_argument('tag')
     capability.add_argument('description')
-    commands.add_parser('find-capability').add_argument('tag')
+    find = commands.add_parser('find-capability')
+    find.add_argument('tag')
+    find.add_argument('--accepting-only', action='store_true')
     match = commands.add_parser('match-capability')
     match.add_argument('need')
+    match.add_argument('--accepting-only', action='store_true')
     match.add_argument('--allow-tag',action='append',help='only consider this declared operation tag; repeat for alternatives')
     match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
@@ -624,11 +644,13 @@ if __name__=='__main__':
             if args.action == 'offer':
                 result = offer(args.directory,args.source,args.tag,args.description)
             elif args.action == 'find-capability':
-                result = find_capability(args.directory,db,args.tag)
+                result = find_capability(args.directory,db,args.tag,accepting_only=args.accepting_only)
             elif args.action == 'match-capability':
-                catalog_result = find_capability(args.directory,db)
+                catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only)
                 result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)
                 result['unavailable'] = catalog_result['unavailable']
+                if args.accepting_only:
+                    result['declined'] = catalog_result['declined']
             elif args.action == 'feedback':
                 result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',
                                            observation=args.observation_file.read_text(encoding='utf-8-sig'))

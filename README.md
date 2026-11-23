@@ -223,3 +223,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 自然语言查询支持重复指定 `--allow-tag`。例如 `match-capability "只检查排班冲突，保持班次不变" --allow-tag audit` 会先按公开声明的标签缩小候选，再让本机模型判断相关性。没有符合标签的声明时返回空并跳过推理。标签由提供方声明，执行效果仍需独立验证。
 
 候选节点启用双向 TLS 后，可运行 `python -m examples.peer_node NODE_A admission B` 查询 B 此刻是否允许 A 发起新会诊。请求只包含发送节点名；B 按客户端证书、当前授权和余量回答。查询不占用名额；发送议题时仍会原子地复核并扣减额度。
+
+双向 TLS 模式下，`find-capability` 和 `match-capability` 均支持 `--accepting-only`。查询会按节点核对当前受理资格，在推荐前筛除未授权或额度已用尽的节点；结果用 declined 列出明确拒绝的节点，用 unavailable 列出无法取得目录或资格答复的节点。筛选后为空时跳过模型调用。

@@ -114,6 +114,13 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(lookup(), dict(matches=[],unavailable=[]))
             share_public(receiver,source,True,draft['sha256'])
             self.assertEqual(lookup()['matches'], [dict(node='B',source=source,description='Repair weekly shifts')])
+            cli(receiver,'permission','A','allow','--remaining','0')
+            blocked = json.loads(cli(folder/'A','match-capability','repair shifts','--accepting-only').stdout)
+            self.assertEqual((blocked['matches'],blocked['declined'],blocked['calls']), ([],['B'],0))
+            cli(receiver,'permission','A','allow','--remaining','1')
+            eligible = json.loads(cli(folder/'A','find-capability','repair','--accepting-only').stdout)
+            self.assertEqual(eligible['matches'],lookup()['matches'])
+            self.assertEqual(eligible['declined'],[])
             share_public(receiver,source,False)
             self.assertEqual(lookup()['matches'], [])
             self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
