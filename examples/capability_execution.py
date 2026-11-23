@@ -10,6 +10,18 @@ from examples.repair_benchmark import schedule
 from open_roundtable.schedule_expert import check
 
 
+def execute_selection(tag, selected, original):
+    # Check the whole recommendation before invoking any provider.
+    if selected != [tag] or tag not in ('repair', 'audit'):
+        return False, 0
+    if tag == 'audit':
+        return check(original) == expected(original), 0
+    rows, plans = prepare(original)
+    repaired = schedule(rows, plans[0])
+    changed = sum(a != b for a, b in zip(original, repaired, strict=True))
+    return not any(expected(repaired).values()), changed
+
+
 def run():
     offers = [
         dict(tag='repair', description='Change shift times to resolve conflicts.'),
@@ -24,18 +36,7 @@ def run():
         for seed in range(501, 510):
             original = generate(seed, (7, 11, 22)[(seed-501)//3])
             for router, selected in [('rule', [tag]), ('model', [o['tag'] for o in result['matches']])]:
-                repaired = original
-                findings = None
-                if 'audit' in selected:
-                    findings = check(original)
-                if 'repair' in selected:
-                    rows, plans = prepare(original)
-                    repaired = schedule(rows, plans[0])
-                changed = sum(a != b for a,b in zip(original, repaired, strict=True))
-                if tag == 'audit':
-                    passed = changed == 0 and findings == expected(original)
-                else:
-                    passed = 'repair' in selected and not any(expected(repaired).values())
+                passed, changed = execute_selection(tag, selected, original)
                 writer.writerow([seed, tag, router, '+'.join(selected), int(passed), changed])
 
 

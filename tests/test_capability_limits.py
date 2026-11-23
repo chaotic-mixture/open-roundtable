@@ -8,9 +8,17 @@ import unittest
 from unittest.mock import patch
 
 from examples.peer_node import find_capability, ledger, match_offers, verify_offer
+from examples.capability_execution import execute_selection
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_mixed_recommendation_never_runs_either_provider(self):
+        with patch('examples.capability_execution.prepare') as repair, patch('examples.capability_execution.check') as audit:
+            for requested in ('audit', 'repair'):
+                self.assertEqual(execute_selection(requested, ['audit', 'repair'], []), (False, 0))
+            repair.assert_not_called()
+            audit.assert_not_called()
+
     def test_admission_requires_a_complete_offer_even_with_matching_digest(self):
         for fields in ({}, {'tag':'repair'}, {'tag':' ', 'description':'fix shifts'},
                        {'tag':'repair', 'description':7}):
