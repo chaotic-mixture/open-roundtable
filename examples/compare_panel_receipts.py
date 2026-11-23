@@ -14,7 +14,7 @@ def read_receipt(path, nested):
             raise ValueError('expected one returned model call per ledger')
         topic, request, _, raw = attempts[0]
         response = json.loads(raw)
-        links = db.execute('SELECT parent,child,spent FROM delegations').fetchall()
+        links = db.execute('SELECT parent,child,spent,member FROM delegations').fetchall()
         if (nested and (len(links) != 1 or links[0][1] != topic)) or (not nested and links):
             raise ValueError('unexpected delegation structure')
         credits = db.execute('SELECT sum(cost) FROM messages WHERE topic=?', (topic,)).fetchone()[0]
@@ -26,7 +26,14 @@ def read_receipt(path, nested):
         result = dict(state=state, selected=proposal['selected'], criteria_met=proposal['criteria_met'],
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         if nested:
-            parent, _, spent = links[0]
+            parent, _, spent, member = links[0]
+            deliveries = db.execute('SELECT body,cost FROM messages WHERE topic=? AND member=?',
+                                    (parent, member)).fetchall()
+            if spent is None:
+                if deliveries:
+                    raise ValueError('unsettled child already has a parent delivery')
+            elif state != 'RESOLVED' or spent != credits or deliveries != [(body[0], credits)]:
+                raise ValueError('child spending and parent settlement disagree')
             result['settled_credits'] = spent
             result['parent_state'] = db.execute('SELECT state FROM topics WHERE id=?', (parent,)).fetchone()[0]
         return json.loads(request), proposal['schedule'], result
