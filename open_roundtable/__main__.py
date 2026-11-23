@@ -32,6 +32,12 @@ def main():
     start = commands.add_parser('start', help='start a draft with seated members')
     start.add_argument('db', type=Path)
     start.add_argument('topic')
+    post = commands.add_parser('post', help='record a member message and its cost in local credits')
+    post.add_argument('db', type=Path)
+    post.add_argument('topic')
+    post.add_argument('member')
+    post.add_argument('body')
+    post.add_argument('--cost', type=int, default=1)
     cite = commands.add_parser('cite', help='attach a resolved local proposal as historical evidence')
     cite.add_argument('db', type=Path)
     cite.add_argument('topic')
@@ -63,7 +69,7 @@ def main():
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)
-        elif args.command in ('create','join','start','delegate','settle','cite','propose','vote'):
+        elif args.command in ('create','join','start','post','delegate','settle','cite','propose','vote'):
             if args.command != 'create' and not args.db.is_file():
                 raise ValueError('database missing')
             with closing(Kernel(args.db)) as k:
@@ -79,6 +85,9 @@ def main():
                         k.join(args.topic,args.member,kind=args.kind,source=args.source)
                     elif args.command=='start':
                         k.start(args.topic)
+                    elif args.command=='post':
+                        if not k.post(args.topic,args.member,args.body,cost=args.cost):
+                            raise ValueError('insufficient credits: topic paused, message not recorded')
                     elif args.command=='cite':
                         k.cite(args.topic,args.source)
                     elif args.command=='propose':

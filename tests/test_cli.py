@@ -32,12 +32,14 @@ class CliTests(unittest.TestCase):
         cli('join', child, 'reviewer', 'human')
         cli('start', parent)
         cli('start', child)
+        posted = cli('post', child, 'reviewer', 'checked two cases', '--cost', '2')
+        self.assertEqual((posted['credits'], posted['messages'][-1]['cost']), (1, 2))
         cli('propose', child, '0', 'approved')
         self.assertEqual(cli('vote', child, '1', 'reviewer', 'yes')['state'], 'RESOLVED')
-        self.assertEqual(cli('settle', child)['spent'], 0)
+        self.assertEqual(cli('settle', child)['spent'], 2)
         cli('propose', parent, '0', 'adopted')
         result = cli('vote', parent, '1', 'panel', 'yes')
-        self.assertEqual((result['state'], result['credits']), ('RESOLVED', 4))
+        self.assertEqual((result['state'], result['credits']), ('RESOLVED', 2))
 
     def test_demo_refuses_existing_database_without_touching_bytes(self):
         first = self.run_demo()
