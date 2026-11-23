@@ -182,6 +182,8 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 
 在源码根目录运行 `python -m examples.nested_consult nested.sqlite3 AXR:20-26 BXR:24-29`，数据库文件须为新路径。父议题从 4 个测试 credits 中划给子圆桌 3 个。子圆桌执行排班检查并表决，花费 1 个，将已通过的提案返回父议题，退回余下 2 个。父议题再花 1 个独立核验结果，最终余额为 2。父级账本中子圆桌发言的费用包含下级消耗，统计总费用时只汇总同一层。此示例检验本地委派、结算与表决；递归对复杂任务完成质量的收益仍待对照实验。
 
+重复测量可运行 `python -m examples.nested_benchmark reports/nested-repeat-four --repeats 4`。每张表两种方式各先执行两次，逐轮使用独立数据库。一次本机实测中，36 对运行的漏报和误报均为零，每次均消耗 2 credits；子圆桌在 33 对中耗时更长，配对耗时差的中位数为 33.51 毫秒。
+
 运行 `python -m examples.nested_benchmark reports/nested-paired` 可复现直接执行和子圆桌执行的对照。两组使用相同的区间检查器、逐小时复核器和 4 credits 预算。固定九张表各含 7、11 或 22 个班次，每种规模三张；每张表每组运行一次。两组各完成 9/9，漏报与误报均为零，各用 18 credits。本次本机端到端耗时中位数分别为 126.84 ms 和 152.13 ms，包含建库和持久化。对这组可直接脚本化的任务，加一层委派没有提高准确率。结果目录保存逐表 CSV 和可独立回读的 SQLite 账本。
 
 同库历史提案可用 `python -m open_roundtable cite DATABASE TARGET_TOPIC SOURCE_TOPIC` 引入当前议题。输出中的 `citations` 保存来源议题、已通过的版本、标题和正文，便于复查。引用不会增加预算支出或表决席位；需要重新执行工作时可使用子圆桌委派。

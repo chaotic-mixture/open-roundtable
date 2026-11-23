@@ -11,14 +11,14 @@ from examples.nested_consult import run
 from examples.overnight_score import expected
 
 
-def benchmark(directory):
-    directory.mkdir(parents=True, exist_ok=False)
+def _round(directory, number):
     rows = []
     for case, size in enumerate([7]*3 + [11]*3 + [22]*3, 1):
         shifts = generate(case, size)
         truth = expected(shifts)
         # Alternate order to distribute startup and filesystem cache effects.
-        for nested in (bool(case % 2), not bool(case % 2)):
+        nested_first = (case + number) % 2 == 0
+        for nested in (nested_first, not nested_first):
             mode = 'nested' if nested else 'direct'
             path = directory / f'{case}-{mode}.sqlite3'
             start = perf_counter()
@@ -34,6 +34,23 @@ def benchmark(directory):
                              missed=sum(len(items-set(findings[r])) for r,items in truth.items()),
                              extra=sum(len(set(findings[r])-items) for r,items in truth.items()),
                              credits=credits, elapsed_ms=round(1000*elapsed, 2)))
+    return rows
+
+
+def benchmark(directory, repeats=1):
+    if repeats < 1:
+        raise ValueError('repeats must be positive')
+    directory.mkdir(parents=True, exist_ok=False)
+    rows = []
+    for number in range(1, repeats + 1):
+        target = directory
+        if repeats > 1:
+            target = directory / f'round-{number}'
+            target.mkdir()
+        for row in _round(target, number):
+            if repeats > 1:
+                row['round'] = number
+            rows.append(row)
     with (directory/'results.csv').open('w', newline='', encoding='utf8') as output:
         writer = csv.DictWriter(output, fieldnames=rows[0])
         writer.writeheader()
@@ -44,5 +61,7 @@ def benchmark(directory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    for row in benchmark(parser.parse_args().directory):
+    parser.add_argument('--repeats', type=int, default=1)
+    args = parser.parse_args()
+    for row in benchmark(args.directory, args.repeats):
         print(row)
