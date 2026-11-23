@@ -254,7 +254,8 @@ def published_offers(root):
     return offers
 
 
-def find_capability(root, db, tag=None, *, accepting_only=False):
+def find_capability(root, db, tag=None, *other_tags, accepting_only=False):
+    tags = {tag, *other_tags} if tag is not None else None
     node = json.loads((root/'node.json').read_text())['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
@@ -272,10 +273,10 @@ def find_capability(root, db, tag=None, *, accepting_only=False):
                 item = json.loads(record['body'])
             except (KeyError,TypeError,ValueError):
                 continue
-            if valid_offer(item, peer) and tag in (None,item['tag']):
+            if valid_offer(item, peer) and (tags is None or item['tag'] in tags):
                 match = dict(node=peer,source=record['source'],description=item['description'],
                              sha256=hashlib.sha256(record['body'].encode()).hexdigest())
-                if tag is None:
+                if tags is None or other_tags:
                     match['tag'] = item['tag']
                 matches.append(match)
     if accepting_only:
@@ -815,7 +816,7 @@ if __name__=='__main__':
     capability.add_argument('tag')
     capability.add_argument('description')
     find = commands.add_parser('find-capability')
-    find.add_argument('tag')
+    find.add_argument('tag', nargs='+', help='return offers matching any of these exact tags')
     find.add_argument('--accepting-only', action='store_true')
     match = commands.add_parser('match-capability')
     match.add_argument('need')
@@ -859,7 +860,7 @@ if __name__=='__main__':
             elif args.action == 'offer':
                 result = offer(args.directory,args.source,args.tag,args.description)
             elif args.action == 'find-capability':
-                result = find_capability(args.directory,db,args.tag,accepting_only=args.accepting_only)
+                result = find_capability(args.directory,db,*args.tag,accepting_only=args.accepting_only)
             elif args.action == 'match-capability':
                 catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only)
                 result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)

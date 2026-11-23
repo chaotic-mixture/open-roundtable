@@ -295,3 +295,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 已结算组逐笔校验回执身份和费用，并计算回执摘要。此处只计本地账单读取，建索引、写入和网络传输耗时另计。
 
 节点的 `send --offer` 当前执行排班修复。新请求绑定的公开声明须使用 `repair` 或 `reschedule` 标签；发送方在投递前、接收方在受理新任务时均检查所选声明的具体版本。节点可以同时发布只读检查等其他声明供发现。已受理任务按原有回执恢复。
+
+运行 `find-capability repair reschedule` 可在一次目录查询中列出任一修复标签的声明；每个匹配项包含实际标签、发布节点和声明摘要。单独查询只读检查仍可用 `find-capability audit`。多标签查询支持与 `--accepting-only` 组合。

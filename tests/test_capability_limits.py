@@ -109,3 +109,15 @@ class CapabilityLimitsTests(unittest.TestCase):
                 result = find_capability(root,db,'audit')
             self.assertEqual(result,dict(matches=[dict(node='D',source='published',description='check only',sha256=hashlib.sha256(body.encode()).hexdigest())],
                                          unavailable=['B','C']))
+
+    def test_multiple_tags_use_one_catalog_read_per_peer(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A"}')
+            db.execute("INSERT INTO peers VALUES ('B','http://example.invalid')")
+            records = [dict(source=tag, body=json.dumps(dict(kind='capability', node='B', tag=tag, description=tag)))
+                       for tag in ('audit','reschedule','repair')]
+            with patch('examples.peer_node.fetch_public_subset',return_value=records) as fetch:
+                result = find_capability(root,db,'repair','reschedule','repair')
+                fetch.assert_called_once()
+            self.assertEqual([m['tag'] for m in result['matches']], ['reschedule','repair'])

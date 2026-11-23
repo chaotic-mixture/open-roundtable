@@ -185,7 +185,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         if bind_offer:
             published = json.loads(cli(b,'offer','https://b.example/offers/weekend','repair','Repair weekly shifts').stdout)
             share_public(b,published['source'],True,published['sha256'])
-            candidates = json.loads(cli(a,'find-capability','repair').stdout)['matches']
+            candidates = json.loads(cli(a,'find-capability','repair','reschedule').stdout)['matches']
             selected, = candidates
             recipient = selected['node']
             offer_args = ['--offer', selected['source'], selected['sha256']]
