@@ -21,7 +21,7 @@ def revise(source, destination):
         with closing(Kernel(snapshot)) as kernel:
             db = kernel.db
             nested = bool(db.execute('SELECT 1 FROM delegations').fetchone())
-            _, _, receipt = read_receipt(snapshot, nested)
+            _, previous_schedule, receipt = read_receipt(snapshot, nested)
             if receipt['state'] != 'PAUSED' or receipt['votes'].get('expert') != 0:
                 raise ValueError('expected a paused proposal with expert dissent')
             [(topic, expert_body)] = db.execute("SELECT topic,body FROM messages WHERE member='expert'").fetchall()
@@ -41,6 +41,9 @@ def revise(source, destination):
             kernel.vote(topic,'expert',True,version=version)
             result = dict(topic=topic, version=version, state=kernel.get(topic)['state'],
                           selected=selected, criteria_met=flags, changed_shifts=-negative_changes)
+            result['previous'] = {field: receipt[field] for field in ('selected', 'criteria_met', 'changed_shifts')}
+            result['revised_shift_ids'] = [shift['id'] for shift, previous in zip(menu[selected], previous_schedule, strict=True)
+                                           if shift['start'] != previous['start']]
         # Publish the closed SQLite file atomically without replacing an existing revision.
         if os.name == 'nt':
             snapshot.rename(destination)
