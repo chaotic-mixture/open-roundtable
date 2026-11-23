@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import sqlite3
 
+from examples.select_repair import choice
+
 
 def read_receipt(path, nested):
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
@@ -31,6 +33,16 @@ def read_receipt(path, nested):
         if body is None:
             raise ValueError('missing repair proposal')
         proposal = json.loads(body[0])
+        candidates = json.loads(charges[0][2])['candidates']
+        if not isinstance(candidates, list) or not candidates:
+            raise ValueError('missing expert candidates')
+        try:
+            selected = choice(response, len(candidates))
+        except (ValueError, TypeError, KeyError):
+            selected = 0
+        if (type(proposal.get('selected')) is not int or proposal['selected'] != selected
+                or proposal.get('schedule') != candidates[selected]):
+            raise ValueError('proposal differs from selected expert candidate')
         result = dict(state=state, selected=proposal['selected'], criteria_met=proposal['criteria_met'],
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         if nested:

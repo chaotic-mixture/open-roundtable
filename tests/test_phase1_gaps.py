@@ -36,6 +36,14 @@ class GapTests(unittest.TestCase):
             self.assertTrue(summary['same_schedule'])
             self.assertEqual(summary['nested']['parent_state'], 'RESOLVED')
             self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
+            with closing(sqlite3.connect(direct)) as flat:
+                original = flat.execute('SELECT body FROM proposals').fetchone()[0]
+                flat.execute("UPDATE proposals SET body=json_set(body,'$.schedule[0].start',999)")
+                flat.commit()
+                with self.assertRaisesRegex(ValueError, 'differs from selected expert candidate'):
+                    compare(direct, nested)
+                flat.execute('UPDATE proposals SET body=?', (original,))
+                flat.commit()
             with closing(sqlite3.connect(nested)) as db:
                 for sql, error in [
                     ('UPDATE delegations SET spent=1 WHERE parent=?', 'settlement disagree'),
