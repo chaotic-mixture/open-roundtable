@@ -131,6 +131,18 @@ def transfer(db,url,data=None,*,peer_name=None):
     return result
 
 
+def confirms_public_record(records, source, expected):
+    if not isinstance(records, list):
+        return False
+    matches = [r for r in records if isinstance(r, dict) and r.get('source') == source]
+    if len(matches) != 1 or not isinstance(matches[0].get('body'), str):
+        return False
+    try:
+        return packed(json.loads(matches[0]['body'])) == packed(expected)
+    except ValueError:
+        return False
+
+
 def discover(db,bootstrap):
     feed = fetch_public_subset(db, bootstrap, None, '/nodes')
     if not isinstance(feed, list):
@@ -157,7 +169,7 @@ def discover(db,bootstrap):
     for source, peer in registrations:
         route = '/record?' + urlencode({'source': source})
         published = fetch_public_subset(db, peer['url'], peer['name'], route)
-        if not any(r['source'] == source and json.loads(r['body']) == peer for r in published):
+        if not confirms_public_record(published, source, peer):
             raise ValueError('advertised node did not confirm registration')
     with db:
         db.execute('BEGIN IMMEDIATE')
@@ -415,7 +427,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         raise ValueError('sender has no consultation grant')
     route = '/record?' + urlencode({'source':request['source']})
     published = fetch_public_subset(db,row[0],request['sender'],route)
-    if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
+    if not confirms_public_record(published, request['source'], request['spec']):
         raise ValueError('topic differs from shared source')
     database=root/(key+'.sqlite3')
     with db:

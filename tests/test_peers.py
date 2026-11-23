@@ -11,7 +11,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
+from examples.peer_node import confirms_public_record, deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from examples.user_consult import NoFeasibleCandidate
 from examples.peer_node import partner_statement, reconcile, reconcile_online, service_account
@@ -19,6 +19,14 @@ from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_shared_record_confirmation_in_a_mixed_catalog(self):
+        record = dict(source='topic', body='{"hours":1}')
+        mixed = [None, {}, dict(source='other', body='plain text'), record]
+        self.assertTrue(confirms_public_record(mixed, 'topic', {'hours': 1}))
+        self.assertFalse(confirms_public_record(mixed, 'topic', {'hours': True}))
+        self.assertFalse(confirms_public_record(mixed + [dict(record, body='{}')], 'topic', {'hours': 1}))
+        self.assertFalse(confirms_public_record(mixed, 'other', {}))
+
     def test_receiver_preserves_charge_changed_while_consulting(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
