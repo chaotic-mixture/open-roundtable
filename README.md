@@ -319,3 +319,4 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 在双向 TLS 模式下，运行 `python -m examples.peer_node NODE_DIR discover BOOTSTRAP_URL --directory-name directory` 可要求引导服务的证书标明节点名 `directory`。名称不匹配时终止此次发现，保留上次同步的节点名单。双节点会诊演练的 TLS 模式为 A、B 两端启用了这项校验。
 
 在提交 `7c76a55` 上，两端核对目录名后，使用本机 `qwen3.5:9b` 完成了一次合成排班会诊。运行 `python -m examples.two_node_demo run reports/named-directory-new --temporary-tls openssl --bind-offer --fault before-receipt` 可在新目录复现。接收端在内核回执落盘后中断，服务声明撤回后重发成功。两次投递合计调用模型一次、专家一次，扣费 2 credits，模型用量为 290 个输入和 7 个输出 tokens，议题结案。关闭模型后运行 `python -m examples.two_node_demo verify reports/named-directory-new` 得到相同结果，受检通信记录中私库标记命中数为零。
+在提交 `f575721` 上，将同一演练的故障参数改为 `--fault after-commit`，并使用新的输出目录。接收方已记入 2 credits、发送方尚未收到回执时中断。撤下服务声明并重启后，两个节点对账一致。使用本机 `qwen3.5:9b` 实测，两次投递共调用模型一次、专家一次，使用 290 个输入和 7 个输出 tokens，议题结案。关闭模型后离线核验得到相同结果，`private_stores_checked` 列出 A、B 和 directory，三方预置标记在受检记录中均无命中。此项演练使用同机回环网络和合成排班。
