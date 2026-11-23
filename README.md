@@ -180,3 +180,7 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 消费方可将实际使用后的观察写入本地 UTF-8 文本，再运行 `python -m examples.peer_node NODE_DIR feedback JOB_ID useful observation.txt`（未起作用时选 `not-useful`）。`python -m examples.peer_node NODE_DIR quality PROVIDER` 汇总本节点收到的服务笔数、已评价笔数和已评价样本中的有用比例。无评价时比例为 null。每张回执最多计一次，观察正文保存在消费方私库。统计反映该消费方的使用经验，尚无跨身份防刷或全网评分。
 
 接收方可用 `permission PEER allow --remaining 3` 把该节点剩余可受理的新会诊设为 3 次。受理新任务与占用一次额度在同一个事务中完成；中断后仍保留已占用额度。额度用尽后仍可重发已受理任务的回执。再次授权会重设余量，省略 `--remaining` 表示不限次数，`revoke` 则撤销整个授权。双节点演练给 A 一次额度，覆盖首次执行与断线恢复。
+
+### Phase 5 本地元议题实验
+
+运行 `python -m examples.meta_consult meta.sqlite3`，使用新的数据库路径。元议题先登记比较方案、九个种子和通过条件，再对同一批候选比较默认选择与优先级排序。种子 601–609 的两组方案均通过全部硬约束。偏好总分从 32/63 增至 44/63，五张表改善、四张持平；602 和 608 分别多改动一个和两个班次。提案、逐表结果与表决保存在本地，运行时默认选择策略保持原样。本实验采用两个确定性脚本角色，结论限于已编码的三类偏好。
