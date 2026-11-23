@@ -34,6 +34,22 @@ class DataTests(unittest.TestCase):
         data.ingest(self.root,'public',[dict(entry,body='updated')])
         self.assertEqual(data.catalog(self.root),[])
 
+    def test_publish_reviewed_revision(self):
+        source = 'https://example.org/review'
+        data.ingest(self.root,'public',[dict(source=source,body='first')])
+        with closing(data.connect(self.root,'public')) as db:
+            original = data.review_public(db,source)
+        data.ingest(self.root,'public',[dict(source=source,body='updated')])
+        with self.assertRaisesRegex(ValueError,'changed since review'):
+            data.share_public(self.root,source,True,original['sha256'])
+        self.assertEqual(data.catalog(self.root),[])
+        with closing(data.connect(self.root,'public')) as db:
+            updated = data.review_public(db,source)
+        data.share_public(self.root,source,True,updated['sha256'])
+        self.assertEqual(data.catalog(self.root),[dict(source=source,body='updated')])
+        data.share_public(self.root,source,False)
+        self.assertEqual(data.catalog(self.root),[])
+
     def test_policy_routes_and_revocation(self):
         data.configure(self.root,'local','local-model')
         with patch.object(data,'exchange',return_value='{"message":{"content":"summary"}}') as send:

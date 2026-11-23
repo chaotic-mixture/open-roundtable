@@ -207,3 +207,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 双方启用双向 TLS 后，B 的操作者可在 node.json 中设置 `"statement_partners":["A"]` 并重启服务，允许证书名为 A 的节点查询 A 与 B 的账目摘要。A 完成发现后运行 `python -m examples.peer_node NODE_A reconcile-online B`。命令核对 B 的证书名，并按本地回执报告差异。默认共享名单为空，查询权限与会诊次数额度分别设置。
 
 在线对账每页最多传输 256 笔摘要。接收端检查各页来自同一账本修订号；双方之间的任务记录在分页期间发生写入时，本次核对会失败，重新运行命令即可从最新账本开始。修订标记按合作双方独立生成，其他合作方的交易不会改变本次标记。离线导出仍生成完整的双方清单。
+
+库主可以先用 `python -m open_roundtable.data NODE_DIR review-public SOURCE` 查看本地公开库中的正文、共享状态和 SHA-256，再用 `share-public SOURCE --if-sha256 HASH` 只发布已核对的内容。若期间导入了新版正文，发布操作会失败，需重新核对。使用 `share-public SOURCE --off` 可直接撤回当前共享。

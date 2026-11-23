@@ -1,5 +1,6 @@
 """Owner-operated public catalog and private personalization store."""
 import argparse
+import hashlib
 from contextlib import closing
 import json
 import os
@@ -125,6 +126,23 @@ def maintain(root, source):
         db.execute('UPDATE records SET summary=? WHERE source=?',(summary,source))
 
 
+def review_public(db, source):
+    row = db.execute('SELECT body,shared FROM records WHERE source=?', (source,)).fetchone()
+    if row is None:
+        raise ValueError('unknown public source')
+    return dict(source=source, body=row[0], shared=bool(row[1]),
+                sha256=hashlib.sha256(row[0].encode('utf-8')).hexdigest())
+
+
+def share_public(root, source, enabled, expected=None):
+    with closing(connect(root,'public')) as db, db:
+        db.execute('BEGIN IMMEDIATE')
+        if expected is not None and review_public(db,source)['sha256'] != expected:
+            raise ValueError('record changed since review')
+        if not db.execute('UPDATE records SET shared=? WHERE source=?',(enabled,source)).rowcount:
+            raise ValueError('unknown public source')
+
+
 def catalog(root):
     with closing(connect(root,'public')) as db:
         return [dict(source=s,body=b) for s,b in db.execute(
@@ -143,8 +161,10 @@ def main():
     fetch.add_argument('url',help='public UTF-8 text URL')
     sync=commands.add_parser('import-feed')
     sync.add_argument('url',help='HTTPS JSON catalog from an owner-selected peer')
+    commands.add_parser('review-public').add_argument('source')
     share=commands.add_parser('share-public')
     share.add_argument('source')
+    share.add_argument('--if-sha256',help='apply only to the reviewed UTF-8 body')
     share.add_argument('--off',action='store_true')
     commands.add_parser('public-feed')
     policy=commands.add_parser('policy')
@@ -165,11 +185,11 @@ def main():
             ingest(root,'public',[dict(source=url,body=exchange(url))])
         elif args.action=='import-feed':
             ingest(root,'public',json.loads(exchange(https_url(args.url))))
+        elif args.action=='review-public':
+            with closing(connect(root,'public')) as db:
+                print(json.dumps(review_public(db,args.source),ensure_ascii=True))
         elif args.action=='share-public':
-            with closing(connect(root,'public')) as db, db:
-                if not db.execute('UPDATE records SET shared=? WHERE source=?',
-                                  (not args.off,args.source)).rowcount:
-                    raise ValueError('unknown public source')
+            share_public(root,args.source,not args.off,args.if_sha256)
         elif args.action=='public-feed':
             print(json.dumps(catalog(root),ensure_ascii=True))
         elif args.action=='policy':
