@@ -22,6 +22,12 @@
 | 跟着一个议题走完暂停、重启、续作和结案 | [离线示例说明](examples/offline_demo.md) · [演示实现](open_roundtable/demo.py) |
 | 核对并发扣费、失败回滚和读取一致性 | [内核测试](tests/test_core.py) |
 | 检查命令行行为及发布限制 | [命令行测试](tests/test_cli.py) · [打包边界测试](tests/test_packaging_boundary.py) |
+| 提交排班需求并核对修复方案 | [会诊程序](examples/user_consult.py) · [九表偏好对照](examples/preference_results.md) |
+| 按自然语言需求寻找公开服务 | [九条需求对照](examples/capability_requests.py) |
+| 复现同机节点发现、断线重发与对账 | [双节点演练](examples/two_node_demo.py) · [故障时点与查账步骤](README.md#接收节点断线后如何查账) |
+| 比较直接会诊与委派子圆桌 | [九表配对实验](examples/paired_panel_benchmark.py) |
+| 比较合作方账单的分页读取成本 | [合成账本实验](examples/statement_benchmark.py) |
+| 用预定标准验证排序策略的改进提案 | [元议题实验](examples/meta_consult.py) |
 
 ## 本地来源与验证
 
@@ -29,6 +35,6 @@
 
 `reports/` 是本地验证证据，默认不随源码公开；验收以真实报告及其源码版本为准，不用本页静态数字推断未来状态。
 
-## 当前下一步
+## 当前验证边界
 
-完成并验收离线内核之后，选一个有独立验证条件的低风险真实任务，讨论成员适配和会诊策略。现阶段不启动全网服务、结算或自改进后台。
+排班会诊已有真实模型与专家工具的对照结果。节点演练在同机独立进程中验证了目录发现、双向证书认证和回执恢复。跨物理主机部署、真实业务排班上的泛化效果，以及引入异构子圆桌能否改善结果，仍待实测。各阶段的证据与待验证项见[主分支路线图](docs/ROADMAP.md)。
