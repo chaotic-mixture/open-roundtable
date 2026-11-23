@@ -45,6 +45,23 @@ def run(directory, model, *, verify_only=False, reverse_order=False):
         yield dict(seed=seed, shifts=size, **compare(*paths, expected_input=spec))
 
 
+def summarize_rounds(first, second):
+    totals = {mode: dict(model_seconds=0.0, consultation_seconds=0.0, credits=0,
+                         input_tokens=0, output_tokens=0) for mode in ('direct', 'nested')}
+    pairs = same_schedule = 0
+    for left, right in zip(run(first, None, verify_only=True), run(second, None, verify_only=True), strict=True):
+        if left['request_sha256'] != right['request_sha256']:
+            raise ValueError(f"model request differs across rounds at seed {left['seed']}")
+        for mode, values in totals.items():
+            if {left[mode].get('position'), right[mode].get('position')} != {1, 2}:
+                raise ValueError(f"expected opposite recorded positions at seed {left['seed']}")
+            for field in values:
+                values[field] += left[mode][field] + right[mode][field]
+        pairs += 2
+        same_schedule += left['same_schedule'] + right['same_schedule']
+    return dict(pairs=pairs, same_schedule_pairs=same_schedule, totals=totals)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
@@ -52,6 +69,10 @@ if __name__ == '__main__':
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--verify-only', action='store_true', help='read existing ledgers without calling a model')
     mode.add_argument('--reverse-order', action='store_true', help='swap which consultation runs first on each roster')
+    mode.add_argument('--compare-round', type=Path, help='summarize this directory and an oppositely ordered round offline')
     args = parser.parse_args()
-    for result in run(args.directory, args.model, verify_only=args.verify_only, reverse_order=args.reverse_order):
-        print(json.dumps(result), flush=True)
+    if args.compare_round:
+        print(json.dumps(summarize_rounds(args.directory, args.compare_round)))
+    else:
+        for result in run(args.directory, args.model, verify_only=args.verify_only, reverse_order=args.reverse_order):
+            print(json.dumps(result), flush=True)

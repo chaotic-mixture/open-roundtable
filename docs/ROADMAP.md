@@ -103,3 +103,5 @@ python -m examples.compare_panel_receipts direct.sqlite3 nested.sqlite3
 用同一本机 qwen3.5:9b 在新目录运行 `python -m examples.paired_panel_benchmark reports/panel-reverse --reverse-order`，可逐表交换先后顺序。反向实测直接组模型请求合计 2.22 秒，委派组合计 6.08 秒；原顺序分别为 5.86 和 2.18 秒。两轮共 18 对，后调用的一方每次都更快。两轮的九表选择编号逐表一致，每轮每组均使用 29,529 输入和 63 输出 tokens、18 credits。两轮在不同时间运行，每张表每种顺序各测一次，只计模型请求耗时；证据支持调用顺序与耗时相关，尚不足以量化层级本身的开销。
 
 新生成的配对账本同时保存执行顺序和整场会诊耗时（从调用 consult 到返回，含候选生成、模型请求与 SQLite 操作）。旧账本仍可离线复核，仅展示已有计时。两次分别启动本机模型服务、按正反顺序各跑九表，直接与委派共 18 对，逐对选出相同排班。直接会诊累计 14.25 秒，其中模型请求 7.65 秒；委派累计 12.61 秒，其中模型请求 7.62 秒。两种方式各用 36 credits。这是单机两轮观测，扣除模型请求的剩余时间包含其他各项工作，不能单独解释为委派成本。
+
+两份带顺序与整场计时的九表账本可直接离线汇总：`python -m examples.paired_panel_benchmark reports/timed-forward --compare-round reports/timed-reverse`。将路径换为实际两轮目录。命令逐表核对原始模型请求摘要、两轮相反的执行位置和双方回执，再输出 18 对结果的一致数、分组耗时、tokens 及 credits 总数。

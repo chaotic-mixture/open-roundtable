@@ -1,5 +1,6 @@
 """Compare a completed model call in each of two saved repair consultation ledgers."""
 import argparse
+import hashlib
 from contextlib import closing
 import json
 import math
@@ -121,7 +122,8 @@ def compare(direct, nested, *, expected_input=None):
     if 'position' in flat or 'position' in panel:
         if {flat.get('position'), panel.get('position')} != {1, 2}:
             raise ValueError('inconsistent consultation order')
-    return dict(same_schedule=schedule == other_schedule, direct=flat, nested=panel)
+    request_hash = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
+    return dict(request_sha256=request_hash, same_schedule=schedule == other_schedule, direct=flat, nested=panel)
 
 
 if __name__ == '__main__':
