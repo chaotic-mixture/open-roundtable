@@ -256,6 +256,17 @@ class PeerRecoveryTests(unittest.TestCase):
                     send(Path(tmp), db, 'B', 'source')
                 saved, cost = db.execute('SELECT result,credits FROM jobs').fetchone()
                 self.assertEqual((json.loads(saved),cost), (receipt,2))
+                for raw, result, charge in [(json.dumps(request), saved, 1),
+                                            (json.dumps(request), None, 1),
+                                            (json.dumps(dict(request, source='other')), None, 0)]:
+                    with db:
+                        db.execute('UPDATE jobs SET request=?,result=?,credits=?',(raw,result,charge))
+                    call.reset_mock()
+                    with self.assertRaises(ValueError):
+                        send(Path(tmp), db, 'B', 'source')
+                    call.assert_not_called()
+                    self.assertEqual(db.execute('SELECT request,result,credits FROM jobs').fetchone(),
+                                     (raw,result,charge))
 
     def test_directory_withdrawal_and_reregistration(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:

@@ -454,15 +454,27 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
         verify_offer(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
+        stored, saved, credits = db.execute('SELECT request,result,credits FROM jobs WHERE id=?',
+                                           (request['id'],)).fetchone()
+        if json.loads(stored) != request:
+            raise ValueError('stored request mismatch')
+        if saved is None:
+            if credits != 0:
+                raise ValueError('pending job has a posted charge')
+        else:
+            receipt = json.loads(saved)
+            validate_receipt(request, receipt)
+            if credits != receipt['credits']:
+                raise ValueError('invalid service charge')
     result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
     validate_receipt(request, result)
     encoded = packed(result).decode()
     with db:
-        posted = db.execute('UPDATE jobs SET result=?,credits=? WHERE id=? AND result IS NULL',
-                            (encoded,result['credits'],result['id'])).rowcount
+        posted = db.execute('UPDATE jobs SET result=?,credits=? WHERE id=? AND request=? AND result IS NULL AND credits=0',
+                            (encoded,result['credits'],result['id'],stored)).rowcount
         if not posted:
-            saved = db.execute('SELECT result,credits FROM jobs WHERE id=?',(result['id'],)).fetchone()
-            if saved != (encoded,result['credits']):
+            saved = db.execute('SELECT request,result,credits FROM jobs WHERE id=?',(result['id'],)).fetchone()
+            if saved != (stored,encoded,result['credits']):
                 raise ValueError('conflicting receipt for a settled job')
     return result
 
