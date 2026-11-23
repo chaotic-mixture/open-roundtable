@@ -53,6 +53,20 @@ python -m examples.two_node_demo run reports/model-replay --model qwen3.5:9b --t
 python -m examples.two_node_demo verify reports/model-replay
 ```
 
+### Phase 3 真实模型配对会诊
+
+同一张合成周末班表分别交给直接会诊和受委派的子圆桌。两组使用相同的规则专家、候选清单和本机模型 qwen3.5:9b，发给模型的请求一致。各组均调用一次专家和一次模型，消耗 2 credits，输入 345 tokens、输出 7 tokens。
+
+两组都选择了满足硬约束的同一方案，保留晚班开始时间，但错过优先级更高的早班结束时间。专家投反对票，两组均暂停。子账本已记入 2 credits，父账本仍待结算。这一例验证了成员分歧可以跨层保留，在这张表上增加子圆桌未改善偏好满足情况。复杂任务的质量收益仍待配对验证。
+
+在源码根目录使用两个新的数据库路径，依次运行以下命令。前两条需要已安装该模型的本机 Ollama；最后一条只读账本，可在模型服务关闭后运行。不同模型版本可能选出不同方案。
+
+```sh
+python -m open_roundtable consult examples/consult_input.json --db direct.sqlite3 --model qwen3.5:9b
+python -m open_roundtable consult examples/consult_input.json --db nested.sqlite3 --model qwen3.5:9b --nested
+python -m examples.compare_panel_receipts direct.sqlite3 nested.sqlite3
+```
+
 ## 公开发布检查
 
 独立测试、许可证范围、无私有会话/凭证、干净白名单快照、依赖与素材血缘、准确能力说明。源码发布流程见 [公开发布清单](PUBLIC_RELEASE_CHECKLIST.md)。
