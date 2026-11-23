@@ -53,6 +53,7 @@ python -m open_roundtable.data runtime/customer-a init
 python -m open_roundtable.data runtime/customer-a import private personal.json
 python -m open_roundtable.data runtime/customer-a maintain-private profile
 python -m open_roundtable.data runtime/customer-a private-status
+python -m open_roundtable.data runtime/customer-a maintain-pending --limit 10
 python -m open_roundtable.data runtime/customer-a public-feed
 ```
 

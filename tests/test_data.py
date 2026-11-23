@@ -11,6 +11,20 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_pending_batch_resumes_and_honors_record_permissions(self):
+        data.ingest(self.root, 'private', [dict(source='sealed', body='local only')])
+        data.configure(self.root, 'api', 'remote', 'https://example.org/chat')
+        data.limit_record(self.root, 'sealed', 'sealed')
+        with patch.object(data, 'exchange', return_value='{"choices":[{"message":{"content":"ok"}}]}') as api:
+            with self.assertRaises(ValueError):
+                data.maintain_pending(self.root, 0)
+            self.assertEqual(data.maintain_pending(self.root, 1)['completed'], 1)
+            self.assertEqual(data.maintain_pending(self.root, 4)['completed'], 1)
+            self.assertEqual(data.maintain_pending(self.root, 4)['selected'], 0)
+            self.assertFalse(data.maintain(self.root, 'profile', only_pending=True))
+            self.assertEqual(api.call_count, 1)
+            self.assertEqual(api.call_args.args[1]['messages'][-1]['content'], ' private   content ')
+
     def test_private_status_tracks_current_summaries_without_exposing_contents(self):
         def status():
             output = StringIO()

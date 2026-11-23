@@ -152,10 +152,13 @@ def preview_private(root, source):
     return route
 
 
-def maintain(root, source):
+def maintain(root, source, *, only_pending=False):
     with closing(connect(root,'private')) as db, db:
         # Serialize permission changes with the entire authorized operation.
         db.execute('BEGIN IMMEDIATE')
+        if only_pending and not db.execute(
+                'SELECT 1 FROM records WHERE source=? AND summary IS NULL', (source,)).fetchone():
+            return False
         route = effective_policy(db,source)
         mode,model,endpoint = route['mode'],route['model'],route['endpoint']
         body = db.execute('SELECT body FROM records WHERE source=?',(source,)).fetchone()[0]
@@ -182,6 +185,17 @@ def maintain(root, source):
         if not isinstance(summary,str) or not summary.strip():
             raise ValueError('empty maintenance result')
         db.execute('UPDATE records SET summary=? WHERE source=?',(summary,source))
+        return True
+
+
+def maintain_pending(root, limit):
+    if limit < 1:
+        raise ValueError('limit must be positive')
+    with closing(connect(root, 'private')) as db:
+        rows = db.execute('SELECT source FROM records WHERE summary IS NULL ORDER BY source LIMIT ?',
+                          (limit,)).fetchall()
+    completed = sum(maintain(root, source, only_pending=True) for source, in rows)
+    return dict(selected=len(rows), completed=completed, skipped=len(rows)-completed)
 
 
 def review_public(db, source):
@@ -235,6 +249,8 @@ def main():
     limit.add_argument('--model')
     commands.add_parser('preview-private').add_argument('source')
     commands.add_parser('private-status', help='count private records with current or pending summaries')
+    batch = commands.add_parser('maintain-pending', help='maintain a bounded batch of pending private records')
+    batch.add_argument('--limit', required=True, type=int)
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -268,6 +284,8 @@ def main():
             print(json.dumps(dict(total=total, ready=ready, pending=total-ready)))
         elif args.action=='maintain-private':
             maintain(root,args.source)
+        elif args.action=='maintain-pending':
+            print(json.dumps(maintain_pending(root, args.limit)))
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
         # Remote messages and malformed input can contain private content.
         parser.exit(2,f'{args.action} failed ({type(exc).__name__})\n')
