@@ -45,6 +45,8 @@ if (!(Test-Path -LiteralPath $env:ROUNDTABLE_TEST_OPENSSL -PathType Leaf)) {
 python tests/verify_core.py
 ```
 
+在仓库根目录运行 `python tests/verify_snapshot.py reports/snapshot-new` 可对 HEAD 执行隔离验收。输出目录须尚不存在；可用 `--revision` 指定已审核的提交，用 `--openssl` 指定程序路径。脚本核对 Git 提交与解压文件清单，运行核心验收和双向 TLS 登记演练，全部通过后生成 `verified.json`。压缩包、测试报告和演练数据库保存在本地。公开范围与第三方许可仍按上面的发布门审核。
+
 在本地报告 `reports/core_verification.md` 中核对完整测试结果、双向证书测试的执行状态和 SQLite 独立回读。回环网络连接与临时文件替换需要在测试环境中可用。
 
 2026-11-23 对提交 `b6a745f1df6858993ae8bd01c8d4660f28239c85` 做了源码快照复验。用 `git archive --format=zip` 从该提交导出 79 个文件，解压后的初始文件名与提交树逐项一致。本次 ZIP 的 SHA-256 为 `0fe8e6a97ef3d376154988a1e86c35fa452a5606d9da5fa7e95d114d3e5ea7fc`。在解压目录运行上述核心验收，80 项测试全部通过，包含双向证书测试、构建禁用检查和同机双节点恢复。合成演示及 SQLite 独立回读通过，重复运行后原库摘要保持一致。
