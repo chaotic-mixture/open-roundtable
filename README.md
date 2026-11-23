@@ -178,3 +178,5 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 对同一次双节点演练，分别运行 `python -m examples.peer_node reports/release-peer-run/A account` 和 `python -m examples.peer_node reports/release-peer-run/B account`。两端输出可按任务编号核对的服务明细，列出供给方、消费方、会诊状态和内部测试 credits。接收节点记录贡献，发起节点记录消费。只有已保存回执的任务计入费用，待处理任务单独计数。此命令离线统计；回执中的会诊状态只表示流程结果，服务质量仍须通过实践反馈评估。
 
 消费方可将实际使用后的观察写入本地 UTF-8 文本，再运行 `python -m examples.peer_node NODE_DIR feedback JOB_ID useful observation.txt`（未起作用时选 `not-useful`）。`python -m examples.peer_node NODE_DIR quality PROVIDER` 汇总本节点收到的服务笔数、已评价笔数和已评价样本中的有用比例。无评价时比例为 null。每张回执最多计一次，观察正文保存在消费方私库。统计反映该消费方的使用经验，尚无跨身份防刷或全网评分。
+
+接收方可用 `permission PEER allow --remaining 3` 把该节点剩余可受理的新会诊设为 3 次。受理新任务与占用一次额度在同一个事务中完成；中断后仍保留已占用额度。额度用尽后仍可重发已受理任务的回执。再次授权会重设余量，省略 `--remaining` 表示不限次数，`revoke` 则撤销整个授权。双节点演练给 A 一次额度，覆盖首次执行与断线恢复。

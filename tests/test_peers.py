@@ -73,6 +73,20 @@ class PeerRecoveryTests(unittest.TestCase):
                 with closing(ledger(root)) as db:
                     self.assertEqual(db.execute('SELECT count(result),sum(credits) FROM jobs').fetchone(), (2,4))
 
+    def test_exhausted_grant_does_not_claim_new_job(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"B"}')
+            body = dict(sender='A', recipient='B', source='public', spec={})
+            request = dict(body, id=digest(body))
+            published = [dict(source='public', body='{}')]
+            with closing(ledger(root)) as db, patch('examples.peer_node.transfer', return_value=published):
+                db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+                set_permission(db, 'A', True, 0)
+                with self.assertRaisesRegex(ValueError, 'allowance exhausted'):
+                    deliver(root, db, request)
+                self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+
     def test_receiver_permission(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -128,6 +142,8 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(accounts[0]['entries'], accounts[1]['entries'])
             self.assertEqual([(a['contributed'],a['consumed'],a['pending']) for a in accounts],
                              [(0,2,0),(2,0,0)])
+            with closing(ledger(folder/'B')) as db:
+                self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (0,))
             key = result['request_id']
             note = folder / 'note.txt'
             note.write_text('private-practice-observation')

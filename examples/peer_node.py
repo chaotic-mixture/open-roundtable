@@ -28,6 +28,7 @@ def ledger(root):
     db.execute('''CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, request TEXT NOT NULL,
         result TEXT, credits INTEGER NOT NULL DEFAULT 0)''')
     db.execute('CREATE TABLE IF NOT EXISTS consult_grants (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
+    db.execute('CREATE TABLE IF NOT EXISTS grant_limits (name TEXT PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining>=0))')
     db.execute('CREATE TABLE IF NOT EXISTS traffic (direction TEXT, route TEXT, body TEXT)')
     db.commit()
     return db
@@ -67,7 +68,9 @@ def discover(db,bootstrap):
     return descriptors
 
 
-def set_permission(db, peer, allow):
+def set_permission(db, peer, allow, remaining=None):
+    if remaining is not None and (not allow or type(remaining) is not int or not 0 <= remaining < 2**63):
+        raise ValueError('remaining consultations must be a nonnegative integer on an active grant')
     with db:
         if allow:
             row = db.execute('SELECT url FROM peers WHERE name=?', (peer,)).fetchone()
@@ -76,7 +79,10 @@ def set_permission(db, peer, allow):
             db.execute('INSERT OR REPLACE INTO consult_grants VALUES (?,?)', (peer, row[0]))
         else:
             db.execute('DELETE FROM consult_grants WHERE name=?', (peer,))
-    return dict(peer=peer, allowed=allow)
+        db.execute('DELETE FROM grant_limits WHERE name=?', (peer,))
+        if remaining is not None:
+            db.execute('INSERT INTO grant_limits VALUES (?,?)', (peer, remaining))
+    return dict(peer=peer, allowed=allow, remaining=remaining)
 
 
 def envelope(root,recipient,source):
@@ -105,6 +111,11 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         raise ValueError('topic differs from shared source')
     database=root/(key+'.sqlite3')
     with db:
+        db.execute('BEGIN IMMEDIATE')
+        still_allowed = db.execute('SELECT 1 FROM peers JOIN consult_grants USING(name,url) WHERE name=? AND url=?',
+                                   (request['sender'], row[0])).fetchone()
+        if not still_allowed:
+            raise ValueError('consultation grant changed')
         claimed = db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',
                              (key, packed(request).decode())).rowcount
         if not claimed:
@@ -124,6 +135,11 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
             result = json.loads(checkpoint[0])
             db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
             return result, False
+        limit = db.execute('SELECT remaining FROM grant_limits WHERE name=?', (request['sender'],)).fetchone()
+        if limit is not None:
+            if limit[0] == 0:
+                raise ValueError('consultation allowance exhausted')
+            db.execute('UPDATE grant_limits SET remaining=remaining-1 WHERE name=?', (request['sender'],))
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))
     outcome=consult(source,database,config['model'])
@@ -306,6 +322,7 @@ if __name__=='__main__':
     access = commands.add_parser('permission')
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
+    access.add_argument('--remaining', type=int)
     mark = commands.add_parser('mark')
     mark.add_argument('job')
     mark.add_argument('label')
@@ -326,7 +343,7 @@ if __name__=='__main__':
             elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':
-                result = set_permission(db, args.peer, args.mode == 'allow')
+                result = set_permission(db, args.peer, args.mode == 'allow', args.remaining)
             elif args.action in ('mark', 'revisit'):
                 result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
             else:
