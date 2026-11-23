@@ -375,6 +375,8 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
                 if posted != receipt['credits']:
                     raise ValueError('invalid service charge')
                 return receipt, False
+            if posted != 0:
+                raise ValueError('pending job has a posted charge')
             if not database.exists():
                 raise ValueError('job in progress or awaiting local reconciliation')
             uri = database.resolve().as_uri() + '?mode=ro'

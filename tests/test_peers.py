@@ -41,6 +41,17 @@ class PeerRecoveryTests(unittest.TestCase):
                         with self.assertRaises(ValueError):
                             deliver(root,db,request)
                         self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchone(),(None,0))
+                    with kernel:
+                        kernel.execute('UPDATE peer_receipt SET result=?',(json.dumps(receipt),))
+                    with db:
+                        db.execute('UPDATE jobs SET credits=1')
+                    with self.assertRaisesRegex(ValueError, 'pending job has a posted charge'):
+                        deliver(root,db,request)
+                    self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchone(),(None,1))
+                    with db:
+                        db.execute('UPDATE jobs SET credits=0')
+                    self.assertEqual(deliver(root,db,request), (receipt,False))
+                    self.assertEqual(db.execute('SELECT credits FROM jobs').fetchone(),(2,))
 
     def test_restart_after_model_dispatch_without_receipt_keeps_job_pending(self):
         started = threading.Event()
