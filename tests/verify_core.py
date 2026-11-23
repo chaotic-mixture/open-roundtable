@@ -10,13 +10,15 @@ import sys
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+if not __debug__:
+    raise SystemExit('Core verification requires Python assertions. Run without -O or PYTHONOPTIMIZE.')
 REPORT = ROOT / 'reports' / 'core_verification.md'
 DB = ROOT / 'reports' / ('core_demo_' + uuid.uuid4().hex + '.sqlite3')
 REPORT.parent.mkdir(exist_ok=True)
 sections = ['# Core verification — actual execution\n', f'Python: `{sys.version}`\n', f'Demo database: `{DB}`\n']
 commands = [
     [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-v'],
-    [sys.executable, '-m', 'compileall', '-q', 'open_roundtable', 'tests'],
+    [sys.executable, '-m', 'compileall', '-q', 'open_roundtable', 'tests', 'examples'],
     [sys.executable, '-m', 'open_roundtable', 'demo', '--db', str(DB)],
 ]
 for command in commands:
