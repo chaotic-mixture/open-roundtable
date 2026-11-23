@@ -52,6 +52,7 @@ python -m examples.two_node_demo verify reports/two-node-run
 python -m open_roundtable.data runtime/customer-a init
 python -m open_roundtable.data runtime/customer-a import private personal.json
 python -m open_roundtable.data runtime/customer-a maintain-private profile
+python -m open_roundtable.data runtime/customer-a summary-origin profile
 python -m open_roundtable.data runtime/customer-a private-status
 python -m open_roundtable.data runtime/customer-a maintain-pending --limit 10 --preview
 python -m open_roundtable.data runtime/customer-a maintain-pending --limit 10

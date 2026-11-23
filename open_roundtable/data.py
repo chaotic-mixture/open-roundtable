@@ -49,6 +49,8 @@ def connect(root, scope):
         if db.execute('SELECT scope FROM metadata').fetchall() != [(scope,)]:
             raise ValueError('store identity mismatch')
         if scope == 'private':
+            db.execute("""CREATE TABLE IF NOT EXISTS summary_origin (
+                source TEXT PRIMARY KEY, mode TEXT NOT NULL, model TEXT)""")
             db.execute("""CREATE TABLE IF NOT EXISTS record_limits (
                 source TEXT PRIMARY KEY REFERENCES records(source),
                 mode TEXT NOT NULL CHECK(mode IN ('sealed','local')), model TEXT)""")
@@ -103,9 +105,11 @@ def ingest(root, scope, records):
             if scope=='public':
                 https_url(source)
             # New and changed material needs a separate owner publication decision.
-            db.execute('''INSERT INTO records(source,body) VALUES (?,?)
+            changed = db.execute('''INSERT INTO records(source,body) VALUES (?,?)
                 ON CONFLICT(source) DO UPDATE SET body=excluded.body,summary=NULL,shared=0
-                WHERE records.body<>excluded.body''',(source,body))
+                WHERE records.body<>excluded.body''',(source,body)).rowcount
+            if scope == 'private' and changed:
+                db.execute('DELETE FROM summary_origin WHERE source=?', (source,))
 
 
 def exchange(url, payload=None, token=None):
@@ -190,6 +194,7 @@ def maintain(root, source, *, only_pending=False):
         if not isinstance(summary,str) or not summary.strip():
             raise ValueError('empty maintenance result')
         db.execute('UPDATE records SET summary=? WHERE source=?',(summary,source))
+        db.execute('INSERT OR REPLACE INTO summary_origin VALUES (?,?,?)', (source, mode, model))
         return True
 
 
@@ -268,6 +273,7 @@ def main():
     limit.add_argument('mode', choices=['inherit','sealed','local'])
     limit.add_argument('--model')
     commands.add_parser('preview-private').add_argument('source')
+    commands.add_parser('summary-origin').add_argument('source')
     commands.add_parser('private-status', help='count private records with current or pending summaries')
     batch = commands.add_parser('maintain-pending', help='maintain a bounded batch of pending private records')
     batch.add_argument('--limit', required=True, type=int)
@@ -299,6 +305,14 @@ def main():
             limit_record(root,args.source,args.mode,args.model)
         elif args.action=='preview-private':
             print(json.dumps(preview_private(root,args.source),ensure_ascii=True))
+        elif args.action=='summary-origin':
+            with closing(connect(root, 'private')) as db:
+                row = db.execute("""SELECT r.summary IS NOT NULL, o.mode, o.model FROM records r
+                    LEFT JOIN summary_origin o USING(source) WHERE r.source=?""", (args.source,)).fetchone()
+                if row is None:
+                    raise ValueError('unknown private record')
+                ready, mode, model = row
+                print(json.dumps(dict(ready=bool(ready), mode=mode, model=model)))
         elif args.action=='private-status':
             with closing(connect(root, 'private')) as db:
                 total, ready = db.execute('SELECT count(*), count(summary) FROM records').fetchone()

@@ -13,6 +13,24 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_summary_origin_tracks_successful_maintenance_across_policy_changes(self):
+        def origin():
+            output = StringIO()
+            with patch('sys.argv', ['data', str(self.root), 'summary-origin', 'profile']), redirect_stdout(output):
+                data.main()
+            return json.loads(output.getvalue())
+
+        with closing(data.connect(self.root, 'private')) as db, db:
+            db.execute("UPDATE records SET summary='legacy'")
+        self.assertEqual(origin(), dict(ready=True, mode=None, model=None))
+        data.configure(self.root, 'local', 'model-a')
+        with patch.object(data, 'exchange', return_value='{"message":{"content":"summary"}}'):
+            data.maintain(self.root, 'profile')
+        data.configure(self.root, 'sealed')
+        self.assertEqual(origin(), dict(ready=True, mode='local', model='model-a'))
+        data.ingest(self.root, 'private', [dict(source='profile', body='changed')])
+        self.assertEqual(origin(), dict(ready=False, mode=None, model=None))
+
     def test_local_service_receives_only_permitted_batch_content(self):
         requests = []
 
