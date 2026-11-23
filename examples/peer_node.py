@@ -183,6 +183,11 @@ def fetch_public_subset(db, url, peer, route):
     return transfer(db,url+'/catalog',peer_name=peer)
 
 
+def valid_offer(item, node):
+    return (isinstance(item, dict) and item.get('kind') == 'capability' and item.get('node') == node
+            and all(isinstance(item.get(field), str) and item[field].strip() for field in ('tag', 'description')))
+
+
 def published_offers(root):
     name = json.loads((root/'node.json').read_text())['name']
     offers = []
@@ -191,8 +196,7 @@ def published_offers(root):
             body = json.loads(record['body'])
         except ValueError:
             continue
-        if (isinstance(body,dict) and body.get('kind')=='capability' and body.get('node')==name
-                and isinstance(body.get('tag'),str) and isinstance(body.get('description'),str)):
+        if valid_offer(body, name):
             offers.append(record)
     return offers
 
@@ -215,9 +219,7 @@ def find_capability(root, db, tag=None, *, accepting_only=False):
                 item = json.loads(record['body'])
             except (KeyError,TypeError,ValueError):
                 continue
-            if (isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == peer
-                    and isinstance(item.get('tag'),str) and tag in (None,item['tag'])
-                    and isinstance(item.get('description'),str)):
+            if valid_offer(item, peer) and tag in (None,item['tag']):
                 match = dict(node=peer,source=record['source'],description=item['description'],
                              sha256=hashlib.sha256(record['body'].encode()).hexdigest())
                 if tag is None:
@@ -266,7 +268,7 @@ def verify_offer(records, node, reference):
     for record in records:
         if record['source'] == source and hashlib.sha256(record['body'].encode()).hexdigest() == checksum:
             item = json.loads(record['body'])
-            if isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == node:
+            if valid_offer(item, node):
                 return
     raise ValueError('selected offer is no longer published at the requested revision')
 

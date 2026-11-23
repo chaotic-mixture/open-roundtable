@@ -7,10 +7,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import find_capability, ledger, match_offers
+from examples.peer_node import find_capability, ledger, match_offers, verify_offer
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_admission_requires_a_complete_offer_even_with_matching_digest(self):
+        for fields in ({}, {'tag':'repair'}, {'tag':' ', 'description':'fix shifts'},
+                       {'tag':'repair', 'description':7}):
+            with self.subTest(fields=fields):
+                body = json.dumps(dict(kind='capability', node='B', **fields))
+                record = dict(source='public-offer', body=body)
+                reference = (record['source'], hashlib.sha256(body.encode()).hexdigest())
+                with self.assertRaises(ValueError):
+                    verify_offer([record], 'B', reference)
+
     def test_model_receives_only_allowed_tags(self):
         offers = [dict(tag='repair',description='change shifts'),dict(tag='audit',description='check conflicts')]
         reply = dict(done=True,message=dict(content='{"ids":[0]}'),prompt_eval_count=12,eval_count=4)
