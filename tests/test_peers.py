@@ -296,7 +296,7 @@ class PeerRecoveryTests(unittest.TestCase):
     def test_sender_preserves_first_valid_receipt(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             db.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8001')")
-            request = dict(id='job', sender='A', recipient='B')
+            request = dict(id='job', sender='A', recipient='B', source='source', spec={})
             receipt = dict(id='job', sender='B', recipient='A', credits=2, outcome=dict(state='RESOLVED'))
             with patch('examples.peer_node.envelope', return_value=request), patch('examples.peer_node.transfer') as call:
                 for fields in [dict(credits=True),dict(credits=-1),dict(credits=3),dict(outcome={}),dict(sender='C')]:
