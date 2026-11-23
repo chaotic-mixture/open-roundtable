@@ -26,6 +26,13 @@ class BenchmarkTests(unittest.TestCase):
                         writer.writerow([case, size, mode, 'RESOLVED', 0, 0, 2, 12])
             with self.assertRaisesRegex(ValueError, 'missing benchmark round or schedule'):
                 summarize(directory)
+            with (directory/'results.csv').open('a', newline='') as output:
+                for mode in ('direct', 'nested'):
+                    csv.writer(output).writerow([9, CASE_SIZES[-1], mode, 'RESOLVED', 0, 0, 2, 12])
+            self.assertEqual(summarize(directory)['pairs'], 9)
+            (directory/'design.json').write_text(json.dumps({'repeats': 2}))
+            with self.assertRaisesRegex(ValueError, 'planned round count'):
+                summarize(directory)
 
     def test_paired_inputs_blinding_scoring_and_charges(self):
         def provider(path, payload=None):

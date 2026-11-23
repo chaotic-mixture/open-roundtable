@@ -44,6 +44,7 @@ def benchmark(directory, repeats=1):
     if repeats < 1:
         raise ValueError('repeats must be positive')
     directory.mkdir(parents=True, exist_ok=False)
+    (directory/'design.json').write_text(json.dumps({'repeats': repeats}), encoding='utf8')
     rows = []
     for number in range(1, repeats + 1):
         target = directory
@@ -82,6 +83,11 @@ def summarize(directory):
         raise ValueError('expected paired direct and nested measurements')
     if len(pairs) != max(number for number, case in pairs) * len(CASE_SIZES):
         raise ValueError('missing benchmark round or schedule')
+    design = directory/'design.json'
+    if design.exists():
+        planned = json.loads(design.read_text(encoding='utf8'))['repeats']
+        if type(planned) is not int or planned * len(CASE_SIZES) != len(pairs):
+            raise ValueError('measurements differ from planned round count')
     differences = [pair['nested'] - pair['direct'] for pair in pairs.values()]
     return dict(pairs=len(pairs), totals=totals, nested_slower=sum(d > 0 for d in differences),
                 median_nested_minus_direct_ms=round(median(differences), 2))
