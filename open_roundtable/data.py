@@ -234,6 +234,7 @@ def main():
     limit.add_argument('mode', choices=['inherit','sealed','local'])
     limit.add_argument('--model')
     commands.add_parser('preview-private').add_argument('source')
+    commands.add_parser('private-status', help='count private records with current or pending summaries')
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -261,6 +262,10 @@ def main():
             limit_record(root,args.source,args.mode,args.model)
         elif args.action=='preview-private':
             print(json.dumps(preview_private(root,args.source),ensure_ascii=True))
+        elif args.action=='private-status':
+            with closing(connect(root, 'private')) as db:
+                total, ready = db.execute('SELECT count(*), count(summary) FROM records').fetchone()
+            print(json.dumps(dict(total=total, ready=ready, pending=total-ready)))
         elif args.action=='maintain-private':
             maintain(root,args.source)
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:

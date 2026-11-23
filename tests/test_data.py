@@ -1,4 +1,7 @@
 from contextlib import closing
+from contextlib import redirect_stdout
+from io import StringIO
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -8,6 +11,24 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_private_status_tracks_current_summaries_without_exposing_contents(self):
+        def status():
+            output = StringIO()
+            with patch('sys.argv', ['data', str(self.root), 'private-status']), redirect_stdout(output):
+                data.main()
+            return json.loads(output.getvalue())
+
+        pending = dict(total=1, ready=0, pending=1)
+        ready = dict(total=1, ready=1, pending=0)
+        with patch.object(data, 'exchange', side_effect=AssertionError):
+            self.assertEqual(status(), pending)
+            data.maintain(self.root, 'profile')
+            self.assertEqual(status(), ready)
+            data.ingest(self.root, 'private', [dict(source='profile', body=' private   content ')])
+            self.assertEqual(status(), ready)
+            data.ingest(self.root, 'private', [dict(source='profile', body='updated')])
+            self.assertEqual(status(), pending)
+
     def setUp(self):
         port = patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='11434')
         port.start()
