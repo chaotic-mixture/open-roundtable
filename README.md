@@ -196,4 +196,4 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 
 在同一可信目录上再次运行 `discover` 会用完整快照更新本地节点名单。目录撤回登记或节点更换地址时，旧授权和剩余额度同时失效；以后重新登记需重新授权。有效空目录会清空名单。若获取目录失败或某个登记无法在节点端核实，保留前一次成功同步的名单。
 
-同机节点可在 node.json 中设置 `"transport":"mtls"`，并在各自节点目录提供 ca.pem、node.pem、node.key。客户端与服务器都校验证书链，服务器证书需覆盖回环 IP，受理会诊还要求客户端证书包含与发送节点名一致的唯一 `urn:roundtable:peer:NAME` URI 标识。目录和节点地址须使用 HTTPS。该模式仍仅监听回环地址，服务端地址与节点名的映射依赖受信目录。测试使用临时证书；设置 ROUNDTABLE_TEST_OPENSSL 为 OpenSSL 程序路径后，运行 `python -m unittest discover -s tests -p test_peer_tls.py` 可复现。
+同机节点可在 node.json 中设置 `"transport":"mtls"`，并在各自节点目录提供 ca.pem、node.pem、node.key。客户端与服务器都校验证书链，服务器证书需覆盖回环 IP，受理会诊还要求客户端证书包含与发送节点名一致的唯一 `urn:roundtable:peer:NAME` URI 标识。目录和节点地址须使用 HTTPS。该模式仍仅监听回环地址，初始目录依赖配置的地址与受信 CA。联系已命名的节点时，还会在发送 HTTP 请求前核对服务器证书中的节点名。测试使用临时证书；设置 ROUNDTABLE_TEST_OPENSSL 为 OpenSSL 程序路径后，运行 `python -m unittest discover -s tests -p test_peer_tls.py` 可复现。

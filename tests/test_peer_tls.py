@@ -9,7 +9,7 @@ import ssl
 import subprocess
 import tempfile
 import unittest
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 from examples.peer_node import ledger, transfer
@@ -44,9 +44,15 @@ class PeerTLSTests(unittest.TestCase):
             _, port = start(stack,base/'B',0)
             url = f'https://127.0.0.1:{port}'
             with closing(ledger(base/'A')) as db:
-                self.assertEqual(transfer(db,url+'/catalog'), [])
+                self.assertEqual(transfer(db,url+'/catalog',peer_name='B'), [])
+                with self.assertRaises(URLError) as wrong_peer:
+                    transfer(db,url+'/consult',dict(sender='A'),peer_name='C')
+                self.assertIsInstance(wrong_peer.exception.reason, ssl.SSLCertVerificationError)
+                with closing(ledger(base/'B')) as receiver:
+                    self.assertEqual(receiver.execute("SELECT count(*) FROM traffic WHERE route='/consult'").fetchone(), (0,))
                 with self.assertRaises(HTTPError) as failure:
                     transfer(db,url+'/consult',dict(sender='C'))
+                failure.exception.close()
                 self.assertEqual(failure.exception.code,403)
                 with self.assertRaises(ValueError):
                     transfer(db,url.replace('https:', 'http:')+'/catalog')

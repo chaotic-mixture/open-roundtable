@@ -2,6 +2,8 @@
 import argparse
 from contextlib import closing
 import hashlib
+from functools import partial
+from http.client import HTTPSConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -53,7 +55,34 @@ def tls_context(root, *, server=False):
     return context
 
 
-def transfer(db,url,data=None):
+def certificate_matches(certificate, peer):
+    names = [value for kind,value in certificate.get('subjectAltName', ())
+             if kind == 'URI' and value.startswith('urn:roundtable:peer:')]
+    return names == ['urn:roundtable:peer:' + peer]
+
+
+class PeerHTTPSConnection(HTTPSConnection):
+    def __init__(self, *args, peer, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.peer = peer
+
+    def connect(self):
+        super().connect()
+        if not certificate_matches(self.sock.getpeercert(), self.peer):
+            self.close()
+            raise ssl.SSLCertVerificationError('recipient certificate identity mismatch')
+
+
+class PeerHTTPSHandler(HTTPSHandler):
+    def __init__(self, context, peer):
+        super().__init__(context=context)
+        self.connection = partial(PeerHTTPSConnection, context=context, peer=peer)
+
+    def https_open(self, request):
+        return self.do_open(self.connection, request)
+
+
+def transfer(db,url,data=None,*,peer_name=None):
     u=urlsplit(url)
     location = db.execute('PRAGMA database_list').fetchone()[2]
     context = tls_context(Path(location).parent)
@@ -62,7 +91,8 @@ def transfer(db,url,data=None):
         raise ValueError('demo transport requires numeric loopback and an explicit port')
     trace(db,'send',url,data)
     request=Request(url,data=None if data is None else packed(data),headers={'Content-Type':'application/json'})
-    with build_opener(ProxyHandler({}),NoRedirect(),HTTPSHandler(context=context)).open(request,timeout=300) as response:
+    handler = PeerHTTPSHandler(context,peer_name) if context and peer_name is not None else HTTPSHandler(context=context)
+    with build_opener(ProxyHandler({}),NoRedirect(),handler).open(request,timeout=300) as response:
         raw=response.read(1_000_001)
     if len(raw)>1_000_000:
         raise ValueError('oversize response')
@@ -77,7 +107,7 @@ def discover(db,bootstrap):
     if not isinstance(feed, list) or len({p['name'] for p in descriptors})!=len(descriptors):
         raise ValueError('invalid public directory snapshot')
     for peer in descriptors:
-        published=transfer(db,peer['url']+'/catalog')
+        published=transfer(db,peer['url']+'/catalog',peer_name=peer['name'])
         if not any(r['source'].endswith('/node') and json.loads(r['body'])==peer for r in published):
             raise ValueError('advertised node did not confirm registration')
     with db:
@@ -128,7 +158,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
                         WHERE name=?''', (request['sender'],)).fetchone()
     if not row:
         raise ValueError('sender has no consultation grant')
-    published=transfer(db,row[0]+'/catalog')
+    published=transfer(db,row[0]+'/catalog',peer_name=request['sender'])
     if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
         raise ValueError('topic differs from shared source')
     database=root/(key+'.sqlite3')
@@ -198,7 +228,7 @@ def send(root,db,recipient,source,*,original=None):
         raise ValueError('discover recipient first')
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
-    result=transfer(db,peer[0]+'/consult',request)
+    result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
     validate_receipt(request, result)
     encoded = packed(result).decode()
     with db:
@@ -327,9 +357,7 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                     raise ValueError('invalid size')
                 request=json.loads(self.rfile.read(size))
                 if context:
-                    identities = [v for kind,v in self.connection.getpeercert().get('subjectAltName', [])
-                                  if kind=='URI' and v.startswith('urn:roundtable:peer:')]
-                    if identities != ['urn:roundtable:peer:' + request['sender']]:
+                    if not certificate_matches(self.connection.getpeercert(), request['sender']):
                         return self.reply(403, {'error':'sender certificate mismatch'})
                 with closing(ledger(root)) as db:
                     trace(db,'accept',self.path,request)
