@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import uuid
+from urllib.parse import urlencode
 
 from examples.peer_node import packed,digest
 from open_roundtable.data import initialize, ingest, connect, catalog, share_public
@@ -99,7 +100,16 @@ def audit(folder):
     if fault.get('directory_ledger') or directory.exists():
         published = read(directory,'public.sqlite3','SELECT source,body FROM records WHERE shared=1 ORDER BY source')
         require([dict(source=s,body=v) for s,v in published] == directory_snapshot, 'directory snapshot mismatch')
-        traffic += read(directory,'network.sqlite3','SELECT direction,route,body FROM traffic')
+        directory_traffic = read(directory,'network.sqlite3','SELECT direction,route,body FROM traffic ORDER BY rowid')
+        imports = {route: json.loads(body) for direction,route,body in directory_traffic if direction == 'receive'}
+        require(len(directory_snapshot) == 2 and len(imports) == 2, 'directory registration count')
+        for record in directory_snapshot:
+            origin = json.loads(record['body'])['url']
+            route = origin + '/record?' + urlencode({'source': record['source']})
+            require(imports.get(route) == [record], 'directory registration import mismatch')
+        served = [json.loads(body) for direction,route,body in directory_traffic if direction == 'serve' and route == '/nodes']
+        require(served == [directory_snapshot, directory_snapshot], 'directory discovery responses mismatch')
+        traffic += directory_traffic
     wire=packed([traffic,calls,charges,shared,catalog(b),directory_snapshot])
     for root in (a,b):
         markers=read(root,'private.sqlite3','SELECT source,body FROM records')

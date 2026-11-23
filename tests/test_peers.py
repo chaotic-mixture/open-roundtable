@@ -309,6 +309,12 @@ class PeerRecoveryTests(unittest.TestCase):
                     audit(folder)
                 with directory:
                     directory.execute('DELETE FROM traffic WHERE rowid=?', (injected,))
+                with directory:
+                    directory.execute("UPDATE traffic SET route='/missing' WHERE route='/nodes'")
+                with self.assertRaisesRegex(ValueError, 'directory discovery responses'):
+                    audit(folder)
+                with directory:
+                    directory.execute("UPDATE traffic SET route='/nodes' WHERE route='/missing'")
             self.assertEqual(result, audit(folder))
             with closing(sqlite3.connect(folder / 'A' / 'network.sqlite3')) as network, network:
                 network.execute("UPDATE jobs SET credits=3")
