@@ -1,0 +1,48 @@
+"""Compare a completed model call in each of two saved repair consultation ledgers."""
+import argparse
+from contextlib import closing
+import json
+from pathlib import Path
+import sqlite3
+
+
+def read_receipt(path, nested):
+    with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        db.execute('BEGIN')
+        attempts = db.execute('SELECT topic,request,status,response FROM attempts').fetchall()
+        if len(attempts) != 1 or attempts[0][2] != 'returned':
+            raise ValueError('expected one returned model call per ledger')
+        topic, request, _, raw = attempts[0]
+        response = json.loads(raw)
+        links = db.execute('SELECT parent,child,spent FROM delegations').fetchall()
+        if (nested and (len(links) != 1 or links[0][1] != topic)) or (not nested and links):
+            raise ValueError('unexpected delegation structure')
+        credits = db.execute('SELECT sum(cost) FROM messages WHERE topic=?', (topic,)).fetchone()[0]
+        state = db.execute('SELECT state FROM topics WHERE id=?', (topic,)).fetchone()[0]
+        body = db.execute('SELECT body FROM proposals WHERE topic=? ORDER BY version DESC LIMIT 1', (topic,)).fetchone()
+        if body is None:
+            raise ValueError('missing repair proposal')
+        proposal = json.loads(body[0])
+        result = dict(state=state, selected=proposal['selected'], criteria_met=proposal['criteria_met'],
+                      credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
+        if nested:
+            parent, _, spent = links[0]
+            result['settled_credits'] = spent
+            result['parent_state'] = db.execute('SELECT state FROM topics WHERE id=?', (parent,)).fetchone()[0]
+        return json.loads(request), proposal['schedule'], result
+
+
+def compare(direct, nested):
+    request, schedule, flat = read_receipt(direct, False)
+    other_request, other_schedule, panel = read_receipt(nested, True)
+    if request != other_request:
+        raise ValueError('model requests differ across paired consultations')
+    return dict(same_schedule=schedule == other_schedule, direct=flat, nested=panel)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('direct', type=Path)
+    parser.add_argument('nested', type=Path)
+    args = parser.parse_args()
+    print(json.dumps(compare(args.direct, args.nested), indent=2))
