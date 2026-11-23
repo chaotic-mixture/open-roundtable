@@ -52,10 +52,7 @@ def refine(rows, plans, rank, indices):
     return result
 
 
-def feasibility(rows, accepts, budget):
-    """Exact finite-domain search; a node limit yields unknown, never infeasible."""
-    if type(budget)!=int or budget<1:
-        raise ValueError('search_nodes must be a positive integer')
+def exceeds_weekly_capacity(rows):
     # A room or worker can occupy at most 168 distinct hours in one week.
     for field in (1, 2):
         hours = {}
@@ -67,7 +64,16 @@ def feasibility(rows, accepts, budget):
             # Touching shifts can share a block, so count blocks from total hours.
             rest = 8 * ((work - 1) // 8) if field == 1 else 0
             if work + rest > 168:
-                return dict(status='infeasible', nodes=0, plan=None)
+                return True
+    return False
+
+
+def feasibility(rows, accepts, budget):
+    """Exact finite-domain search; a node limit yields unknown, never infeasible."""
+    if type(budget)!=int or budget<1:
+        raise ValueError('search_nodes must be a positive integer')
+    if exceeds_weekly_capacity(rows):
+        return dict(status='infeasible', nodes=0, plan=None)
     original=[r[1] for r in rows]
     domains=[sorted(range(169-r[2]),key=lambda h:abs(h-r[1])) for r in rows]
     starts=[]

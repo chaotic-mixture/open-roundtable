@@ -6,7 +6,7 @@ from examples.overnight_score import expected
 from examples.repair_benchmark import candidates, schedule
 from examples.select_repair import choice
 from examples.roster_criteria import compile_criteria, evaluate
-from examples.refine_schedule import refine, feasibility
+from examples.refine_schedule import exceeds_weekly_capacity, refine, feasibility
 from open_roundtable.core import Kernel
 from open_roundtable.run_journal import initialize, dispatch
 
@@ -56,6 +56,8 @@ def validate_roster(spec):
 def consult(source, database, model):
     spec=json.loads(source.read_text(encoding='utf-8-sig'))
     rows, rules = validate_roster(spec)
+    if exceeds_weekly_capacity(rows):
+        raise NoFeasibleCandidate(dict(status='infeasible', nodes=0))
     shifts = spec['shifts']
     plans=candidates(rows)
     if not plans:

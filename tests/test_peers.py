@@ -21,7 +21,9 @@ class PeerRecoveryTests(unittest.TestCase):
         self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
 
     def test_room_capacity_returns_replayable_zero_charge(self):
-        self.check_no_plan_receipt(22, 'infeasible', 0, separate_workers=True)
+        with patch('examples.user_consult.candidates') as generate:
+            self.check_no_plan_receipt(22, 'infeasible', 0, separate_workers=True)
+            generate.assert_not_called()
 
     def check_no_plan_receipt(self, count, status, nodes, separate_workers=False, duration=8):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
