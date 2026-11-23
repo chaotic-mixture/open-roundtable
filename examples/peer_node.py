@@ -28,11 +28,16 @@ def digest(value):
     return hashlib.sha256(packed(value)).hexdigest()
 
 
+PAIR_COLUMNS = """min(json_extract(request,'$.sender'),json_extract(request,'$.recipient')),
+                  max(json_extract(request,'$.sender'),json_extract(request,'$.recipient'))"""
+
+
 def ledger(root):
     db=sqlite3.connect(root/'network.sqlite3')
     db.execute('CREATE TABLE IF NOT EXISTS peers (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('''CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, request TEXT NOT NULL,
         result TEXT, credits INTEGER NOT NULL DEFAULT 0)''')
+    db.execute(f'CREATE INDEX IF NOT EXISTS jobs_partner_page ON jobs ({PAIR_COLUMNS}, id)')
     db.execute('CREATE TABLE IF NOT EXISTS consult_grants (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS grant_limits (name TEXT PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining>=0))')
     db.execute('CREATE TABLE IF NOT EXISTS traffic (direction TEXT, route TEXT, body TEXT)')
@@ -518,10 +523,9 @@ def partner_statement(root, db, partner, *, after='', limit=None):
     if node == partner or not partner.strip():
         raise ValueError('choose a distinct partner')
     entries = []
-    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs WHERE id>? ORDER BY id',(after,)):
+    query = f'SELECT id,request,result,credits FROM jobs WHERE ({PAIR_COLUMNS})=(?,?) AND id>? ORDER BY id'
+    for key, raw, saved, credits in db.execute(query, (*sorted((node,partner)), after)):
         request = json.loads(raw)
-        if {request['sender'], request['recipient']} != {node,partner}:
-            continue
         if request['id'] != key or digest({k:v for k,v in request.items() if k!='id'}) != key:
             raise ValueError('job identity mismatch')
         receipt_hash = None
