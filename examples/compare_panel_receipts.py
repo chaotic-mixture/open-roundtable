@@ -60,8 +60,13 @@ def read_receipt(path, nested, expected_input=None):
             raise ValueError('missing expert candidates')
         try:
             selected = choice(response, len(candidates))
+            fallback = False
         except (ValueError, TypeError, KeyError):
             selected = 0
+            fallback = True
+        reason = proposal.get('fallback')
+        if not isinstance(reason, str) or bool(reason) != fallback:
+            raise ValueError('recorded fallback differs from model response')
         if (type(proposal.get('selected')) is not int or proposal['selected'] != selected
                 or proposal.get('schedule') != candidates[selected]):
             raise ValueError('proposal differs from selected expert candidate')
@@ -72,7 +77,7 @@ def read_receipt(path, nested, expected_input=None):
         saved = proposal.get('criteria_met')
         if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
             raise ValueError('recorded preference scores differ from the selected schedule')
-        result = dict(state=state, selected=proposal['selected'], criteria_met=flags,
+        result = dict(state=state, selected=proposal['selected'], used_fallback=fallback, criteria_met=flags,
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
         result['can_meet_all'] = any(all(score) for score in scores)

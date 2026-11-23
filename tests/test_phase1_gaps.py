@@ -34,10 +34,18 @@ class GapTests(unittest.TestCase):
             panel = consult(source, nested, 'fixture', nested=True)
             summary = compare(direct, nested)
             self.assertTrue(summary['same_schedule'])
+            self.assertEqual(summary['direct']['selected'], 0)
+            self.assertFalse(summary['direct']['used_fallback'])
             self.assertEqual(summary['nested']['parent_state'], 'RESOLVED')
             self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
             with closing(sqlite3.connect(direct)) as flat:
                 original = flat.execute('SELECT body FROM proposals').fetchone()[0]
+                with flat:
+                    flat.execute("UPDATE proposals SET body=json_set(body,'$.fallback','invalid reply')")
+                with self.assertRaisesRegex(ValueError, 'recorded fallback'):
+                    compare(direct, nested)
+                with flat:
+                    flat.execute('UPDATE proposals SET body=?', (original,))
                 expert_body = flat.execute("SELECT body FROM messages WHERE member='expert'").fetchone()[0]
                 expert = json.loads(expert_body)
                 proposal = json.loads(original)
