@@ -2,15 +2,12 @@
 import argparse
 import hashlib
 from contextlib import closing, ExitStack
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import sqlite3
-import ssl
 import tempfile
 import subprocess
 import sys
-import threading
 import time
 import uuid
 
@@ -117,7 +114,12 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
     a,b=folder/'A',folder/'B'
     with ExitStack() as stack:
         scheme = 'https' if credentials else 'http'
-        descriptors=[]
+        directory = folder/'directory'
+        initialize(directory)
+        directory_config = dict(name='directory')
+        if credentials:
+            directory_config.update(transport='mtls', credentials=str((credentials/'directory').resolve()))
+        (directory/'node.json').write_bytes(packed(directory_config))
         for name,root in [('A',a),('B',b)]:
             initialize(root)
             ingest(root,'private',[dict(source='private-key-'+uuid.uuid4().hex,body='secret-'+uuid.uuid4().hex)])
@@ -129,27 +131,11 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
             source = f'https://{name.lower()}.example/node'
             registration = json.loads(cli(root,'register',source,f'{scheme}://127.0.0.1:{port}').stdout)
             share_public(root,source,True,registration['sha256'])
-            descriptors.extend(catalog(root))
-        (folder/'directory.json').write_bytes(packed(descriptors))
-        class Directory(BaseHTTPRequestHandler):
-            def do_GET(self):
-                if self.path not in ('/nodes', '/catalog'):
-                    return self.send_error(404)
-                self.send_response(200)
-                self.end_headers()
-                records = [r for r in descriptors if r['source'].endswith('/node')] if self.path == '/nodes' else descriptors
-                self.wfile.write(packed(records))
-        directory=stack.enter_context(HTTPServer(('127.0.0.1',0),Directory))
-        if credentials:
-            directory_keys = credentials/'directory'
-            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, cafile=str(directory_keys/'ca.pem'))
-            context.verify_mode = ssl.CERT_REQUIRED
-            context.load_cert_chain(directory_keys/'node.pem', directory_keys/'node.key')
-            directory.socket = context.wrap_socket(directory.socket, server_side=True)
-        thread=threading.Thread(target=directory.serve_forever,daemon=True)
-        thread.start()
-        stack.callback(directory.shutdown)
-        bootstrap=f'{scheme}://127.0.0.1:{directory.server_port}'
+            cli(directory,'import-registration',name,source,f'{scheme}://127.0.0.1:{port}')
+            share_public(directory,source,True,registration['sha256'])
+        (folder/'directory.json').write_bytes(packed(catalog(directory)))
+        _, directory_port = start(stack,directory,0)
+        bootstrap=f'{scheme}://127.0.0.1:{directory_port}'
         for root in (a,b):
             cli(root,'discover',bootstrap)
         cli(b,'permission','A','allow','--remaining','1')
