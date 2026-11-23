@@ -105,7 +105,7 @@ def audit(folder):
                 observed.extend(json.loads(value))
         else:
             raise ValueError('missing dispatch to registered offer owner')
-        verify_offer(observed, recipient, req['offer'])
+        verify_offer(observed, recipient, req['offer'], repair_only=True)
         require(all(r['source'] != req['offer'][0] for r in catalog(b)), 'offer still published after interruption')
     directory = folder/'directory'
     if fault.get('directory_ledger') or directory.exists():
