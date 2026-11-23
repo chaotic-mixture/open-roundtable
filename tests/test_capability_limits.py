@@ -31,7 +31,7 @@ class CapabilityLimitsTests(unittest.TestCase):
 
     def test_model_receives_only_allowed_tags(self):
         offers = [dict(tag='repair',description='change shifts'),dict(tag='audit',description='check conflicts')]
-        reply = dict(done=True,message=dict(content='{"ids":[0]}'),prompt_eval_count=12,eval_count=4)
+        reply = dict(done=True,done_reason='stop',message=dict(content='{"ids":[0]}'),prompt_eval_count=12,eval_count=4)
         with patch('examples.auto_consult.api',return_value=reply) as api:
             result = match_offers('check only',offers,'fixture',allowed_tags=['audit'])
             menu = json.loads(api.call_args.args[1]['messages'][1]['content'])['offers']
@@ -41,6 +41,17 @@ class CapabilityLimitsTests(unittest.TestCase):
             empty = match_offers('check only',offers,'fixture',allowed_tags=['review'])
             self.assertEqual((empty['matches'],empty['calls']), ([],0))
             api.assert_not_called()
+
+    def test_invalid_model_receipt_cannot_recommend_a_provider(self):
+        offer = dict(tag='audit', description='check conflicts')
+        reply = dict(done=True, done_reason='stop', message=dict(content='{"ids":[0]}'),
+                     prompt_eval_count=12, eval_count=4)
+        for changes in (dict(done_reason='length'), dict(done='false'), dict(eval_count=None),
+                        dict(prompt_eval_count=-1), dict(eval_count=True), dict(message={}),
+                        dict(message=dict(content='{"ids":[true]}'))):
+            with self.subTest(changes=changes), patch('examples.auto_consult.api', return_value=reply | changes):
+                with self.assertRaises(ValueError):
+                    match_offers('check conflicts', [offer], 'fixture')
 
     def test_partial_discovery_survives_invalid_peers(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:

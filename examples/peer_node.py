@@ -304,11 +304,19 @@ def match_offers(need, offers, model, *, allowed_tags=None):
     prompt = 'Select all offers explicitly able to fulfill the entire need. Return {"ids": [integer IDs]}, empty if none.'
     reply = api('/api/chat',dict(model=model, stream=False, think=False, format='json',options={'temperature':0},
         messages=[dict(role='system',content=prompt),dict(role='user',content=json.dumps(dict(need=need,offers=menu),ensure_ascii=False))]))
-    ids = json.loads(reply['message']['content'])['ids']
-    if not reply.get('done') or not isinstance(ids,list) or any(type(i) is not int or not 0<=i<len(menu) for i in ids):
+    if not isinstance(reply, dict) or reply.get('done') is not True or reply.get('done_reason') != 'stop':
+        raise ValueError('incomplete model selection')
+    usage = (reply.get('prompt_eval_count'), reply.get('eval_count'))
+    if any(type(count) is not int or count < 0 for count in usage):
+        raise ValueError('invalid model token counts')
+    try:
+        ids = json.loads(reply['message']['content'])['ids']
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError('invalid model selection') from error
+    if not isinstance(ids,list) or any(type(i) is not int or not 0<=i<len(menu) for i in ids):
         raise ValueError('invalid model selection')
     return dict(matches=[offers[i] for i in sorted(set(ids))], calls=1,
-                input_tokens=reply.get('prompt_eval_count'), output_tokens=reply.get('eval_count'))
+                input_tokens=usage[0], output_tokens=usage[1])
 
 
 def verify_offer(records, node, reference):
