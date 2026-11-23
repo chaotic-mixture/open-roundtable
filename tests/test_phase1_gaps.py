@@ -10,6 +10,7 @@ from urllib.error import URLError
 
 from examples import preference_benchmark as batch
 from examples.compare_panel_receipts import compare
+from examples.paired_panel_benchmark import seeded_spec
 from examples.user_consult import consult
 from examples.refine_schedule import feasibility
 from examples.revise_panel_proposal import revise
@@ -27,6 +28,25 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_revision_minimizes_changes_from_first_proposal_on_tie(self):
+        def choose_third_index(path, payload=None):
+            reply = provider(path, payload)
+            if path == '/api/chat':
+                reply['message']['content'] = '{"plan":3}'
+            return reply
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root/'507.json'
+            source.write_text(json.dumps(seeded_spec(507,22)),encoding='utf8')
+            with patch('examples.user_consult.api', side_effect=choose_third_index):
+                first = consult(source,root/'first.db','fixture')
+            revised = revise(root/'first.db',root/'second.db')
+            self.assertEqual(first['selected'],3)
+            self.assertEqual(revised['criteria_met'],[True,True])
+            self.assertEqual(revised['changed_shifts'],19)
+            self.assertEqual(len(revised['revised_shift_ids']),21)
+
     def test_revision_archives_ballots_and_preserves_source(self):
         spec = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
         def choose_second(path, payload=None):
