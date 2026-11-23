@@ -9,7 +9,7 @@ from examples.select_repair import choice
 from examples.roster_criteria import evaluate
 from examples.overnight_score import expected
 from examples.repair_benchmark import schedule
-from examples.user_consult import validate_roster
+from examples.user_consult import selection_messages, validate_roster
 
 
 def candidate_score(chosen, original, rows, rules):
@@ -85,7 +85,10 @@ def read_receipt(path, nested):
                 raise ValueError('child spending and parent settlement disagree')
             result['settled_credits'] = spent
             result['parent_state'] = db.execute('SELECT state FROM topics WHERE id=?', (parent,)).fetchone()[0]
-        return json.loads(request), proposal['schedule'], result
+        dispatch = json.loads(request)
+        if dispatch.get('messages') != selection_messages(expert['input'], candidates):
+            raise ValueError('model menu differs from recorded expert input or candidates')
+        return dispatch, proposal['schedule'], result
 
 
 def compare(direct, nested):

@@ -53,6 +53,12 @@ def validate_roster(spec):
     return rows, rules
 
 
+def selection_messages(spec, menu):
+    return [dict(role='user',content='Select the best feasible weekly schedule for this request. '
+                 'Candidate times are absolute hours. Return only {"plan": '
+                 'zero-based integer}. Request and candidates: '+encoded([spec,menu]))]
+
+
 def consult(source, database, model, *, nested=False):
     spec=json.loads(source.read_text(encoding='utf-8-sig'))
     rows, rules = validate_roster(spec)
@@ -94,9 +100,7 @@ def consult(source, database, model, *, nested=False):
         menu=[[dict(item,start=h,end=h+row[2]) for item,h,row in zip(shifts,p,rows)] for p in plans]
         assert_post(k,topic,'expert',encoded(dict(input=spec,candidates=menu)))
         request=dict(model=model,stream=False,think=False,format='json',options={'temperature':0},
-                     messages=[dict(role='user',content='Select the best feasible weekly schedule for this request. '
-                         'Candidate times are absolute hours. Return only {"plan": '
-                         'zero-based integer}. Request and candidates: '+encoded([spec,menu]))])
+                     messages=selection_messages(spec,menu))
         response,error,_=dispatch(k,topic,request,api)
         selected=0
         if response is not None:

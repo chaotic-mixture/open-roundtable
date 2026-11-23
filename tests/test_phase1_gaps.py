@@ -60,6 +60,14 @@ class GapTests(unittest.TestCase):
                     compare(direct, nested)
                 flat.execute('UPDATE proposals SET body=?', (original,))
                 flat.commit()
+                changed = json.loads(expert_body)
+                changed['candidates'].append(changed['candidates'][0])
+                flat.execute("UPDATE messages SET body=? WHERE member='expert'", (json.dumps(changed),))
+                flat.commit()
+                with self.assertRaisesRegex(ValueError, 'model menu differs'):
+                    compare(direct, nested)
+                flat.execute("UPDATE messages SET body=? WHERE member='expert'", (expert_body,))
+                flat.commit()
             with closing(sqlite3.connect(nested)) as db:
                 for sql, error in [
                     ('UPDATE delegations SET spent=1 WHERE parent=?', 'settlement disagree'),
