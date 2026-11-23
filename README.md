@@ -174,7 +174,24 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 
 接收方须在本机运行 `python -m examples.peer_node NODE_DIR permission PEER allow`，才能受理该节点的会诊。授权绑定已发现的名称和地址，节点地址变化后需要重新授权。用 `revoke` 代替 `allow` 可撤销后续受理和回执重发；已经受理的任务可以继续。旧节点库首次使用此版本时也需要授权。示例自动在 B 授权 A。此控制适用于可信回环环境，发送方名称和地址尚无密码学身份证明。
 
-双节点演练支持第二个中断位置。运行 `python -m examples.two_node_demo run reports/peer-before-receipt --fault before-receipt`，接收节点会在会诊库保存完整回执之后、网络账本登记费用之前退出。重发时先核对权限和公开议题，再从会诊库恢复回执和费用。可用 `python -m examples.two_node_demo verify reports/peer-before-receipt` 离线对账。缺少完整回执的执行仍需本地核对。
+### 接收节点断线后如何查账
+
+| 接收节点退出时点 | 当时接收方网络账本 | 重发同一议题后的实测结果 |
+|---|---|---|
+| 模型已收到请求，会诊库尚无回执 | 待结算，0 credits | 双方均待核对，模型替身总共收到一次请求，实际推理消耗未知 |
+| 会诊库已保存回执，网络账本尚未结算 | 待结算，0 credits | 从会诊库恢复原回执，双方各记录同一笔 2 credits |
+| 接收方网络账本已结算，发送方尚未收到回执 | 已结算，2 credits | 返回已存回执，双方各记录同一笔 2 credits |
+
+首行用可计数的模型替身和两个本机节点进程复现，运行 `python -m unittest discover -s tests -p test_peers.py -k restart_after_model_dispatch`。在双方的 `account` 输出中按 `pending_jobs` 的议题编号查找，再用 `statement` 和 `reconcile` 核对。
+
+后两行使用同机双向 TLS、公开能力声明和本机 Ollama 模型 `qwen3.5:9b` 验证，每组实际投递两次，专家和模型各执行一次。以下各次 run 需指定新目录，openssl 需在 PATH 中或替换为程序路径。verify 可在节点和模型退出后运行，会核对两端账本、新演练在重启前保存的回执摘要，以及私有标记是否出现在受检记录中。
+
+```text
+python -m examples.two_node_demo run reports/peer-before-receipt --temporary-tls openssl --bind-offer --fault before-receipt
+python -m examples.two_node_demo verify reports/peer-before-receipt
+python -m examples.two_node_demo run reports/peer-after-commit --temporary-tls openssl --bind-offer --fault after-commit
+python -m examples.two_node_demo verify reports/peer-after-commit
+```
 
 ### Phase 3 本地子圆桌实验
 
