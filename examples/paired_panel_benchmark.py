@@ -49,17 +49,21 @@ def summarize_rounds(first, second):
     totals = {mode: dict(model_seconds=0.0, consultation_seconds=0.0, credits=0,
                          input_tokens=0, output_tokens=0) for mode in ('direct', 'nested')}
     pairs = same_schedule = 0
+    changed_selections = {mode: [] for mode in totals}
     for left, right in zip(run(first, None, verify_only=True), run(second, None, verify_only=True), strict=True):
         if left['request_sha256'] != right['request_sha256']:
             raise ValueError(f"model request differs across rounds at seed {left['seed']}")
         for mode, values in totals.items():
             if {left[mode].get('position'), right[mode].get('position')} != {1, 2}:
                 raise ValueError(f"expected opposite recorded positions at seed {left['seed']}")
+            if left[mode]['selected'] != right[mode]['selected']:
+                changed_selections[mode].append(dict(seed=left['seed'], first=left[mode]['selected'],
+                                                     second=right[mode]['selected']))
             for field in values:
                 values[field] += left[mode][field] + right[mode][field]
         pairs += 2
         same_schedule += left['same_schedule'] + right['same_schedule']
-    return dict(pairs=pairs, same_schedule_pairs=same_schedule, totals=totals)
+    return dict(pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections, totals=totals)
 
 
 if __name__ == '__main__':
