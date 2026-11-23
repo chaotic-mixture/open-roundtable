@@ -12,25 +12,40 @@ from examples.repair_benchmark import candidates, schedule
 from open_roundtable.core import Kernel
 
 
+def prepare(tokens):
+    rows = []
+    for token in tokens:
+        key, span = token.split(':')
+        start, end = map(int, span.split('-'))
+        if len(key) != 3 or not 0 <= start < end <= 168:
+            raise ValueError('expected a three-character shift key and a positive interval within one week')
+        rows.append((key, start, end-start))
+    if len({r[0][0] for r in rows}) != len(rows):
+        raise ValueError('shift identifiers must be unique')
+    if len(rows) < 3 or [r[0][0] for r in rows[:3]] != list('ABC'):
+        raise ValueError('the three supported briefs require leading shifts A, B and C')
+    plans = candidates(rows)
+    if not plans:
+        raise ValueError('no feasible candidates')
+    return rows, plans
+
+
+def rule_choice(profile, rows, plans):
+    def rank(i):
+        plan = plans[i]
+        moved = sum(hour != row[1] for hour,row in zip(plan, rows))
+        return rule_key(profile, facts(plan, rows), moved, i)
+    return max(range(len(plans)), key=rank)
+
+
 def evaluate(seed, index):
     profile = index % 3
     size = (7, 11, 22)[index // 3]
-    rows = []
-    for token in generate(seed, size):
-        key, span = token.split(':')
-        start, end = map(int, span.split('-'))
-        rows.append((key, start, end-start))
+    rows, plans = prepare(generate(seed, size))
     original = [r[1] for r in rows]
     durations = [r[2] for r in rows]
-    plans = candidates(rows)
-    if not plans:
-        raise ValueError(f'no feasible candidates for seed {seed}')
-    def rank(i):
-        plan = plans[i]
-        moved = sum(a != b for a,b in zip(original, plan))
-        return rule_key(profile, facts(plan, rows), moved, i)
     record = dict(seed=seed, profile=profile, candidates=len(plans))
-    for name, i in [('default', 0), ('rules', max(range(len(plans)), key=rank))]:
+    for name, i in [('default', 0), ('rules', rule_choice(profile, rows, plans))]:
         plan = plans[i]
         passed = not any(expected(schedule(rows, plan)).values())
         score = sum(w*b for w,b in zip((4,2,1), assess(profile, original, durations, plan)))

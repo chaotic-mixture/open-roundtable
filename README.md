@@ -184,3 +184,12 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 ### Phase 5 本地元议题实验
 
 运行 `python -m examples.meta_consult meta.sqlite3`，使用新的数据库路径。元议题先登记比较方案、九个种子和通过条件，再对同一批候选比较默认选择与优先级排序。种子 601–609 的两组方案均通过全部硬约束。偏好总分从 32/63 增至 44/63，五张表改善、四张持平；602 和 608 分别多改动一个和两个班次。提案、逐表结果与表决保存在本地，运行时默认选择策略保持原样。本实验采用两个确定性脚本角色，结论限于已编码的三类偏好。
+
+本机操作者可为上述元议题单独启用或撤回已验证的排序规则。下列命令里的 TOPIC 是实验输出的 topic 值。选择结果包含方案编号与实际排班，返回前再次检查硬约束。授权依据是本地实验库的写权限；数据库记录每次生效的选择与对应提案版本。每个议题初始使用默认排序。
+
+~~~
+python -m examples.selector_policy meta.sqlite3 TOPIC enable
+python -m examples.selector_policy meta.sqlite3 TOPIC select 1 Axu:20-25 Byv:21-25 Cxu:24-31
+python -m examples.selector_policy meta.sqlite3 TOPIC withdraw
+python -m examples.selector_policy meta.sqlite3 TOPIC status
+~~~
