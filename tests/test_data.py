@@ -1,9 +1,11 @@
 from contextlib import closing
 from contextlib import redirect_stdout
 from io import StringIO
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import tempfile
+from threading import Thread
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +13,41 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_local_service_receives_only_permitted_batch_content(self):
+        requests = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                raw = self.rfile.read(int(self.headers['Content-Length']))
+                requests.append((self.path, json.loads(raw)))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"done":true,"message":{"content":"local summary"}}')
+
+        data.ingest(self.root, 'private', [dict(source='sealed', body='sealed fixture text')])
+        data.configure(self.root, 'local', 'fixture')
+        data.limit_record(self.root, 'sealed', 'sealed')
+        with HTTPServer(('127.0.0.1', 0), Handler) as server:
+            worker = Thread(target=server.serve_forever)
+            worker.start()
+            try:
+                with patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT=str(server.server_port)):
+                    preview = data.maintain_pending(self.root, 2, preview=True)
+                    self.assertEqual(preview['modes'], dict(sealed=1, local=1, api=0))
+                    self.assertEqual(requests, [])
+                    self.assertEqual(data.maintain_pending(self.root, 2)['completed'], 2)
+                    self.assertEqual(data.maintain_pending(self.root, 2)['selected'], 0)
+            finally:
+                server.shutdown()
+                worker.join()
+        (path, payload), = requests
+        self.assertEqual(path, '/api/chat')
+        self.assertEqual(payload['messages'][-1]['content'], ' private   content ')
+        self.assertNotIn('sealed fixture text', json.dumps(payload))
+        with closing(data.connect(self.root, 'private')) as db:
+            self.assertEqual(db.execute('SELECT summary FROM records ORDER BY source').fetchall(),
+                             [('local summary',), ('sealed fixture text',)])
+
     def test_batch_preview_counts_routes_without_advancing(self):
         data.ingest(self.root, 'private', [dict(source='second', body='local only')])
         data.configure(self.root, 'api', 'remote', 'https://example.org/chat')
