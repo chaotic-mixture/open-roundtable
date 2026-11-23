@@ -317,3 +317,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 
 运行 `python -m examples.rule_discovery --dispatch` 可用一个发起方和四个提供方在本机比较两种发现方式。对每张公开合成班表，两组都向全部入选服务尝试派单，并逐份与独立评分器核对。九张表中，仅按标签筛选产生 36 次尝试，其中 21 次在发送班表前被服务声明检查拦下。要求全部规则匹配产生 15 次尝试，全部取得正确回执。两组各有 36 次初始目录请求，之后发起方的网络请求分别为 51 次和 30 次，两组各登记 15 份回执、0 credits。
 在双向 TLS 模式下，运行 `python -m examples.peer_node NODE_DIR discover BOOTSTRAP_URL --directory-name directory` 可要求引导服务的证书标明节点名 `directory`。名称不匹配时终止此次发现，保留上次同步的节点名单。双节点会诊演练的 TLS 模式为 A、B 两端启用了这项校验。
+
+在提交 `7c76a55` 上，两端核对目录名后，使用本机 `qwen3.5:9b` 完成了一次合成排班会诊。运行 `python -m examples.two_node_demo run reports/named-directory-new --temporary-tls openssl --bind-offer --fault before-receipt` 可在新目录复现。接收端在内核回执落盘后中断，服务声明撤回后重发成功。两次投递合计调用模型一次、专家一次，扣费 2 credits，模型用量为 290 个输入和 7 个输出 tokens，议题结案。关闭模型后运行 `python -m examples.two_node_demo verify reports/named-directory-new` 得到相同结果，受检通信记录中私库标记命中数为零。
