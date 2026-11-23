@@ -24,6 +24,7 @@
 | 检查命令行行为及发布限制 | [命令行测试](tests/test_cli.py) · [打包边界测试](tests/test_packaging_boundary.py) |
 | 提交排班需求并核对修复方案 | [会诊程序](examples/user_consult.py) · [九表偏好对照](examples/preference_results.md) |
 | 按自然语言需求寻找公开服务 | [九条需求对照](examples/capability_requests.py) |
+| 从空目录验证节点登记、发布和撤回 | 在源码根目录运行 `python -m examples.registration_demo`。[同机示例](examples/registration_demo.py) |
 | 比较标签筛选与按排班规则筛选的实际派单成本 | [远端排班审查与复现命令](README.md#远端排班审查) · [九表实验](examples/rule_discovery.py) |
 | 设置客户私库权限、预览批次、查询摘要来源 | [公开资料和个人资料](README.md#公开资料和个人资料) · [权限与回滚测试](tests/test_data.py) |
 | 检查本机模型是否保留中文记录中的否定、例外与偏好归属 | [三组合成记录对照](examples/private_summary_cases.py) |
