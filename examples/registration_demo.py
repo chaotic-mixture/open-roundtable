@@ -29,16 +29,19 @@ def run(openssl=None):
         scheme = 'https' if openssl else 'http'
         endpoint = f'{scheme}://127.0.0.1:{provider_port}'
         bootstrap = f'{scheme}://127.0.0.1:{directory_port}'
+        discovery = ['discover', bootstrap]
+        if openssl:
+            discovery.extend(['--directory-name', 'directory'])
         registration = json.loads(cli(provider, 'register', source, endpoint).stdout)
         share_public(provider, source, True, registration['sha256'])
         imported = json.loads(cli(directory, 'import-registration', 'B', source, endpoint).stdout)
         if imported != registration:
             raise ValueError('directory imported a different registration')
-        before = json.loads(cli(consumer, 'discover', bootstrap).stdout)
+        before = json.loads(cli(consumer, *discovery).stdout)
         share_public(directory, source, True, imported['sha256'])
-        published = json.loads(cli(consumer, 'discover', bootstrap).stdout)
+        published = json.loads(cli(consumer, *discovery).stdout)
         share_public(directory, source, False)
-        withdrawn = json.loads(cli(consumer, 'discover', bootstrap).stdout)
+        withdrawn = json.loads(cli(consumer, *discovery).stdout)
         if before or published != [dict(name='B', url=endpoint)] or withdrawn:
             raise ValueError('unexpected discovery result')
         return dict(before_publication=before, published=published, after_withdrawal=withdrawn)

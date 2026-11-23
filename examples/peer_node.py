@@ -143,14 +143,16 @@ def confirms_public_record(records, source, expected):
         return False
 
 
-def discover(db,bootstrap):
-    feed = fetch_public_subset(db, bootstrap, None, '/nodes')
+def discover(db,bootstrap, *, directory_name=None):
+    root = Path(db.execute('PRAGMA database_list').fetchone()[2]).parent
+    config = json.loads((root/'node.json').read_text())
+    if directory_name is not None and (not directory_name.strip() or config.get('transport') != 'mtls'):
+        raise ValueError('directory identity verification requires mutual TLS and a node name')
+    feed = fetch_public_subset(db, bootstrap, directory_name, '/nodes')
     if not isinstance(feed, list):
         raise ValueError('invalid public directory snapshot')
     registrations = []
     sources = set()
-    root = Path(db.execute('PRAGMA database_list').fetchone()[2]).parent
-    config = json.loads((root/'node.json').read_text())
     for record in feed:
         if not isinstance(record, dict) or not isinstance(record.get('source'), str):
             raise ValueError('invalid public directory record')
@@ -892,7 +894,9 @@ if __name__=='__main__':
     server.add_argument('port',type=int)
     server.add_argument('--interrupt-after-commit',action='store_true')
     server.add_argument('--interrupt-before-receipt',action='store_true')
-    commands.add_parser('discover').add_argument('bootstrap')
+    discovery = commands.add_parser('discover')
+    discovery.add_argument('bootstrap')
+    discovery.add_argument('--directory-name', help='verify the bootstrap node identity with mutual TLS')
     registration = commands.add_parser('register')
     registration.add_argument('source')
     registration.add_argument('url')
@@ -986,7 +990,7 @@ if __name__=='__main__':
                 result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
             else:
                 result=(resume(args.directory,db) if args.action=='resume' else
-                    discover(db,args.bootstrap) if args.action=='discover' else
+                    discover(db,args.bootstrap,directory_name=args.directory_name) if args.action=='discover' else
                     send(args.directory,db,args.recipient,args.source,offer_ref=args.offer))
         print(packed(result).decode())
         if args.action in ('reconcile','reconcile-online') and result['differences']:

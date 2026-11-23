@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.demo_certificates import issue_certificates
-from examples.peer_node import digest, ledger, packed, transfer
+from examples.peer_node import digest, discover, ledger, packed, transfer
 from examples.two_node_demo import audit, cli, run, start
 from open_roundtable.data import initialize, ingest, share_public
 
@@ -49,6 +49,11 @@ class PeerTLSTests(unittest.TestCase):
                 for record in (registration, topic):
                     share_public(base/'B', record['source'], True)
                 self.assertEqual(transfer(db,url+'/nodes',peer_name='B'), [registration])
+                self.assertEqual(discover(db, url, directory_name='B'), [dict(name='B', url=url)])
+                with self.assertRaises(URLError) as mismatch:
+                    discover(db, url, directory_name='directory')
+                self.assertIsInstance(mismatch.exception.reason, ssl.SSLCertVerificationError)
+                self.assertEqual(db.execute('SELECT name,url FROM peers').fetchall(), [('B', url)])
                 imported = cli(base/'A', 'import-registration', 'B', registration['source'], url)
                 self.assertEqual(json.loads(imported.stdout)['source'], registration['source'])
                 from open_roundtable.data import connect
