@@ -93,6 +93,7 @@ class PeerTLSTests(unittest.TestCase):
             with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
                 result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
             self.assertEqual(audit(folder), result)
+            self.assertEqual(result['private_stores_checked'], ['A', 'B', 'directory'])
             with closing(ledger(folder/'A')) as db:
                 db.execute("UPDATE traffic SET route=replace(route,'/offers','/other') WHERE direction='receive' AND route LIKE '%/offers'")
                 db.commit()

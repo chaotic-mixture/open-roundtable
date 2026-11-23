@@ -144,7 +144,8 @@ def audit(folder):
         require(fault['kernel_receipt_sha256'] == digest(res), 'recovered receipt differs from pre-restart checkpoint')
     return dict(discovered=['A','B'],deliveries=2,model_calls=1,expert_calls=1,credits=cost,
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
-                state=state,private_markers_found=0,request_id=key)
+                state=state,private_markers_found=0,private_stores_checked=[root.name for root in marker_roots],
+                request_id=key)
 
 
 def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False):
