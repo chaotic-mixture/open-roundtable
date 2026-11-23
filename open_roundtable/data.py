@@ -192,9 +192,14 @@ def maintain(root, source, *, only_pending=False):
 def maintain_pending(root, limit):
     if limit < 1:
         raise ValueError('limit must be positive')
-    with closing(connect(root, 'private')) as db:
-        rows = db.execute('SELECT source FROM records WHERE summary IS NULL ORDER BY source LIMIT ?',
-                          (limit,)).fetchall()
+    with closing(connect(root, 'private')) as db, db:
+        db.execute('BEGIN IMMEDIATE')
+        db.execute('CREATE TABLE IF NOT EXISTS maintenance_cursor (id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL)')
+        rows = db.execute("""SELECT source FROM records WHERE summary IS NULL
+            ORDER BY source <= coalesce((SELECT source FROM maintenance_cursor WHERE id=1), ''), source
+            LIMIT ?""", (limit,)).fetchall()
+        if rows:
+            db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0
     for source, in rows:
         try:
