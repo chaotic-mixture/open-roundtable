@@ -3,11 +3,20 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
 from zipfile import ZipFile
+
+
+def check_archive(snapshot, expected):
+    directories = {parent.as_posix() + '/' for name in expected
+                   for parent in PurePosixPath(name).parents if parent != PurePosixPath('.')}
+    entries = snapshot.namelist()
+    files = {entry for entry in entries if not entry.endswith('/')}
+    if len(entries) != len(set(entries)) or files != expected or set(entries) - files - directories:
+        raise ValueError('ZIP entries differ from commit inventory')
 
 
 def verify(output, revision, openssl):
@@ -25,6 +34,7 @@ def verify(output, revision, openssl):
     subprocess.run(['git', 'archive', '--format=zip', '-o', str(archive), commit], cwd=repo, check=True)
     tree = output/'tree'
     with ZipFile(archive) as snapshot:
+        check_archive(snapshot, expected)
         snapshot.extractall(tree)
     actual = {path.relative_to(tree).as_posix() for path in tree.rglob('*') if path.is_file()}
     if actual != expected:
