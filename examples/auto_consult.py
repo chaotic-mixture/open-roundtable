@@ -8,16 +8,17 @@ from pathlib import Path
 import platform
 import sqlite3
 from time import perf_counter
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from examples.generate_overnight import generate
 from examples.overnight_score import expected
 from open_roundtable.core import Kernel
+from open_roundtable.data import NoRedirect
+from open_roundtable.local_model import ollama_origin
 from open_roundtable.schedule_expert import check
 
 
 RULES = ('P', 'V', 'R', 'L')
-from open_roundtable.local_model import ollama_origin
 SOURCES = ('examples/auto_consult.py', 'examples/generate_overnight.py',
            'examples/overnight_score.py', 'open_roundtable/core.py',
            'open_roundtable/schedule_expert.py')
@@ -52,7 +53,7 @@ def prompt(shifts, findings, version):
 def api(path, payload=None):
     data = None if payload is None else encoded(payload).encode()
     req = Request(ollama_origin()+path, data=data, headers={'Content-Type':'application/json'})
-    with urlopen(req, timeout=300) as response:
+    with build_opener(ProxyHandler({}), NoRedirect()).open(req, timeout=300) as response:
         return json.load(response)
 
 
