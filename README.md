@@ -217,3 +217,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 ### 按能力发现候选议员
 
 提供方在本机运行 `python -m examples.peer_node NODE_B offer https://b.example/offers/repair repair "修复每周排班"`，审核后用 `python -m open_roundtable.data NODE_B share-public https://b.example/offers/repair --if-sha256 HASH` 发布。已经发现 B 的节点 A 运行 `python -m examples.peer_node NODE_A find-capability repair` 即可按标签查询。查询直接读取各节点最新公开目录，同时返回未能查询的节点。结果表示服务方当前公开声明的能力；实际受理仍取决于授权与剩余额度。
+
+使用 `match-capability "自然语言需求"` 可让本机模型从当前公开声明中推荐候选。查询只返回候选，不发起会诊。运行 `python -m examples.capability_comparison` 可复现三组小样本比较：精确标签在同义修复能力上漏选一次；qwen3.5:9b 找到了两个修复候选，但在“只检查不改班”上漏选一项、误选两项。两组在无供给需求上均返回空。三次模型调用共用 405 个输入和 26 个输出 tokens。每组只运行一次，尚未检验接单成功率。

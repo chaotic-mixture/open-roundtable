@@ -168,7 +168,7 @@ def offer(root, source, tag, description):
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
 
 
-def find_capability(root, db, tag):
+def find_capability(root, db, tag=None):
     node = json.loads((root/'node.json').read_text())['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
@@ -183,9 +183,28 @@ def find_capability(root, db, tag):
             except (KeyError,TypeError,ValueError):
                 continue
             if (isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == peer
-                    and item.get('tag') == tag and isinstance(item.get('description'),str)):
-                matches.append(dict(node=peer,source=record['source'],description=item['description']))
+                    and isinstance(item.get('tag'),str) and tag in (None,item['tag'])
+                    and isinstance(item.get('description'),str)):
+                match = dict(node=peer,source=record['source'],description=item['description'])
+                if tag is None:
+                    match['tag'] = item['tag']
+                matches.append(match)
     return dict(matches=matches, unavailable=unavailable)
+
+
+def match_offers(need, offers, model):
+    from examples.auto_consult import api
+    if not offers:
+        return dict(matches=[], calls=0, input_tokens=0, output_tokens=0)
+    menu = [dict(id=i, tag=o['tag'], description=o['description']) for i,o in enumerate(offers)]
+    prompt = 'Select all offers explicitly able to fulfill the entire need. Return {"ids": [integer IDs]}, empty if none.'
+    reply = api('/api/chat',dict(model=model, stream=False, think=False, format='json',options={'temperature':0},
+        messages=[dict(role='system',content=prompt),dict(role='user',content=json.dumps(dict(need=need,offers=menu),ensure_ascii=False))]))
+    ids = json.loads(reply['message']['content'])['ids']
+    if not reply.get('done') or not isinstance(ids,list) or any(type(i) is not int or not 0<=i<len(menu) for i in ids):
+        raise ValueError('invalid model selection')
+    return dict(matches=[offers[i] for i in sorted(set(ids))], calls=1,
+                input_tokens=reply.get('prompt_eval_count'), output_tokens=reply.get('eval_count'))
 
 
 def envelope(root,recipient,source):
@@ -544,6 +563,9 @@ if __name__=='__main__':
     capability.add_argument('tag')
     capability.add_argument('description')
     commands.add_parser('find-capability').add_argument('tag')
+    match = commands.add_parser('match-capability')
+    match.add_argument('need')
+    match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
     commands.add_parser('account')
     commands.add_parser('reconcile-online').add_argument('partner')
@@ -576,6 +598,10 @@ if __name__=='__main__':
                 result = offer(args.directory,args.source,args.tag,args.description)
             elif args.action == 'find-capability':
                 result = find_capability(args.directory,db,args.tag)
+            elif args.action == 'match-capability':
+                catalog_result = find_capability(args.directory,db)
+                result = match_offers(args.need,catalog_result['matches'],args.model)
+                result['unavailable'] = catalog_result['unavailable']
             elif args.action == 'feedback':
                 result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',
                                            observation=args.observation_file.read_text(encoding='utf-8-sig'))
