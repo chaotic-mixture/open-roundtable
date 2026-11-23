@@ -172,3 +172,7 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 运行 `python -m examples.nested_benchmark reports/nested-paired` 可复现直接执行和子圆桌执行的对照。两组使用相同的区间检查器、逐小时复核器和 4 credits 预算。固定九张表各含 7、11 或 22 个班次，每种规模三张；每张表每组运行一次。两组各完成 9/9，漏报与误报均为零，各用 18 credits。本次本机端到端耗时中位数分别为 126.84 ms 和 152.13 ms，包含建库和持久化。对这组可直接脚本化的任务，加一层委派没有提高准确率。结果目录保存逐表 CSV 和可独立回读的 SQLite 账本。
 
 同库历史提案可用 `python -m open_roundtable cite DATABASE TARGET_TOPIC SOURCE_TOPIC` 引入当前议题。输出中的 `citations` 保存来源议题、已通过的版本、标题和正文，便于复查。引用不会增加预算支出或表决席位；需要重新执行工作时可使用子圆桌委派。
+
+### Phase 4 本地贡献与消费账本
+
+对同一次双节点演练，分别运行 `python -m examples.peer_node reports/release-peer-run/A account` 和 `python -m examples.peer_node reports/release-peer-run/B account`。两端输出可按任务编号核对的服务明细，列出供给方、消费方、会诊状态和内部测试 credits。接收节点记录贡献，发起节点记录消费。只有已保存回执的任务计入费用，待处理任务单独计数。此命令离线统计；回执中的会诊状态只表示流程结果，服务质量仍须通过实践反馈评估。

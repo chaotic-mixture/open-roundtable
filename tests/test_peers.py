@@ -124,6 +124,10 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual((result['deliveries'], result['credits']), (2, 2))
             self.assertEqual([path for path, _ in requests], ['/api/chat'])
             self.assertEqual(result, audit(folder))
+            accounts = [json.loads(cli(folder / node, 'account').stdout) for node in ('A','B')]
+            self.assertEqual(accounts[0]['entries'], accounts[1]['entries'])
+            self.assertEqual([(a['contributed'],a['consumed'],a['pending']) for a in accounts],
+                             [(0,2,0),(2,0,0)])
             key = result['request_id']
             label = 'personal-revisit-label'
             for _ in range(2):
@@ -143,6 +147,7 @@ class PeerRecoveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'endpoints disagree'):
                     network.commit()
                     audit(folder)
+                self.assertNotEqual(cli(folder / 'A', 'account', ok=False).returncode, 0)
                 network.execute("UPDATE jobs SET credits=2")
                 network.execute("INSERT INTO traffic(direction,route,body) VALUES('send','/check',?)", (body,))
             with self.assertRaisesRegex(ValueError, 'private marker'):

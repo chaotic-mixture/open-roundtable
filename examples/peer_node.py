@@ -157,6 +157,34 @@ def send(root,db,recipient,source,*,original=None):
     return result
 
 
+def service_account(root, db):
+    """Summarize each durable service receipt once from this node's perspective."""
+    node = json.loads((root / 'node.json').read_text())['name']
+    account = dict(node=node, contributed=0, consumed=0, pending=0, entries=[])
+    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
+        request = json.loads(raw)
+        sender, provider = request['sender'], request['recipient']
+        if key != request['id'] or key != digest({k:v for k,v in request.items() if k!='id'}):
+            raise ValueError('job identity mismatch')
+        if node not in (sender, provider) or sender == provider:
+            raise ValueError('service account requires two distinct participants')
+        if saved is None:
+            if credits != 0:
+                raise ValueError('pending job has a posted charge')
+            account['pending'] += 1
+            continue
+        receipt = json.loads(saved)
+        if (receipt['id'],receipt['sender'],receipt['recipient']) != (key,provider,sender):
+            raise ValueError('service receipt identity mismatch')
+        if type(receipt['credits']) is not int or not 0 <= receipt['credits'] <= 2 or credits != receipt['credits']:
+            raise ValueError('invalid service charge')
+        side = 'contributed' if node == provider else 'consumed'
+        account[side] += credits
+        account['entries'].append(dict(job=key, provider=provider, consumer=sender, credits=credits,
+                                       state=receipt['outcome']['state']))
+    return account
+
+
 def resume(root, db):
     """Retry pending outbound jobs whose original topic is still shared."""
     name = json.loads((root / 'node.json').read_text())['name']
@@ -247,6 +275,7 @@ if __name__=='__main__':
     server.add_argument('--interrupt-before-receipt',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
+    commands.add_parser('account')
     access = commands.add_parser('permission')
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
@@ -262,7 +291,9 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:
-            if args.action == 'permission':
+            if args.action == 'account':
+                result = service_account(args.directory, db)
+            elif args.action == 'permission':
                 result = set_permission(db, args.peer, args.mode == 'allow')
             elif args.action in ('mark', 'revisit'):
                 result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
