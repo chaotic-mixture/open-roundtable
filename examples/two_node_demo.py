@@ -1,5 +1,6 @@
 """Exercise real peers through a lost receipt and audit the resulting evidence."""
 import argparse
+import hashlib
 from contextlib import closing, ExitStack
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -13,7 +14,7 @@ import time
 import uuid
 
 from examples.peer_node import packed,digest
-from open_roundtable.data import initialize, ingest, connect, catalog
+from open_roundtable.data import initialize, ingest, connect, catalog, share_public
 
 
 SOURCE='https://roundtable.example/topics/weekend'
@@ -85,6 +86,13 @@ def audit(folder):
     accepted=[json.loads(v) for d,r,v in traffic if d=='accept' and r=='/consult']
     replies=[json.loads(v) for d,r,v in traffic if d=='reply' and r=='/consult']
     require(accepted==[req,req] and replies==[res],'lost-receipt replay sequence')
+    if 'offer' in req:
+        source, checksum = req['offer']
+        observed = [record for direction,route,value in traffic if direction=='receive' and route.endswith('/catalog')
+                    for record in json.loads(value) if record['source']==source]
+        require(any(hashlib.sha256(r['body'].encode()).hexdigest()==checksum for r in observed),
+                'missing published offer revision')
+        require(all(r['source']!=source for r in catalog(b)), 'offer still published after interruption')
     received=[json.loads(v) for d,r,v in traffic if d=='receive' and r.endswith('/consult')]
     require(received==[res],'sender receipt')
     wire=packed([traffic,calls,charges,shared,catalog(b),json.loads((folder/'directory.json').read_text())])
@@ -101,7 +109,7 @@ def audit(folder):
                 state=state,private_markers_found=0,request_id=key)
 
 
-def run(folder,model,fault='after-commit', *, credentials=None):
+def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False):
     if fault not in ('before-receipt','after-commit'):
         raise ValueError('unknown fault window')
     folder.mkdir(parents=True,exist_ok=False)
@@ -149,7 +157,14 @@ def run(folder,model,fault='after-commit', *, credentials=None):
         ingest(a,'public',[dict(source=SOURCE,body=packed(spec).decode())])
         with closing(connect(a,'public')) as db,db:
             db.execute('UPDATE records SET shared=1 WHERE source=?',(SOURCE,))
-        failed=cli(a,'send','B',SOURCE,ok=False)
+        offer_args = []
+        if bind_offer:
+            published = json.loads(cli(b,'offer','https://b.example/offers/weekend','repair','Repair weekly shifts').stdout)
+            share_public(b,published['source'],True,published['sha256'])
+            candidates = json.loads(cli(a,'find-capability','repair').stdout)['matches']
+            selected, = candidates
+            offer_args = ['--offer', selected['source'], selected['sha256']]
+        failed=cli(a,'send','B',SOURCE,*offer_args,ok=False)
         exit_code = proc.wait(timeout=10)
         if failed.returncode==0 or exit_code!=(76 if fault=='before-receipt' else 75):
             raise RuntimeError('forced disconnect did not occur')
@@ -157,6 +172,8 @@ def run(folder,model,fault='after-commit', *, credentials=None):
             receipt=db.execute('SELECT result FROM jobs').fetchone()[0]
         with closing(sqlite3.connect(b/'network.sqlite3')) as db:
             credits=db.execute('SELECT credits FROM jobs').fetchone()[0]
+        if bind_offer:
+            share_public(b,published['source'],False)
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
                 after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits)))
@@ -175,5 +192,6 @@ if __name__=='__main__':
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
     parser.add_argument('--credentials', type=Path, help='TLS credentials directory containing A, B and directory')
+    parser.add_argument('--bind-offer',action='store_true',help='select a published offer and withdraw it before replay')
     args=parser.parse_args()
-    print(json.dumps(run(args.directory,args.model,args.fault,credentials=args.credentials) if args.action=='run' else audit(args.directory)))
+    print(json.dumps(run(args.directory,args.model,args.fault,credentials=args.credentials,bind_offer=args.bind_offer) if args.action=='run' else audit(args.directory)))

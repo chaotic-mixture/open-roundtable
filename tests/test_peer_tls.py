@@ -82,7 +82,7 @@ class PeerTLSTests(unittest.TestCase):
             stack.callback(model.shutdown)
             folder = base/'exercise'
             with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
-                result = run(folder, 'fixture', 'before-receipt', credentials=base)
+                result = run(folder, 'fixture', 'before-receipt', credentials=base, bind_offer=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual((result['deliveries'], result['credits'], calls), (2, 2, ['/api/chat']))
             for name in ('A','B'):

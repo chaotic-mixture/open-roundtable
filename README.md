@@ -227,3 +227,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 双向 TLS 模式下，`find-capability` 和 `match-capability` 均支持 `--accepting-only`。查询会按节点核对当前受理资格，在推荐前筛除未授权或额度已用尽的节点；结果用 declined 列出明确拒绝的节点，用 unavailable 列出无法取得目录或资格答复的节点。筛选后为空时跳过模型调用。
 
 发现结果中的 source 和 sha256 可传给 `send RECIPIENT TOPIC_SOURCE --offer OFFER_SOURCE SHA256`。首次发送前会复查对方公开目录；接收方受理新任务时也会复查。该引用纳入请求编号，恢复待处理请求时会沿用原引用。相同议题若改用另一份声明会形成独立任务，可能另行扣费。
+
+运行 `python -m examples.two_node_demo run reports/offer-replay --bind-offer --fault before-receipt` 可复现绑定声明的断线恢复。B 在会诊结果落盘后退出，演练撤回该能力声明，再启动 B 并重发原请求。离线核验检查初次发现的声明摘要、两次投递的请求编号、恢复的费用以及最终公开目录。
