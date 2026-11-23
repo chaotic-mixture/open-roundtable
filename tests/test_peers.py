@@ -14,10 +14,54 @@ from unittest.mock import patch
 from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from examples.peer_node import partner_statement, reconcile, reconcile_online, service_account
-from open_roundtable.data import connect, ingest, initialize
+from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_restart_after_model_dispatch_without_receipt_keeps_job_pending(self):
+        started = threading.Event()
+        release = threading.Event()
+        calls = []
+
+        class Model(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers['Content-Length']))
+                calls.append(self.path)
+                started.set()
+                release.wait(15)
+
+        with tempfile.TemporaryDirectory() as tmp, ThreadPoolExecutor(1) as pool, ExitStack() as stack:
+            model = stack.enter_context(ThreadingHTTPServer(('127.0.0.1', 0), Model))
+            threading.Thread(target=model.serve_forever, daemon=True).start()
+            stack.callback(model.shutdown)
+            stack.callback(release.set)
+            a, b = Path(tmp)/'A', Path(tmp)/'B'
+            for root in (a,b):
+                initialize(root)
+                (root/'node.json').write_text(json.dumps(dict(name=root.name,model='fixture')))
+            spec = Path(__file__).resolve().parents[1]/'examples'/'consult_input.json'
+            ingest(a,'public',[dict(source=SOURCE,body=spec.read_text(encoding='utf8'))])
+            share_public(a,SOURCE,True)
+            _, port_a = start(stack,a,0)
+            with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
+                receiver, port_b = start(stack,b,0)
+                for root, peer, port in [(a,'B',port_b),(b,'A',port_a)]:
+                    with closing(ledger(root)) as db, db:
+                        db.execute('INSERT INTO peers VALUES (?,?)',(peer,f'http://127.0.0.1:{port}'))
+                        set_permission(db,peer,True,1)
+                sent = pool.submit(cli,a,'send','B',SOURCE,ok=False)
+                self.assertTrue(started.wait(10))
+                receiver.terminate()
+                receiver.wait(timeout=10)
+                self.assertNotEqual(sent.result(timeout=10).returncode,0)
+                release.set()
+                start(stack,b,port_b)
+                self.assertNotEqual(cli(a,'send','B',SOURCE,ok=False).returncode,0)
+            for root in (a,b):
+                with closing(ledger(root)) as db:
+                    self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchall(),[(None,0)])
+            self.assertEqual(calls,['/api/chat'])
+
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
