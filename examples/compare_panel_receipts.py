@@ -2,6 +2,7 @@
 import argparse
 from contextlib import closing
 import json
+import math
 from pathlib import Path
 import sqlite3
 
@@ -30,10 +31,12 @@ def candidate_score(chosen, original, rows, rules):
 def read_receipt(path, nested, expected_input=None):
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
-        attempts = db.execute('SELECT topic,request,status,response FROM attempts').fetchall()
+        attempts = db.execute('SELECT topic,request,status,response,seconds FROM attempts').fetchall()
         if len(attempts) != 1 or attempts[0][2] != 'returned':
             raise ValueError('expected one returned model call per ledger')
-        topic, request, _, raw = attempts[0]
+        topic, request, _, raw, seconds = attempts[0]
+        if not isinstance(seconds, (float, int)) or not math.isfinite(seconds) or seconds < 0:
+            raise ValueError('invalid recorded model call duration')
         response = json.loads(raw)
         links = db.execute('SELECT parent,child,spent,member FROM delegations').fetchall()
         if (nested and (len(links) != 1 or links[0][1] != topic)) or (not nested and links):
@@ -78,7 +81,8 @@ def read_receipt(path, nested, expected_input=None):
         if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
             raise ValueError('recorded preference scores differ from the selected schedule')
         result = dict(state=state, selected=proposal['selected'], used_fallback=fallback, criteria_met=flags,
-                      credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
+                      credits=credits, model_seconds=seconds,
+                      input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
         result['can_meet_all'] = any(all(score) for score in scores)
         changes = [sum(shift['start'] != before['start'] for shift, before in zip(candidate, original, strict=True))
