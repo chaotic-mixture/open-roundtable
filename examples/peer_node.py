@@ -12,7 +12,7 @@ from pathlib import Path
 import sqlite3
 import ssl
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
 from open_roundtable.data import catalog, connect, ingest, NoRedirect
@@ -169,9 +169,9 @@ def offer(root, source, tag, description):
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
 
 
-def fetch_offers(db, url, peer):
+def fetch_public_subset(db, url, peer, route):
     try:
-        return transfer(db,url+'/offers',peer_name=peer)
+        return transfer(db,url+route,peer_name=peer)
     except HTTPError as error:
         if error.code != 404:
             raise
@@ -198,7 +198,7 @@ def find_capability(root, db, tag=None, *, accepting_only=False):
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
         try:
-            records = fetch_offers(db,url,peer)
+            records = fetch_public_subset(db,url,peer,'/offers')
             if not isinstance(records,list):
                 raise ValueError('expected a catalog list')
         except (HTTPException,OSError,ValueError):
@@ -290,7 +290,8 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
                         WHERE name=?''', (request['sender'],)).fetchone()
     if not row:
         raise ValueError('sender has no consultation grant')
-    published=transfer(db,row[0]+'/catalog',peer_name=request['sender'])
+    route = '/record?' + urlencode({'source':request['source']})
+    published = fetch_public_subset(db,row[0],request['sender'],route)
     if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
         raise ValueError('topic differs from shared source')
     database=root/(key+'.sqlite3')
@@ -364,7 +365,7 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
     if not peer:
         raise ValueError('discover recipient first')
     if offer_ref is not None and original is None:
-        verify_offer(fetch_offers(db,peer[0],recipient),recipient,offer_ref)
+        verify_offer(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
     result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
@@ -570,9 +571,18 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             self.wfile.write(raw)
 
         def do_GET(self):
-            if self.path not in ('/catalog','/offers'):
+            if urlsplit(self.path).path == '/record':
+                query = parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                if set(query) != {'source'} or len(query['source']) != 1 or not query['source'][0]:
+                    return self.reply(400, {})
+                with closing(connect(root,'public')) as public:
+                    rows = public.execute('SELECT source,body FROM records WHERE shared=1 AND source=?',
+                                          (query['source'][0],)).fetchall()
+                result = [dict(source=source,body=body) for source,body in rows]
+            elif self.path in ('/catalog','/offers'):
+                result = published_offers(root) if self.path=='/offers' else catalog(root)
+            else:
                 return self.reply(404,{})
-            result = published_offers(root) if self.path=='/offers' else catalog(root)
             with closing(ledger(root)) as db:
                 trace(db,'serve',self.path,result)
             self.reply(200,result)

@@ -76,6 +76,11 @@ class PeerTLSTests(unittest.TestCase):
                 result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual((result['deliveries'], result['credits'], calls), (2, 2, ['/api/chat']))
+            with closing(ledger(folder/'B')) as db:
+                fetched = db.execute("SELECT body FROM traffic WHERE direction='receive' AND route LIKE '%/record?%'").fetchall()
+                self.assertTrue(fetched)
+                for body, in fetched:
+                    self.assertEqual([r['source'] for r in json.loads(body)], ['https://roundtable.example/topics/weekend'])
             for name in ('A','B'):
                 with closing(ledger(folder/name)) as db:
                     routes = db.execute("SELECT route FROM traffic WHERE direction='send'").fetchall()
