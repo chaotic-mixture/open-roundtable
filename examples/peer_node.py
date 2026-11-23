@@ -34,11 +34,20 @@ def ledger(root):
     db.execute('CREATE TABLE IF NOT EXISTS consult_grants (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS grant_limits (name TEXT PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining>=0))')
     db.execute('CREATE TABLE IF NOT EXISTS traffic (direction TEXT, route TEXT, body TEXT)')
-    db.execute('CREATE TABLE IF NOT EXISTS job_revision (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL)')
-    db.execute('INSERT OR IGNORE INTO job_revision VALUES (1,0)')
-    for event in ('INSERT','UPDATE','DELETE'):
-        db.execute(f"""CREATE TRIGGER IF NOT EXISTS jobs_revision_{event} AFTER {event} ON jobs
-                       BEGIN UPDATE job_revision SET revision=revision+1 WHERE id=1; END""")
+    db.execute("""CREATE TABLE IF NOT EXISTS statement_revisions (
+        first_node TEXT NOT NULL, second_node TEXT NOT NULL, token TEXT NOT NULL,
+        PRIMARY KEY(first_node,second_node))""")
+    for event, records in [('INSERT', ('NEW',)), ('UPDATE', ('OLD','NEW')), ('DELETE', ('OLD',))]:
+        db.execute(f'DROP TRIGGER IF EXISTS jobs_revision_{event}')
+        updates = []
+        for record in records:
+            sender = f"json_extract({record}.request,'$.sender')"
+            recipient = f"json_extract({record}.request,'$.recipient')"
+            updates.append(f"""INSERT INTO statement_revisions VALUES (
+                min({sender},{recipient}),max({sender},{recipient}),hex(randomblob(16)))
+                ON CONFLICT(first_node,second_node) DO UPDATE SET token=excluded.token;""")
+        db.execute(f"CREATE TRIGGER IF NOT EXISTS pair_revision_{event} AFTER {event} ON jobs "
+                   + "BEGIN " + " ".join(updates) + " END")
     db.commit()
     return db
 
@@ -460,7 +469,10 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                         if 'after' not in request:
                             return self.reply(200,partner_statement(root,db,partner))
                         db.execute('BEGIN')
-                        revision = db.execute('SELECT revision FROM job_revision WHERE id=1').fetchone()[0]
+                        pair = sorted((config['name'],partner))
+                        row = db.execute('SELECT token FROM statement_revisions WHERE first_node=? AND second_node=?',
+                                         pair).fetchone()
+                        revision = row[0] if row else 'initial'
                         if request['revision'] is not None and request['revision'] != revision:
                             return self.reply(409, {'error':'statement changed; retry reconciliation'})
                         page = partner_statement(root,db,partner,after=request['after'],limit=257)

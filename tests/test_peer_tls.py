@@ -121,6 +121,13 @@ class PeerTLSTests(unittest.TestCase):
                 page = transfer(db,endpoint,dict(sender='A',after='',revision=None),peer_name='B')
                 self.assertEqual(len(page['entries']),256)
                 with closing(ledger(receiver)) as writer, writer:
+                    other = dict(sender='B', recipient='C', source='other', spec={})
+                    other['id'] = digest(other)
+                    writer.execute('INSERT INTO jobs(id,request) VALUES (?,?)',(other['id'],packed(other).decode()))
+                following = transfer(db,endpoint,dict(sender='A',after=page['next'],revision=page['revision']),peer_name='B')
+                self.assertEqual(following['revision'],page['revision'])
+                self.assertNotIn(other['id'], {e['job'] for e in following['entries']})
+                with closing(ledger(receiver)) as writer, writer:
                     writer.execute('DELETE FROM jobs WHERE id=?',(synthetic[0][0],))
                 with self.assertRaises(HTTPError) as stale:
                     transfer(db,endpoint,dict(sender='A',after=page['next'],revision=page['revision']),peer_name='B')
