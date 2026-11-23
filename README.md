@@ -61,6 +61,10 @@ python -m open_roundtable.data runtime/customer-a public-feed
 
 本机 `qwen3.5:9b` 混合批次实测使用两条合成记录。一条记录描述虚构协调员偏好周二上午开会，另一条仅允许封闭整理。预览得到 sealed 1、local 1、api 0；执行后完成 2 条，再次执行选中 0 条。SQLite 中的模型摘要保留了周二上午和协调员角色，省略了“虚构”这一限定；封闭记录的结果只合并了多余空白。此例验证本机维护流程，摘要保真度仍需按用途核对。
 
+在本机 Ollama 提供 `qwen3.5:9b` 时，运行 `python -m examples.private_summary_cases` 可逐条比较三条中文合成记录与私库实际保存的摘要。调整摘要提示后，每条各测一次：偏好归属样本保留了小周喜欢早班和转述者小林偏好未知；晚班例外保留了周五与同事接孩子两个必要条件；试点样本保留了尚未获批、排班照旧以及获批后也只是可能变更。三条结果按原文人工核对，样本量不足以估计整体准确率。
+
+批量维护前可用 `--preview` 查看各权限模式下的记录数。正式执行会逐条核对当前权限；个别模型请求失败时继续处理同批其他记录，并以退出码 2 报告部分失败。下次运行从上次选取的位置继续。用 `summary-origin SOURCE` 可查询当前摘要实际使用的模式和模型名；旧摘要的来源信息可能为空。
+
 导入文件是 UTF-8 JSON 数组，例如 `[{"source":"profile","body":"偏好上午开会"}]`。默认 sealed 模式允许写入和无网络的本地文本整理，结果只写回私库。选择 `policy local --model qwen3.5:9b` 后可用本机 Ollama 摘要；选择 `policy api --model MODEL --endpoint HTTPS_URL` 后，维护命令会将该条正文发给指定的兼容聊天接口。可通过环境变量 `ROUNDTABLE_API_KEY` 配置密钥，通过 `policy sealed` 撤销后续调用。已发送的数据由接收方处理。
 
 公开库支持 `fetch-public URL` 采集指定的 UTF-8 文本、`import public FILE` 批量导入、`import-feed URL` 拉取选定节点的 JSON 目录。资料默认仅本机使用。`share-public URL` 允许该条进入 `public-feed`，加 `--off` 可撤下。内容变更后需要重新选择共享。节点运营者自行托管导出的目录；来源字段由提供方声明。
@@ -312,4 +316,3 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 运行 `python -m unittest tests.test_peer_audit` 可复现同机双进程的九表审查、独立评分和重复派单核账。
 
 运行 `python -m examples.rule_discovery --dispatch` 可用一个发起方和四个提供方在本机比较两种发现方式。对每张公开合成班表，两组都向全部入选服务尝试派单，并逐份与独立评分器核对。九张表中，仅按标签筛选产生 36 次尝试，其中 21 次在发送班表前被服务声明检查拦下。要求全部规则匹配产生 15 次尝试，全部取得正确回执。两组各有 36 次初始目录请求，之后发起方的网络请求分别为 51 次和 30 次，两组各登记 15 份回执、0 credits。
-在本机 Ollama 提供 `qwen3.5:9b` 时，运行 `python -m examples.private_summary_cases` 可逐条比较三条中文合成记录与私库实际保存的摘要。调整摘要提示后，每条各测一次：偏好归属样本保留了小周喜欢早班和转述者小林偏好未知；晚班例外保留了周五与同事接孩子两个必要条件；试点样本保留了尚未获批、排班照旧以及获批后也只是可能变更。三条结果按原文人工核对，样本量不足以估计整体准确率。

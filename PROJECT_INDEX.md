@@ -24,6 +24,9 @@
 | 检查命令行行为及发布限制 | [命令行测试](tests/test_cli.py) · [打包边界测试](tests/test_packaging_boundary.py) |
 | 提交排班需求并核对修复方案 | [会诊程序](examples/user_consult.py) · [九表偏好对照](examples/preference_results.md) |
 | 按自然语言需求寻找公开服务 | [九条需求对照](examples/capability_requests.py) |
+| 比较标签筛选与按排班规则筛选的实际派单成本 | [远端排班审查与复现命令](README.md#远端排班审查) · [九表实验](examples/rule_discovery.py) |
+| 设置客户私库权限、预览批次、查询摘要来源 | [公开资料和个人资料](README.md#公开资料和个人资料) · [权限与回滚测试](tests/test_data.py) |
+| 检查本机模型是否保留中文记录中的否定、例外与偏好归属 | [三组合成记录对照](examples/private_summary_cases.py) |
 | 复现同机节点发现、断线重发与对账 | [双节点演练](examples/two_node_demo.py) · [故障时点与查账步骤](README.md#接收节点断线后如何查账) |
 | 比较直接会诊与委派子圆桌 | [九表配对实验](examples/paired_panel_benchmark.py) |
 | 比较合作方账单的分页读取成本 | [合成账本实验](examples/statement_benchmark.py) |
