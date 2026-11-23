@@ -125,7 +125,7 @@ def transfer(db,url,data=None,*,peer_name=None):
 
 
 def discover(db,bootstrap):
-    feed=transfer(db,bootstrap+'/catalog')
+    feed = fetch_public_subset(db, bootstrap, None, '/nodes')
     if not isinstance(feed, list):
         raise ValueError('invalid public directory snapshot')
     registrations = [(r['source'], json.loads(r['body'])) for r in feed if r['source'].endswith('/node')]
@@ -583,6 +583,8 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                     rows = public.execute('SELECT source,body FROM records WHERE shared=1 AND source=?',
                                           (query['source'][0],)).fetchall()
                 result = [dict(source=source,body=body) for source,body in rows]
+            elif self.path == '/nodes':
+                result = [record for record in catalog(root) if record['source'].endswith('/node')]
             elif self.path in ('/catalog','/offers'):
                 result = published_offers(root) if self.path=='/offers' else catalog(root)
             else:

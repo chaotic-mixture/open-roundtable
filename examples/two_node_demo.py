@@ -134,11 +134,12 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         (folder/'directory.json').write_bytes(packed(descriptors))
         class Directory(BaseHTTPRequestHandler):
             def do_GET(self):
-                if self.path!='/catalog':
+                if self.path not in ('/nodes', '/catalog'):
                     return self.send_error(404)
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(packed(descriptors))
+                records = [r for r in descriptors if r['source'].endswith('/node')] if self.path == '/nodes' else descriptors
+                self.wfile.write(packed(records))
         directory=stack.enter_context(HTTPServer(('127.0.0.1',0),Directory))
         if credentials:
             directory_keys = credentials/'directory'

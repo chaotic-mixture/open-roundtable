@@ -18,7 +18,7 @@ from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 from examples.demo_certificates import issue_certificates
 from examples.peer_node import digest, ledger, packed, transfer
 from examples.two_node_demo import audit, cli, run, start
-from open_roundtable.data import initialize, share_public
+from open_roundtable.data import initialize, ingest, share_public
 
 
 class PeerTLSTests(unittest.TestCase):
@@ -43,6 +43,12 @@ class PeerTLSTests(unittest.TestCase):
                     transfer(db,url+'/catalog',peer_name='B')
                 (base/'A'/'node.json').write_text(json.dumps(dict(name='A',transport='mtls',credentials=str(credentials/'A'),allowed_origins=[url])))
                 self.assertEqual(transfer(db,url+'/catalog',peer_name='B'), [])
+                registration = dict(source='https://b.example/node', body=json.dumps(dict(name='B', url=url)))
+                topic = dict(source='https://b.example/topic', body='public schedule')
+                ingest(base/'B', 'public', [registration, topic])
+                for record in (registration, topic):
+                    share_public(base/'B', record['source'], True)
+                self.assertEqual(transfer(db,url+'/nodes',peer_name='B'), [registration])
                 with self.assertRaises(URLError) as wrong_peer:
                     transfer(db,url+'/consult',dict(sender='A'),peer_name='C')
                 self.assertIsInstance(wrong_peer.exception.reason, ssl.SSLCertVerificationError)
