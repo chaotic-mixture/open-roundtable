@@ -11,7 +11,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import deliver, digest, ledger, resume, send, set_permission
+from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from open_roundtable.data import connect, ingest, initialize
 
@@ -106,6 +106,23 @@ class PeerRecoveryTests(unittest.TestCase):
                     send(Path(tmp), db, 'B', 'source')
                 saved, cost = db.execute('SELECT result,credits FROM jobs').fetchone()
                 self.assertEqual((json.loads(saved),cost), (receipt,2))
+
+    def test_directory_withdrawal_and_reregistration(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            feed = [dict(source='https://a.example/node', body=json.dumps(dict(name='A',url='http://127.0.0.1:8001')))]
+            with patch('examples.peer_node.transfer', side_effect=[feed,feed]):
+                discover(db, 'directory')
+            set_permission(db, 'A', True, 1)
+            with patch('examples.peer_node.transfer', side_effect=[feed,[]]), self.assertRaises(ValueError):
+                discover(db, 'directory')
+            self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))
+            with patch('examples.peer_node.transfer', return_value=[]):
+                self.assertEqual(discover(db, 'directory'), [])
+            for table in ('peers','consult_grants','grant_limits'):
+                self.assertEqual(db.execute('SELECT count(*) FROM '+table).fetchone(), (0,))
+            with patch('examples.peer_node.transfer', side_effect=[feed,feed]):
+                discover(db, 'directory')
+            self.assertEqual(db.execute('SELECT count(*) FROM consult_grants').fetchone(), (0,))
 
     def test_receiver_permission(self):
         with tempfile.TemporaryDirectory() as tmp:

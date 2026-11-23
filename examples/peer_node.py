@@ -57,14 +57,19 @@ def transfer(db,url,data=None):
 def discover(db,bootstrap):
     feed=transfer(db,bootstrap+'/catalog')
     descriptors=[json.loads(r['body']) for r in feed if r['source'].endswith('/node')]
-    if not descriptors or len({p['name'] for p in descriptors})!=len(descriptors):
-        raise ValueError('missing or duplicate public registration')
+    if not isinstance(feed, list) or len({p['name'] for p in descriptors})!=len(descriptors):
+        raise ValueError('invalid public directory snapshot')
     for peer in descriptors:
         published=transfer(db,peer['url']+'/catalog')
         if not any(r['source'].endswith('/node') and json.loads(r['body'])==peer for r in published):
             raise ValueError('advertised node did not confirm registration')
     with db:
-        db.executemany('INSERT OR REPLACE INTO peers VALUES (?,?)',[(p['name'],p['url']) for p in descriptors])
+        db.execute('BEGIN IMMEDIATE')
+        db.execute('DELETE FROM peers')
+        db.executemany('INSERT INTO peers VALUES (?,?)', [(p['name'], p['url']) for p in descriptors])
+        db.execute('''DELETE FROM consult_grants WHERE NOT EXISTS (
+            SELECT 1 FROM peers WHERE peers.name=consult_grants.name AND peers.url=consult_grants.url)''')
+        db.execute('DELETE FROM grant_limits WHERE name NOT IN (SELECT name FROM consult_grants)')
     return descriptors
 
 

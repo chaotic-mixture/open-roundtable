@@ -193,3 +193,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC select 1 Axu:20-25 Byv:21-
 python -m examples.selector_policy meta.sqlite3 TOPIC withdraw
 python -m examples.selector_policy meta.sqlite3 TOPIC status
 ~~~
+
+在同一可信目录上再次运行 `discover` 会用完整快照更新本地节点名单。目录撤回登记或节点更换地址时，旧授权和剩余额度同时失效；以后重新登记需重新授权。有效空目录会清空名单。若获取目录失败或某个登记无法在节点端核实，保留前一次成功同步的名单。
