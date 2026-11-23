@@ -25,6 +25,12 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_weekly_worker_rest_capacity_boundary(self):
+        rows = [(chr(65+i)+'xu', 16*i, 8) for i in range(11)]
+        self.assertEqual(feasibility(rows, lambda p: True, 11)['plan'], [16*i for i in range(11)])
+        rows.append(('Lxu', 0, 1))
+        self.assertEqual(feasibility(rows, lambda p: True, 1), dict(status='infeasible', nodes=0, plan=None))
+
     def test_exhausted_domain_differs_from_exhausted_budget(self):
         rows=[('Axu',8,4)]
         impossible=lambda plan:plan[0]>168

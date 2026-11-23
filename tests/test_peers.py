@@ -18,18 +18,18 @@ from open_roundtable.data import connect, ingest, initialize
 
 class PeerRecoveryTests(unittest.TestCase):
     def test_search_limit_returns_replayable_zero_charge(self):
-        self.check_no_plan_receipt(12, 'unknown', 1)
+        self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
 
     def test_room_capacity_returns_replayable_zero_charge(self):
         self.check_no_plan_receipt(22, 'infeasible', 0, separate_workers=True)
 
-    def check_no_plan_receipt(self, count, status, nodes, separate_workers=False):
+    def check_no_plan_receipt(self, count, status, nodes, separate_workers=False, duration=8):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
             (root/'node.json').write_text('{"name":"B","model":"fixture"}')
             spec = dict(title='crowded week', preference='keep starts', search_nodes=1,
                         shifts=[dict(id=str(i), worker=str(i) if separate_workers else 'w',
-                                     room='r', start=0, end=8) for i in range(count)])
+                                     room='r', start=0, end=duration) for i in range(count)])
             body = dict(sender='A', recipient='B', source='public', spec=spec)
             request = dict(body, id=digest(body))
             db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")

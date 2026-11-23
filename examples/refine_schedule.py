@@ -62,7 +62,11 @@ def feasibility(rows, accepts, budget):
         for key, _, duration in rows:
             resource = key[field]
             hours[resource] = hours.get(resource, 0) + duration
-            if hours[resource] > 168:
+            work = hours[resource]
+            # Each worker needs eight hours off between blocks of at most eight hours.
+            # Touching shifts can share a block, so count blocks from total hours.
+            rest = 8 * ((work - 1) // 8) if field == 1 else 0
+            if work + rest > 168:
                 return dict(status='infeasible', nodes=0, plan=None)
     original=[r[1] for r in rows]
     domains=[sorted(range(169-r[2]),key=lambda h:abs(h-r[1])) for r in rows]
