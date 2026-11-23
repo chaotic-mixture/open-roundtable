@@ -4,6 +4,7 @@ from io import StringIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 from threading import Thread
 import unittest
@@ -13,6 +14,20 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_failed_origin_write_rolls_back_new_summary(self):
+        data.maintain(self.root, 'profile')
+        with closing(data.connect(self.root, 'private')) as db, db:
+            db.execute("""CREATE TRIGGER reject_origin BEFORE INSERT ON summary_origin
+                BEGIN SELECT RAISE(ABORT, 'origin unavailable'); END""")
+        data.configure(self.root, 'local', 'new-model')
+        with patch.object(data, 'exchange', return_value='{"message":{"content":"replacement"}}'):
+            with self.assertRaisesRegex(sqlite3.IntegrityError, 'origin unavailable'):
+                data.maintain(self.root, 'profile')
+        with closing(data.connect(self.root, 'private')) as db:
+            row = db.execute("""SELECT summary, mode, model FROM records
+                JOIN summary_origin USING(source) WHERE source='profile'""").fetchone()
+        self.assertEqual(row, ('private content', 'sealed', None))
+
     def test_summary_origin_tracks_successful_maintenance_across_policy_changes(self):
         def origin():
             output = StringIO()
