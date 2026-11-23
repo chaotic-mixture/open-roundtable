@@ -1,6 +1,9 @@
 """Issue temporary test credentials and exercise the actual TLS listener."""
 from contextlib import closing, ExitStack
 from http.client import HTTPException
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
+from unittest.mock import patch
 import json
 import os
 from pathlib import Path
@@ -13,7 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 from examples.peer_node import ledger, transfer
-from examples.two_node_demo import start
+from examples.two_node_demo import audit, run, start
 from open_roundtable.data import initialize
 
 
@@ -30,7 +33,7 @@ class PeerTLSTests(unittest.TestCase):
 
             issue('req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=Test CA',
                   '-addext','basicConstraints=critical,CA:TRUE','-keyout','ca.key','-out','ca.pem')
-            for name in ('A','B'):
+            for name in ('A','B','directory'):
                 root = base/name
                 initialize(root)
                 (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls')))
@@ -59,3 +62,27 @@ class PeerTLSTests(unittest.TestCase):
             client = ssl.create_default_context(cafile=str(base/'ca.pem'))
             with self.assertRaises((OSError,HTTPException)):
                 urlopen(url+'/catalog',context=client,timeout=3)
+
+            calls = []
+            class Model(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    self.rfile.read(int(self.headers['Content-Length']))
+                    calls.append(self.path)
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(dict(model='fixture', done=True, done_reason='stop',
+                        prompt_eval_count=19, eval_count=7,
+                        message=dict(role='assistant', content='{"plan":0}'))).encode())
+
+            model = stack.enter_context(HTTPServer(('127.0.0.1',0), Model))
+            threading.Thread(target=model.serve_forever,daemon=True).start()
+            stack.callback(model.shutdown)
+            folder = base/'exercise'
+            with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
+                result = run(folder, 'fixture', 'before-receipt', credentials=base)
+            self.assertEqual(audit(folder), result)
+            self.assertEqual((result['deliveries'], result['credits'], calls), (2, 2, ['/api/chat']))
+            for name in ('A','B'):
+                with closing(ledger(folder/name)) as db:
+                    routes = db.execute("SELECT route FROM traffic WHERE direction='send'").fetchall()
+                    self.assertTrue(routes and all(url.startswith('https://') for url, in routes))

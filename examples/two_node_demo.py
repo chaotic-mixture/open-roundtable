@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import sqlite3
+import ssl
 import subprocess
 import sys
 import threading
@@ -100,19 +101,23 @@ def audit(folder):
                 state=state,private_markers_found=0,request_id=key)
 
 
-def run(folder,model,fault='after-commit'):
+def run(folder,model,fault='after-commit', *, credentials=None):
     if fault not in ('before-receipt','after-commit'):
         raise ValueError('unknown fault window')
     folder.mkdir(parents=True,exist_ok=False)
     a,b=folder/'A',folder/'B'
     with ExitStack() as stack:
+        scheme = 'https' if credentials else 'http'
         descriptors=[]
         for name,root in [('A',a),('B',b)]:
             initialize(root)
             ingest(root,'private',[dict(source='private-key-'+uuid.uuid4().hex,body='secret-'+uuid.uuid4().hex)])
-            (root/'node.json').write_bytes(packed(dict(name=name,model=model)))
+            config = dict(name=name,model=model)
+            if credentials:
+                config.update(transport='mtls', credentials=str((credentials/name).resolve()))
+            (root/'node.json').write_bytes(packed(config))
             proc,port=start(stack,root,0,interrupt=fault if name=='B' else False)
-            desc=dict(name=name,url=f'http://127.0.0.1:{port}')
+            desc=dict(name=name,url=f'{scheme}://127.0.0.1:{port}')
             ingest(root,'public',[dict(source=f'https://{name.lower()}.example/node',body=packed(desc).decode())])
             with closing(connect(root,'public')) as db,db:
                 db.execute('UPDATE records SET shared=1')
@@ -126,10 +131,16 @@ def run(folder,model,fault='after-commit'):
                 self.end_headers()
                 self.wfile.write(packed(descriptors))
         directory=stack.enter_context(HTTPServer(('127.0.0.1',0),Directory))
+        if credentials:
+            directory_keys = credentials/'directory'
+            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, cafile=str(directory_keys/'ca.pem'))
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_cert_chain(directory_keys/'node.pem', directory_keys/'node.key')
+            directory.socket = context.wrap_socket(directory.socket, server_side=True)
         thread=threading.Thread(target=directory.serve_forever,daemon=True)
         thread.start()
         stack.callback(directory.shutdown)
-        bootstrap=f'http://127.0.0.1:{directory.server_port}'
+        bootstrap=f'{scheme}://127.0.0.1:{directory.server_port}'
         for root in (a,b):
             cli(root,'discover',bootstrap)
         cli(b,'permission','A','allow','--remaining','1')
@@ -163,5 +174,6 @@ if __name__=='__main__':
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
+    parser.add_argument('--credentials', type=Path, help='TLS credentials directory containing A, B and directory')
     args=parser.parse_args()
-    print(json.dumps(run(args.directory,args.model,args.fault) if args.action=='run' else audit(args.directory)))
+    print(json.dumps(run(args.directory,args.model,args.fault,credentials=args.credentials) if args.action=='run' else audit(args.directory)))

@@ -48,6 +48,7 @@ def tls_context(root, *, server=False):
         return None
     if config['transport'] != 'mtls':
         raise ValueError('unknown node transport')
+    root = Path(config.get('credentials', root))
     purpose = ssl.Purpose.CLIENT_AUTH if server else ssl.Purpose.SERVER_AUTH
     context = ssl.create_default_context(purpose, cafile=str(root/'ca.pem'))
     context.verify_mode = ssl.CERT_REQUIRED
