@@ -355,17 +355,21 @@ class PeerRecoveryTests(unittest.TestCase):
 
     def test_directory_withdrawal_and_reregistration(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            (Path(tmp)/'node.json').write_text('{"name":"B"}')
             feed = [dict(source='https://a.example/node', body=json.dumps(dict(name='A',url='http://127.0.0.1:8001')))]
             with patch('examples.peer_node.transfer', side_effect=[feed,feed]):
                 discover(db, 'directory')
             set_permission(db, 'A', True, 1)
             other_source = [dict(feed[0], source='https://other.example/node')]
             same_source = dict(feed[0], body=json.dumps(dict(name='B', url='http://127.0.0.1:8002')))
-            for malformed in ([None], [dict(feed[0], body='null')], [feed[0], same_source]):
+            path_endpoint = dict(name='A', url='http://127.0.0.1:8001/subpath')
+            for malformed in ([None], [dict(feed[0], body='null')], [feed[0], same_source],
+                              [dict(feed[0], source='relative/node')], [dict(feed[0], body=json.dumps(path_endpoint))]):
                 with patch('examples.peer_node.transfer', return_value=malformed) as fetch:
                     with self.assertRaises(ValueError):
                         discover(db, 'directory')
                     self.assertEqual(fetch.call_count, 1)
+                    self.assertEqual(db.execute('SELECT name,url FROM peers').fetchall(), [('A','http://127.0.0.1:8001')])
                     self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))
             with patch('examples.peer_node.transfer', side_effect=[feed,other_source]), self.assertRaises(ValueError):
                 discover(db, 'directory')

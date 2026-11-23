@@ -149,6 +149,8 @@ def discover(db,bootstrap):
         raise ValueError('invalid public directory snapshot')
     registrations = []
     sources = set()
+    root = Path(db.execute('PRAGMA database_list').fetchone()[2]).parent
+    config = json.loads((root/'node.json').read_text())
     for record in feed:
         if not isinstance(record, dict) or not isinstance(record.get('source'), str):
             raise ValueError('invalid public directory record')
@@ -161,6 +163,7 @@ def discover(db,bootstrap):
         if not isinstance(peer, dict) or not all(isinstance(peer.get(k), str) and peer[k].strip()
                                                  for k in ('name', 'url')):
             raise ValueError('invalid public node registration')
+        validate_registration_origin(config, source, peer['url'])
         sources.add(source)
         registrations.append((source, peer))
     descriptors = [peer for source, peer in registrations]
