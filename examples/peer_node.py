@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import sqlite3
 import ssl
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
@@ -168,12 +169,36 @@ def offer(root, source, tag, description):
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
 
 
+def fetch_offers(db, url, peer):
+    try:
+        return transfer(db,url+'/offers',peer_name=peer)
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+        error.close()
+    return transfer(db,url+'/catalog',peer_name=peer)
+
+
+def published_offers(root):
+    name = json.loads((root/'node.json').read_text())['name']
+    offers = []
+    for record in catalog(root):
+        try:
+            body = json.loads(record['body'])
+        except ValueError:
+            continue
+        if (isinstance(body,dict) and body.get('kind')=='capability' and body.get('node')==name
+                and isinstance(body.get('tag'),str) and isinstance(body.get('description'),str)):
+            offers.append(record)
+    return offers
+
+
 def find_capability(root, db, tag=None, *, accepting_only=False):
     node = json.loads((root/'node.json').read_text())['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
         try:
-            records = transfer(db,url+'/catalog',peer_name=peer)
+            records = fetch_offers(db,url,peer)
             if not isinstance(records,list):
                 raise ValueError('expected a catalog list')
         except (HTTPException,OSError,ValueError):
@@ -339,7 +364,7 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
     if not peer:
         raise ValueError('discover recipient first')
     if offer_ref is not None and original is None:
-        verify_offer(transfer(db,peer[0]+'/catalog',peer_name=recipient),recipient,offer_ref)
+        verify_offer(fetch_offers(db,peer[0],recipient),recipient,offer_ref)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
     result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
@@ -545,9 +570,9 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             self.wfile.write(raw)
 
         def do_GET(self):
-            if self.path!='/catalog':
+            if self.path not in ('/catalog','/offers'):
                 return self.reply(404,{})
-            result=catalog(root)
+            result = published_offers(root) if self.path=='/offers' else catalog(root)
             with closing(ledger(root)) as db:
                 trace(db,'serve',self.path,result)
             self.reply(200,result)

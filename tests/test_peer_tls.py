@@ -105,6 +105,9 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(lookup(), dict(matches=[],unavailable=[]))
             share_public(receiver,source,True,draft['sha256'])
             self.assertEqual(lookup()['matches'], [dict(node='B',source=source,description='Repair weekly shifts',sha256=draft['sha256'])])
+            with closing(ledger(folder/'A')) as db:
+                wire = db.execute("SELECT body FROM traffic WHERE direction='receive' AND route LIKE '%/offers' ORDER BY rowid DESC LIMIT 1").fetchone()
+                self.assertEqual([r['source'] for r in json.loads(wire[0])], [source])
             cli(receiver,'permission','A','allow','--remaining','0')
             blocked = json.loads(cli(folder/'A','match-capability','repair shifts','--accepting-only').stdout)
             self.assertEqual((blocked['matches'],blocked['declined'],blocked['calls']), ([],['B'],0))

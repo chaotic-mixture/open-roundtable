@@ -89,7 +89,7 @@ def audit(folder):
     require(accepted==[req,req] and replies==[res],'lost-receipt replay sequence')
     if 'offer' in req:
         source, checksum = req['offer']
-        observed = [record for direction,route,value in traffic if direction=='receive' and route.endswith('/catalog')
+        observed = [record for direction,route,value in traffic if direction=='receive' and route.endswith(('/catalog','/offers'))
                     for record in json.loads(value) if record['source']==source]
         require(any(hashlib.sha256(r['body'].encode()).hexdigest()==checksum for r in observed),
                 'missing published offer revision')

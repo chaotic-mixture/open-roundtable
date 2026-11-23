@@ -233,3 +233,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 2026-11-23 在同机两个节点进程、回环 HTTP 和本机 qwen3.5:9b 上复跑上述绑定声明演练。接收方退出后撤回声明，原请求重发成功；两次投递对应专家一次、模型一次、合计 2 个测试 credits。模型回执为输入 290、输出 7 tokens，议题状态为 RESOLVED。独立 verify 得到相同结果，受查记录中的私库标记命中数为零。双向 TLS 的同类回归使用可计数模型替身，跨物理主机仍待验收。
 
 使用本机已安装的 OpenSSL 和 Ollama 可直接复跑加密演练：`python -m examples.two_node_demo run reports/real-tls-offer --temporary-tls openssl --bind-offer --fault before-receipt`。该模式为 A、B 和目录临时签发测试证书，退出后清理密钥。2026-11-23 同机双向 TLS 与真实 qwen3.5:9b 联合实测：两次投递、专家与模型各一次、2 credits、290 输入和 7 输出 tokens，离线核验一致。演练结束后两端配置指向的临时凭证目录均已清理。
+
+能力查询和发送前的声明复核优先读取对端的 `/offers`，其中只包含该节点明确共享的能力声明。旧节点返回 404 时会兼容读取其完整公开目录；其他错误按查询失败处理。
