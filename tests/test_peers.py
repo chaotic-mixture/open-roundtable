@@ -18,6 +18,30 @@ from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_invalid_kernel_receipt_leaves_network_job_pending(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"B"}')
+            body = dict(sender='A',recipient='B',source='public',spec={})
+            request = dict(body,id=digest(body))
+            db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+            set_permission(db,'A',True,0)
+            db.execute('INSERT INTO jobs(id,request) VALUES (?,?)',(request['id'],json.dumps(request)))
+            db.commit()
+            receipt = dict(id=request['id'],sender='B',recipient='A',credits=2,outcome=dict(state='RESOLVED'))
+            with closing(sqlite3.connect(root/(request['id']+'.sqlite3'))) as kernel:
+                kernel.execute('CREATE TABLE peer_receipt (id TEXT PRIMARY KEY,result TEXT)')
+                kernel.execute('CREATE TABLE messages (cost INTEGER)')
+                kernel.executemany('INSERT INTO messages VALUES (?)',[(1,),(1,)])
+                with patch('examples.peer_node.transfer',return_value=[dict(source='public',body='{}')]):
+                    for changes in [dict(recipient='C'),dict(credits=1)]:
+                        kernel.execute('INSERT OR REPLACE INTO peer_receipt VALUES (?,?)',
+                                       (request['id'],json.dumps(receipt | changes)))
+                        kernel.commit()
+                        with self.assertRaises(ValueError):
+                            deliver(root,db,request)
+                        self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchone(),(None,0))
+
     def test_restart_after_model_dispatch_without_receipt_keeps_job_pending(self):
         started = threading.Event()
         release = threading.Event()

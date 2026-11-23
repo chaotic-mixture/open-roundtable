@@ -366,20 +366,30 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         claimed = db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',
                              (key, packed(request).decode())).rowcount
         if not claimed:
-            saved, result = db.execute('SELECT request,result FROM jobs WHERE id=?', (key,)).fetchone()
+            saved, result, posted = db.execute('SELECT request,result,credits FROM jobs WHERE id=?', (key,)).fetchone()
             if json.loads(saved) != request:
                 raise ValueError('stored request mismatch')
             if result is not None:
-                return json.loads(result), False
+                receipt = json.loads(result)
+                validate_receipt(request, receipt)
+                if posted != receipt['credits']:
+                    raise ValueError('invalid service charge')
+                return receipt, False
             if not database.exists():
                 raise ValueError('job in progress or awaiting local reconciliation')
             uri = database.resolve().as_uri() + '?mode=ro'
             with closing(sqlite3.connect(uri, uri=True)) as kernel:
                 exists = kernel.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='peer_receipt'").fetchone()
                 checkpoint = kernel.execute('SELECT result FROM peer_receipt WHERE id=?', (key,)).fetchone() if exists else None
-            if checkpoint is None:
-                raise ValueError('job in progress or awaiting local reconciliation')
-            result = json.loads(checkpoint[0])
+                if checkpoint is None:
+                    raise ValueError('job in progress or awaiting local reconciliation')
+                result = json.loads(checkpoint[0])
+                validate_receipt(request, result)
+                has_messages = kernel.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='messages'").fetchone()
+                if has_messages or result['outcome']['state'] != 'NO_PLAN':
+                    recorded = kernel.execute('SELECT sum(cost) FROM messages').fetchone()[0]
+                    if recorded != result['credits']:
+                        raise ValueError('checkpoint charge differs from kernel ledger')
             db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
             return result, False
         if 'offer' in request:
@@ -403,6 +413,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         if credits is None:
             credits=k.execute('SELECT sum(cost) FROM messages').fetchone()[0]
         result=dict(id=key,sender=config['name'],recipient=request['sender'],outcome=outcome,credits=credits)
+        validate_receipt(request, result)
         k.execute('CREATE TABLE peer_receipt (id TEXT PRIMARY KEY, result TEXT NOT NULL)')
         k.execute('INSERT INTO peer_receipt VALUES (?,?)', (key, packed(result).decode()))
     if interrupt_before_receipt:
