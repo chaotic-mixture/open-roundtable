@@ -19,6 +19,10 @@ def main():
     consult.add_argument('--model',default='qwen3.5:9b')
     verify = commands.add_parser('verify-batch',help='reconcile preference results offline')
     verify.add_argument('directory',type=Path)
+    cite = commands.add_parser('cite', help='attach a resolved local proposal as historical evidence')
+    cite.add_argument('db', type=Path)
+    cite.add_argument('topic')
+    cite.add_argument('source')
     for name in ('propose','vote'):
         command=commands.add_parser(name)
         command.add_argument('db',type=Path)
@@ -37,11 +41,13 @@ def main():
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)
-        elif args.command in ('propose','vote'):
+        elif args.command in ('cite','propose','vote'):
             if not args.db.is_file():
                 raise ValueError('database missing')
             with closing(Kernel(args.db)) as k:
-                if args.command=='propose':
+                if args.command=='cite':
+                    k.cite(args.topic,args.source)
+                elif args.command=='propose':
                     k.propose(args.topic,args.body,previous_version=args.version)
                 else:
                     k.vote(args.topic,args.member,args.ballot=='yes',version=args.version)

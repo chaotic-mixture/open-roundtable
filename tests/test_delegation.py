@@ -19,6 +19,32 @@ class DelegationTests(unittest.TestCase):
                 self.assertEqual(k.get(result['parent'])['credits'], 2)
                 self.assertEqual(len(k.get(result['parent'])['messages']), 2)
 
+    def test_historical_proposal_is_evidence_without_a_seat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'history.sqlite3'
+            with closing(Kernel(path)) as k:
+                source = k.create('earlier review', 1)
+                target = k.create('follow-up', 2)
+                k.join(source, 'author', kind='human')
+                k.join(target, 'reviewer', kind='expert')
+                k.start(source)
+                version = k.propose(source, 'original result', previous_version=0)
+                with self.assertRaises(ValueError):
+                    k.cite(target, source)
+                k.vote(source, 'author', True, version=version)
+                self.assertEqual(k.cite(target, source), version)
+            with closing(Kernel(path)) as k:
+                k.start(target)
+                snapshot = k.get(target)
+                self.assertEqual(snapshot['citations'], [dict(source=source, version=version,
+                                     title='earlier review', body='original result')])
+                self.assertEqual((snapshot['credits'], len(snapshot['members'])), (2, 1))
+                with self.assertRaises(ValueError):
+                    k.vote(target, 'author', True)
+                k.vote(target, 'reviewer', True)
+                self.assertEqual(k.cite(target, source), version)
+                self.assertEqual((k.get(target)['state'], len(k.get(target)['citations'])), ('RESOLVED', 1))
+
     def test_three_levels(self):
         with closing(Kernel(':memory:')) as k:
             root = k.create('root', 6)

@@ -55,6 +55,9 @@ class Kernel:
             parent TEXT NOT NULL, member TEXT NOT NULL, child TEXT PRIMARY KEY REFERENCES topics(id),
             budget INTEGER NOT NULL, spent INTEGER, UNIQUE(parent,member),
             FOREIGN KEY(parent,member) REFERENCES members(topic,id))""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS citations (
+            topic TEXT NOT NULL REFERENCES topics(id), source TEXT NOT NULL, version INTEGER NOT NULL,
+            PRIMARY KEY(topic,source,version), FOREIGN KEY(source,version) REFERENCES proposals(topic,version))""")
         self.db.commit()
 
     def close(self):
@@ -100,7 +103,27 @@ class Kernel:
             'SELECT * FROM feedback WHERE topic=? ORDER BY id', (topic,))]
         result['tags'] = [dict(r) for r in self.db.execute(
             'SELECT * FROM tags WHERE topic=? ORDER BY member, label', (topic,))]
+        result['citations'] = [dict(r) for r in self.db.execute(
+            '''SELECT c.source,c.version,t.title,p.body FROM citations c
+               JOIN topics t ON t.id=c.source JOIN proposals p ON p.topic=c.source AND p.version=c.version
+               WHERE c.topic=? ORDER BY c.source,c.version''', (topic,))]
         return result
+
+    def cite(self, topic, source):
+        """Attach a resolved local proposal as non-voting evidence."""
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            target = self.get(topic)
+            history = self.get(source)
+            if topic == source or history['state'] != 'RESOLVED' or not history['proposals']:
+                raise ValueError('cite a separate resolved topic with a proposal')
+            version = history['current_version']
+            if any(item['source'] == source and item['version'] == version for item in target['citations']):
+                return version
+            if target['state'] == 'RESOLVED':
+                raise ValueError('closed topic cannot receive new evidence')
+            self.db.execute('INSERT INTO citations VALUES (?,?,?)', (topic, source, version))
+            return version
 
     def tag(self, topic, member, label):
         _text(label, 'label')
