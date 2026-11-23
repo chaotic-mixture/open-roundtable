@@ -42,6 +42,10 @@ class GapTests(unittest.TestCase):
                 flat.commit()
                 with self.assertRaisesRegex(ValueError, 'differs from selected expert candidate'):
                     compare(direct, nested)
+                flat.execute("UPDATE proposals SET body=json_set(?,'$.criteria_met',json('[]'))", (original,))
+                flat.commit()
+                with self.assertRaisesRegex(ValueError, 'preference scores'):
+                    compare(direct, nested)
                 flat.execute('UPDATE proposals SET body=?', (original,))
                 flat.commit()
             with closing(sqlite3.connect(nested)) as db:

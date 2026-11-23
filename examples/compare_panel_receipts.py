@@ -6,6 +6,8 @@ from pathlib import Path
 import sqlite3
 
 from examples.select_repair import choice
+from examples.roster_criteria import evaluate
+from examples.user_consult import validate_roster
 
 
 def read_receipt(path, nested):
@@ -33,7 +35,8 @@ def read_receipt(path, nested):
         if body is None:
             raise ValueError('missing repair proposal')
         proposal = json.loads(body[0])
-        candidates = json.loads(charges[0][2])['candidates']
+        expert = json.loads(charges[0][2])
+        candidates = expert['candidates']
         if not isinstance(candidates, list) or not candidates:
             raise ValueError('missing expert candidates')
         try:
@@ -43,7 +46,12 @@ def read_receipt(path, nested):
         if (type(proposal.get('selected')) is not int or proposal['selected'] != selected
                 or proposal.get('schedule') != candidates[selected]):
             raise ValueError('proposal differs from selected expert candidate')
-        result = dict(state=state, selected=proposal['selected'], criteria_met=proposal['criteria_met'],
+        rows, rules = validate_roster(expert['input'])
+        flags = list(evaluate(rules, rows, [shift['start'] for shift in candidates[selected]]))
+        saved = proposal.get('criteria_met')
+        if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
+            raise ValueError('recorded preference scores differ from the selected schedule')
+        result = dict(state=state, selected=proposal['selected'], criteria_met=flags,
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         if nested:
             parent, _, spent, member = links[0]
