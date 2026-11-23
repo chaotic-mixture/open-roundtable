@@ -93,3 +93,5 @@ python -m examples.compare_panel_receipts direct.sqlite3 nested.sqlite3
 | 509 | 19 | 19 | 20 |
 
 若先满足两项偏好、再按改动数取最小，501、503、504 可比实选少动班次；502、507 持平；505、506、508、509 各需多动一个班次。该排序使用已编码的偏好，只作为本批离线对照。
+
+已有九表账本时，运行 `python -m examples.paired_panel_benchmark reports/panel-nine-new --verify-only`，将目录换为实际保存位置。程序按原种子重新生成预期输入，核对每份账本的排班、偏好及标准，然后逐表输出 JSON。该模式只读 SQLite，缺少任一回执文件时以非零状态退出。

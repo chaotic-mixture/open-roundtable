@@ -8,8 +8,9 @@ from examples.generate_overnight import generate
 from examples.user_consult import consult
 
 
-def run(directory, model):
-    directory.mkdir(parents=True, exist_ok=False)
+def run(directory, model, *, verify_only=False):
+    if not verify_only:
+        directory.mkdir(parents=True, exist_ok=False)
     for index, size in enumerate((7, 7, 7, 11, 11, 11, 22, 22, 22)):
         seed = 501 + index
         shifts = []
@@ -22,17 +23,23 @@ def run(directory, model):
                     criteria=[dict(shift='A', field='delta', min=0, max=0),
                               dict(shift='B', field='hour', min=0, max=11)])
         source = directory/f'{seed}.json'
-        source.write_text(json.dumps(spec), encoding='utf8')
         paths = [directory/f'{seed}-{mode}.sqlite3' for mode in ('direct', 'nested')]
-        for nested in (bool(index % 2), not bool(index % 2)):
-            consult(source, paths[int(nested)], model, nested=nested)
-        yield dict(seed=seed, shifts=size, **compare(*paths))
+        if verify_only:
+            for path in paths:
+                if not path.is_file():
+                    raise FileNotFoundError(f'missing consultation ledger: {path}')
+        else:
+            source.write_text(json.dumps(spec), encoding='utf8')
+            for nested in (bool(index % 2), not bool(index % 2)):
+                consult(source, paths[int(nested)], model, nested=nested)
+        yield dict(seed=seed, shifts=size, **compare(*paths, expected_input=spec))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
     parser.add_argument('--model', default='qwen3.5:9b')
+    parser.add_argument('--verify-only', action='store_true', help='read existing ledgers without calling a model')
     args = parser.parse_args()
-    for result in run(args.directory, args.model):
+    for result in run(args.directory, args.model, verify_only=args.verify_only):
         print(json.dumps(result), flush=True)

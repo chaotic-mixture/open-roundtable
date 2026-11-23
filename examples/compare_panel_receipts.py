@@ -27,7 +27,7 @@ def candidate_score(chosen, original, rows, rules):
     return list(evaluate(rules, rows, starts))
 
 
-def read_receipt(path, nested):
+def read_receipt(path, nested, expected_input=None):
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
         attempts = db.execute('SELECT topic,request,status,response FROM attempts').fetchall()
@@ -53,6 +53,8 @@ def read_receipt(path, nested):
             raise ValueError('missing repair proposal')
         proposal = json.loads(body[0])
         expert = json.loads(charges[0][2])
+        if expected_input is not None and expert['input'] != expected_input:
+            raise ValueError(f'{path.name}: ledger input differs from seeded roster')
         candidates = expert['candidates']
         if not isinstance(candidates, list) or not candidates:
             raise ValueError('missing expert candidates')
@@ -97,9 +99,9 @@ def read_receipt(path, nested):
         return dispatch, proposal['schedule'], result
 
 
-def compare(direct, nested):
-    request, schedule, flat = read_receipt(direct, False)
-    other_request, other_schedule, panel = read_receipt(nested, True)
+def compare(direct, nested, *, expected_input=None):
+    request, schedule, flat = read_receipt(direct, False, expected_input)
+    other_request, other_schedule, panel = read_receipt(nested, True, expected_input)
     if request != other_request:
         raise ValueError('model requests differ across paired consultations')
     return dict(same_schedule=schedule == other_schedule, direct=flat, nested=panel)
