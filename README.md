@@ -304,3 +304,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 提供方可用 `offer SOURCE audit "检查休息与工时" --rule R --rule L` 登记能力并共享该记录。发起方显式共享审查议题，例如 `{"operation":"schedule-audit-v1","rules":["R","L"],"shifts":["Axv:22-26","Bxu:29-33"]}`。用 `find-capability audit --require-rule R --require-rule L` 获取服务来源和摘要，再用 `send NODE TOPIC --offer SOURCE SHA256` 派单。回执中的 R 项会报告 `x@26-29`。此入口接受一周以内的合成班表编码，提供方每次新审查使用一个授权名额，规则工具扣费为零。
 
 运行 `python -m unittest tests.test_peer_audit` 可复现同机双进程的九表审查、独立评分和重复派单核账。
+
+运行 `python -m examples.rule_discovery --dispatch` 可用一个发起方和四个提供方在本机比较两种发现方式。对每张公开合成班表，两组都向全部入选服务尝试派单，并逐份与独立评分器核对。九张表中，仅按标签筛选产生 36 次尝试，其中 21 次在发送班表前被服务声明检查拦下。要求全部规则匹配产生 15 次尝试，全部取得正确回执。两组各有 36 次初始目录请求，之后发起方的网络请求分别为 51 次和 30 次，两组各登记 15 份回执、0 credits。
