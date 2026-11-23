@@ -1,6 +1,7 @@
 """Exercise discovery, lost receipt recovery and private-data boundaries over HTTP."""
-from contextlib import closing
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing, ExitStack
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
@@ -11,10 +12,67 @@ import unittest
 from unittest.mock import patch
 
 from examples.peer_node import deliver, digest, ledger, resume, set_permission
-from examples.two_node_demo import SOURCE, audit, cli, run
+from examples.two_node_demo import SOURCE, audit, cli, run, start
+from open_roundtable.data import connect, ingest, initialize
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_simultaneous_consultations_and_duplicate(self):
+        both_started = threading.Event()
+        release = threading.Event()
+        calls = []
+        lock = threading.Lock()
+
+        class Model(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers['Content-Length']))
+                with lock:
+                    calls.append(self.path)
+                    if len(calls) == 2:
+                        both_started.set()
+                release.wait(15)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps(dict(model='fixture', done=True, done_reason='stop',
+                    prompt_eval_count=19, eval_count=7,
+                    message=dict(role='assistant', content='{"plan":0}'))).encode())
+
+        with tempfile.TemporaryDirectory() as tmp, ThreadPoolExecutor(3) as pool, ExitStack() as stack:
+            server = stack.enter_context(ThreadingHTTPServer(('127.0.0.1', 0), Model))
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            stack.callback(server.shutdown)
+            addresses = {}
+            spec = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
+            roots = {name: Path(tmp) / name for name in ('A', 'B')}
+            for name, root in roots.items():
+                initialize(root)
+                (root / 'node.json').write_text(json.dumps(dict(name=name, model='fixture')))
+                ingest(root, 'public', [dict(source=SOURCE, body=spec.read_text(encoding='utf8'))])
+                with closing(connect(root, 'public')) as db, db:
+                    db.execute('UPDATE records SET shared=1')
+                with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(server.server_port)):
+                    _, port = start(stack, root, 0)
+                addresses[name] = f'http://127.0.0.1:{port}'
+            for name, other in [('A','B'), ('B','A')]:
+                with closing(ledger(roots[name])) as db:
+                    db.execute('INSERT INTO peers VALUES (?,?)', (other, addresses[other]))
+                    set_permission(db, other, True)
+            stack.callback(release.set)
+            pending = [pool.submit(cli, roots[name], 'send', other, SOURCE)
+                       for name, other in [('A','B'), ('B','A')]]
+            self.assertTrue(both_started.wait(10), 'both consultations should reach the model')
+            duplicate = pool.submit(cli, roots['A'], 'send', 'B', SOURCE, ok=False)
+            self.assertNotEqual(duplicate.result(timeout=5).returncode, 0)
+            release.set()
+            receipts = [json.loads(task.result(timeout=10).stdout) for task in pending]
+            replay = json.loads(cli(roots['A'], 'send', 'B', SOURCE).stdout)
+            self.assertEqual(replay, receipts[0])
+            self.assertEqual([r['credits'] for r in receipts], [2, 2])
+            self.assertEqual(calls, ['/api/chat', '/api/chat'])
+            for root in roots.values():
+                with closing(ledger(root)) as db:
+                    self.assertEqual(db.execute('SELECT count(result),sum(credits) FROM jobs').fetchone(), (2,4))
+
     def test_receiver_permission(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

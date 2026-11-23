@@ -2,7 +2,7 @@
 import argparse
 from contextlib import closing
 import hashlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
@@ -103,13 +103,14 @@ def deliver(root,db,request):
     published=transfer(db,row[0]+'/catalog')
     if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
         raise ValueError('topic differs from shared source')
-    cached=db.execute('SELECT request,result FROM jobs WHERE id=?',(key,)).fetchone()
-    if cached:
-        if json.loads(cached[0])!=request or not cached[1]:
-            raise ValueError('incomplete job requires local reconciliation')
-        return json.loads(cached[1]),False
     with db:
-        db.execute('INSERT INTO jobs(id,request) VALUES (?,?)',(key,packed(request).decode()))
+        claimed = db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',
+                             (key, packed(request).decode())).rowcount
+        if not claimed:
+            saved, result = db.execute('SELECT request,result FROM jobs WHERE id=?', (key,)).fetchone()
+            if json.loads(saved) != request or result is None:
+                raise ValueError('job in progress or awaiting local reconciliation')
+            return json.loads(result), False
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))
     database=root/(key+'.sqlite3')
@@ -215,7 +216,7 @@ def serve(root,port,interrupt):
             except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):
                 self.reply(409,{'error':'request could not be completed'})
 
-    with HTTPServer(('127.0.0.1',port),Handler) as server:
+    with ThreadingHTTPServer(('127.0.0.1',port),Handler) as server:
         (root/'ready').write_text(str(server.server_port))
         server.serve_forever()
 
