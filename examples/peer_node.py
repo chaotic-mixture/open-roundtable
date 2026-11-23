@@ -217,11 +217,16 @@ def import_registration(root, db, name, source, url):
     return dict(source=source, sha256=hashlib.sha256(record['body'].encode()).hexdigest())
 
 
-def offer(root, source, tag, description):
+def offer(root, source, tag, description, *, rules=()):
     node = json.loads((root/'node.json').read_text())['name']
     if not tag.strip() or not description.strip():
         raise ValueError('provide a capability tag and description')
-    body = packed(dict(kind='capability', node=node, tag=tag.strip(), description=description.strip())).decode()
+    item = dict(kind='capability', node=node, tag=tag.strip(), description=description.strip())
+    if rules:
+        if any(not isinstance(rule, str) or not rule.strip() for rule in rules):
+            raise ValueError('provide nonempty rule names')
+        item['rules'] = sorted({rule.strip() for rule in rules})
+    body = packed(item).decode()
     ingest(root,'public',[dict(source=source,body=body)])
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
 
@@ -238,7 +243,9 @@ def fetch_public_subset(db, url, peer, route):
 
 def valid_offer(item, node):
     return (isinstance(item, dict) and item.get('kind') == 'capability' and item.get('node') == node
-            and all(isinstance(item.get(field), str) and item[field].strip() for field in ('tag', 'description')))
+            and all(isinstance(item.get(field), str) and item[field].strip() for field in ('tag', 'description'))
+            and isinstance(item.get('rules', []), list)
+            and all(isinstance(rule, str) and rule.strip() for rule in item.get('rules', [])))
 
 
 def published_offers(root):
@@ -254,8 +261,9 @@ def published_offers(root):
     return offers
 
 
-def find_capability(root, db, tag=None, *other_tags, accepting_only=False):
+def find_capability(root, db, tag=None, *other_tags, accepting_only=False, required_rules=()):
     tags = {tag, *other_tags} if tag is not None else None
+    required = set(required_rules)
     node = json.loads((root/'node.json').read_text())['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
@@ -274,10 +282,14 @@ def find_capability(root, db, tag=None, *other_tags, accepting_only=False):
             except (KeyError,TypeError,ValueError):
                 continue
             if valid_offer(item, peer) and (tags is None or item['tag'] in tags):
+                if not required.issubset(item.get('rules', [])):
+                    continue
                 match = dict(node=peer,source=record['source'],description=item['description'],
                              sha256=hashlib.sha256(record['body'].encode()).hexdigest())
                 if tags is None or other_tags:
                     match['tag'] = item['tag']
+                if 'rules' in item:
+                    match['rules'] = item['rules']
                 matches.append(match)
     if accepting_only:
         if json.loads((root/'node.json').read_text()).get('transport') != 'mtls':
@@ -815,9 +827,11 @@ if __name__=='__main__':
     capability.add_argument('source')
     capability.add_argument('tag')
     capability.add_argument('description')
+    capability.add_argument('--rule', action='append', default=[], help='supported rule name (repeatable)')
     find = commands.add_parser('find-capability')
     find.add_argument('tag', nargs='+', help='return offers matching any of these exact tags')
     find.add_argument('--accepting-only', action='store_true')
+    find.add_argument('--require-rule', action='append', default=[], help='require every listed rule')
     match = commands.add_parser('match-capability')
     match.add_argument('need')
     match.add_argument('--accepting-only', action='store_true')
@@ -858,9 +872,10 @@ if __name__=='__main__':
             elif args.action == 'import-registration':
                 result = import_registration(args.directory, db, args.name, args.source, args.url)
             elif args.action == 'offer':
-                result = offer(args.directory,args.source,args.tag,args.description)
+                result = offer(args.directory,args.source,args.tag,args.description,rules=args.rule)
             elif args.action == 'find-capability':
-                result = find_capability(args.directory,db,*args.tag,accepting_only=args.accepting_only)
+                result = find_capability(args.directory,db,*args.tag,accepting_only=args.accepting_only,
+                                         required_rules=args.require_rule)
             elif args.action == 'match-capability':
                 catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only)
                 result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)
