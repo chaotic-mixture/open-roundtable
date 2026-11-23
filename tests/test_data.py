@@ -11,6 +11,22 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_batch_finishes_sealed_record_after_api_outage(self):
+        data.ingest(self.root, 'private', [dict(source='sealed', body='local only')])
+        data.configure(self.root, 'api', 'remote', 'https://example.org/chat')
+        data.limit_record(self.root, 'sealed', 'sealed')
+        output = StringIO()
+        with patch('sys.argv', ['data', str(self.root), 'maintain-pending', '--limit', '2']), redirect_stdout(output):
+            with patch.object(data, 'exchange', side_effect=ConnectionError('sensitive detail')) as api:
+                with self.assertRaises(SystemExit) as exit_status:
+                    data.main()
+                api.assert_called_once()
+        self.assertEqual(exit_status.exception.code, 2)
+        self.assertEqual(json.loads(output.getvalue()), dict(selected=2, completed=1, skipped=0, failed=1))
+        with closing(data.connect(self.root, 'private')) as db:
+            self.assertEqual(db.execute('SELECT source,summary FROM records ORDER BY source').fetchall(),
+                             [('profile', None), ('sealed', 'local only')])
+
     def test_pending_batch_resumes_and_honors_record_permissions(self):
         data.ingest(self.root, 'private', [dict(source='sealed', body='local only')])
         data.configure(self.root, 'api', 'remote', 'https://example.org/chat')

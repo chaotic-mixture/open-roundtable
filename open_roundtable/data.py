@@ -3,6 +3,7 @@ import argparse
 import hashlib
 from .local_model import ollama_origin
 from contextlib import closing
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -194,8 +195,13 @@ def maintain_pending(root, limit):
     with closing(connect(root, 'private')) as db:
         rows = db.execute('SELECT source FROM records WHERE summary IS NULL ORDER BY source LIMIT ?',
                           (limit,)).fetchall()
-    completed = sum(maintain(root, source, only_pending=True) for source, in rows)
-    return dict(selected=len(rows), completed=completed, skipped=len(rows)-completed)
+    completed = failed = 0
+    for source, in rows:
+        try:
+            completed += maintain(root, source, only_pending=True)
+        except (OSError, HTTPException, ValueError, KeyError, IndexError, TypeError):
+            failed += 1
+    return dict(selected=len(rows), completed=completed, skipped=len(rows)-completed-failed, failed=failed)
 
 
 def review_public(db, source):
@@ -285,7 +291,10 @@ def main():
         elif args.action=='maintain-private':
             maintain(root,args.source)
         elif args.action=='maintain-pending':
-            print(json.dumps(maintain_pending(root, args.limit)))
+            result = maintain_pending(root, args.limit)
+            print(json.dumps(result))
+            if result['failed']:
+                raise SystemExit(2)
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
         # Remote messages and malformed input can contain private content.
         parser.exit(2,f'{args.action} failed ({type(exc).__name__})\n')
