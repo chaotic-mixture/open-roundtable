@@ -113,6 +113,9 @@ class PeerRecoveryTests(unittest.TestCase):
             thread.start()
             try:
                 with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(server.server_port)):
+                    early = run(Path(tmp) / 'early', 'fixture', 'before-receipt')
+                    self.assertEqual((early['credits'], len(requests)), (2, 1))
+                    requests.clear()
                     result = run(folder, 'fixture')
             finally:
                 server.shutdown()

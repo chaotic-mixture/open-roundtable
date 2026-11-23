@@ -162,3 +162,5 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 ~~~
 
 接收方须在本机运行 `python -m examples.peer_node NODE_DIR permission PEER allow`，才能受理该节点的会诊。授权绑定已发现的名称和地址，节点地址变化后需要重新授权。用 `revoke` 代替 `allow` 可撤销后续受理和回执重发；已经受理的任务可以继续。旧节点库首次使用此版本时也需要授权。示例自动在 B 授权 A。此控制适用于可信回环环境，发送方名称和地址尚无密码学身份证明。
+
+双节点演练支持第二个中断位置。运行 `python -m examples.two_node_demo run reports/peer-before-receipt --fault before-receipt`，接收节点会在会诊库保存完整回执之后、网络账本登记费用之前退出。重发时先核对权限和公开议题，再从会诊库恢复回执和费用。可用 `python -m examples.two_node_demo verify reports/peer-before-receipt` 离线对账。缺少完整回执的执行仍需本地核对。

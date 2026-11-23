@@ -88,7 +88,7 @@ def envelope(root,recipient,source):
     return dict(body,id=digest(body))
 
 
-def deliver(root,db,request):
+def deliver(root,db,request,*,interrupt_before_receipt=False):
     key=request['id']
     body={k:request[k] for k in ('sender','recipient','source','spec')}
     if set(request)!=set(body)|{'id'} or key!=digest(body):
@@ -103,21 +103,37 @@ def deliver(root,db,request):
     published=transfer(db,row[0]+'/catalog')
     if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
         raise ValueError('topic differs from shared source')
+    database=root/(key+'.sqlite3')
     with db:
         claimed = db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',
                              (key, packed(request).decode())).rowcount
         if not claimed:
             saved, result = db.execute('SELECT request,result FROM jobs WHERE id=?', (key,)).fetchone()
-            if json.loads(saved) != request or result is None:
+            if json.loads(saved) != request:
+                raise ValueError('stored request mismatch')
+            if result is not None:
+                return json.loads(result), False
+            if not database.exists():
                 raise ValueError('job in progress or awaiting local reconciliation')
-            return json.loads(result), False
+            uri = database.resolve().as_uri() + '?mode=ro'
+            with closing(sqlite3.connect(uri, uri=True)) as kernel:
+                exists = kernel.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='peer_receipt'").fetchone()
+                checkpoint = kernel.execute('SELECT result FROM peer_receipt WHERE id=?', (key,)).fetchone() if exists else None
+            if checkpoint is None:
+                raise ValueError('job in progress or awaiting local reconciliation')
+            result = json.loads(checkpoint[0])
+            db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
+            return result, False
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))
-    database=root/(key+'.sqlite3')
     outcome=consult(source,database,config['model'])
-    with closing(sqlite3.connect(database)) as k:
+    with closing(sqlite3.connect(database)) as k, k:
         credits=k.execute('SELECT sum(cost) FROM messages').fetchone()[0]
-    result=dict(id=key,sender=config['name'],recipient=request['sender'],outcome=outcome,credits=credits)
+        result=dict(id=key,sender=config['name'],recipient=request['sender'],outcome=outcome,credits=credits)
+        k.execute('CREATE TABLE peer_receipt (id TEXT PRIMARY KEY, result TEXT NOT NULL)')
+        k.execute('INSERT INTO peer_receipt VALUES (?,?)', (key, packed(result).decode()))
+    if interrupt_before_receipt:
+        os._exit(76)  # Durable kernel checkpoint, network ledger still pending.
     with db:
         db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?',(packed(result).decode(),credits,key))
     return result,True
@@ -180,7 +196,7 @@ def local_history(root, network, label, job=None):
         return matches
 
 
-def serve(root,port,interrupt):
+def serve(root,port,interrupt,interrupt_before_receipt=False):
     class Handler(BaseHTTPRequestHandler):
         def reply(self,code,value):
             raw=packed(value)
@@ -208,7 +224,7 @@ def serve(root,port,interrupt):
                 request=json.loads(self.rfile.read(size))
                 with closing(ledger(root)) as db:
                     trace(db,'accept',self.path,request)
-                    result,fresh=deliver(root,db,request)
+                    result,fresh=deliver(root,db,request,interrupt_before_receipt=interrupt_before_receipt)
                     if fresh and interrupt:
                         os._exit(75)  # Fault injection: durable result, no receipt delivered.
                     trace(db,'reply',self.path,result)
@@ -228,6 +244,7 @@ if __name__=='__main__':
     server=commands.add_parser('serve')
     server.add_argument('port',type=int)
     server.add_argument('--interrupt-after-commit',action='store_true')
+    server.add_argument('--interrupt-before-receipt',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
     access = commands.add_parser('permission')
@@ -242,7 +259,7 @@ if __name__=='__main__':
     submit.add_argument('source')
     args=parser.parse_args()
     if args.action=='serve':
-        serve(args.directory,args.port,args.interrupt_after_commit)
+        serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:
             if args.action == 'permission':

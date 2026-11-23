@@ -29,7 +29,7 @@ def start(stack,root,port,interrupt=False):
     log=stack.enter_context((root/'server.log').open('ab'))
     cmd=[sys.executable,'-m','examples.peer_node',str(root),'serve',str(port)]
     if interrupt:
-        cmd.append('--interrupt-after-commit')
+        cmd.append('--interrupt-before-receipt' if interrupt=='before-receipt' else '--interrupt-after-commit')
     proc=subprocess.Popen(cmd,stdout=log,stderr=log)
     def stop():
         if proc.poll() is None:
@@ -93,14 +93,16 @@ def audit(folder):
         for source,value in markers:
             require(source.encode() not in wire and value.encode() not in wire,'private marker crossed boundary')
     fault=json.loads((folder/'interruption.json').read_text())
-    require(fault['exit']==75 and fault['sender_receipt'] is None and fault['receiver_credits']==2
+    require((fault['exit'],fault['receiver_credits']) in ((75,2),(76,0)) and fault['sender_receipt'] is None
             and fault['before_pid']!=fault['after_pid'],'restart checkpoint')
     return dict(discovered=['A','B'],deliveries=2,model_calls=1,expert_calls=1,credits=cost,
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
                 state=state,private_markers_found=0,request_id=key)
 
 
-def run(folder,model):
+def run(folder,model,fault='after-commit'):
+    if fault not in ('before-receipt','after-commit'):
+        raise ValueError('unknown fault window')
     folder.mkdir(parents=True,exist_ok=False)
     a,b=folder/'A',folder/'B'
     with ExitStack() as stack:
@@ -109,7 +111,7 @@ def run(folder,model):
             initialize(root)
             ingest(root,'private',[dict(source='private-key-'+uuid.uuid4().hex,body='secret-'+uuid.uuid4().hex)])
             (root/'node.json').write_bytes(packed(dict(name=name,model=model)))
-            proc,port=start(stack,root,0,interrupt=name=='B')
+            proc,port=start(stack,root,0,interrupt=fault if name=='B' else False)
             desc=dict(name=name,url=f'http://127.0.0.1:{port}')
             ingest(root,'public',[dict(source=f'https://{name.lower()}.example/node',body=packed(desc).decode())])
             with closing(connect(root,'public')) as db,db:
@@ -137,14 +139,15 @@ def run(folder,model):
         with closing(connect(a,'public')) as db,db:
             db.execute('UPDATE records SET shared=1 WHERE source=?',(SOURCE,))
         failed=cli(a,'send','B',SOURCE,ok=False)
-        if failed.returncode==0 or proc.wait(timeout=10)!=75:
+        exit_code = proc.wait(timeout=10)
+        if failed.returncode==0 or exit_code!=(76 if fault=='before-receipt' else 75):
             raise RuntimeError('forced disconnect did not occur')
         with closing(sqlite3.connect(a/'network.sqlite3')) as db:
             receipt=db.execute('SELECT result FROM jobs').fetchone()[0]
         with closing(sqlite3.connect(b/'network.sqlite3')) as db:
             credits=db.execute('SELECT credits FROM jobs').fetchone()[0]
         restarted,_=start(stack,b,port)
-        (folder/'interruption.json').write_bytes(packed(dict(exit=75,before_pid=proc.pid,
+        (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
                 after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits)))
         cli(a,'resume')
         if json.loads(cli(a,'resume').stdout) != {}:
@@ -159,5 +162,6 @@ if __name__=='__main__':
     parser.add_argument('action',choices=['run','verify'])
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
+    parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
     args=parser.parse_args()
-    print(json.dumps(run(args.directory,args.model) if args.action=='run' else audit(args.directory)))
+    print(json.dumps(run(args.directory,args.model,args.fault) if args.action=='run' else audit(args.directory)))
