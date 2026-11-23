@@ -11,9 +11,22 @@ from unittest.mock import patch
 from examples.benchmark_consult import run
 from examples.generate_overnight import generate
 from examples.overnight_score import expected
+from examples.nested_benchmark import CASE_SIZES, summarize
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_nested_summary_detects_a_missing_pair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            with (directory/'results.csv').open('w', newline='') as output:
+                writer = csv.writer(output)
+                writer.writerow('case shifts mode state missed extra credits elapsed_ms'.split())
+                for case, size in enumerate(CASE_SIZES[:-1], 1):
+                    for mode in ('direct', 'nested'):
+                        writer.writerow([case, size, mode, 'RESOLVED', 0, 0, 2, 12])
+            with self.assertRaisesRegex(ValueError, 'missing benchmark round or schedule'):
+                summarize(directory)
+
     def test_paired_inputs_blinding_scoring_and_charges(self):
         def provider(path, payload=None):
             if path == '/api/tags':

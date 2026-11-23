@@ -12,10 +12,11 @@ from examples.generate_overnight import generate
 from examples.nested_consult import run
 from examples.overnight_score import expected
 
+CASE_SIZES = (7, 7, 7, 11, 11, 11, 22, 22, 22)
 
 def _round(directory, number):
     rows = []
-    for case, size in enumerate([7]*3 + [11]*3 + [22]*3, 1):
+    for case, size in enumerate(CASE_SIZES, 1):
         shifts = generate(case, size)
         truth = expected(shifts)
         # Alternate order to distribute startup and filesystem cache effects.
@@ -66,6 +67,9 @@ def summarize(directory):
     with (directory/'results.csv').open(newline='', encoding='utf8') as source:
         for row in csv.DictReader(source):
             key = int(row.get('round', 1)), int(row['case'])
+            number, case = key
+            if number < 1 or not 1 <= case <= len(CASE_SIZES) or int(row['shifts']) != CASE_SIZES[case-1]:
+                raise ValueError('invalid benchmark round, case or shift count')
             pair = pairs.setdefault(key, {})
             mode = row['mode']
             if mode not in totals or mode in pair:
@@ -76,6 +80,8 @@ def summarize(directory):
                 totals[mode][metric] += int(row[metric])
     if not pairs or any(pair.keys() != totals.keys() for pair in pairs.values()):
         raise ValueError('expected paired direct and nested measurements')
+    if len(pairs) != max(number for number, case in pairs) * len(CASE_SIZES):
+        raise ValueError('missing benchmark round or schedule')
     differences = [pair['nested'] - pair['direct'] for pair in pairs.values()]
     return dict(pairs=len(pairs), totals=totals, nested_slower=sum(d > 0 for d in differences),
                 median_nested_minus_direct_ms=round(median(differences), 2))
