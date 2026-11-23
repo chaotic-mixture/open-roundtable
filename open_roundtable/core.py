@@ -103,6 +103,8 @@ class Kernel:
             'SELECT * FROM feedback WHERE topic=? ORDER BY id', (topic,))]
         result['tags'] = [dict(r) for r in self.db.execute(
             'SELECT * FROM tags WHERE topic=? ORDER BY member, label', (topic,))]
+        result['delegations'] = [dict(r) for r in self.db.execute(
+            'SELECT member,child,budget,spent FROM delegations WHERE parent=? ORDER BY member', (topic,))]
         result['citations'] = [dict(r) for r in self.db.execute(
             '''SELECT c.source,c.version,t.title,p.body FROM citations c
                JOIN topics t ON t.id=c.source JOIN proposals p ON p.topic=c.source AND p.version=c.version

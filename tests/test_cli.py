@@ -29,6 +29,8 @@ class CliTests(unittest.TestCase):
 
         parent = cli('create', 'review', '4')['id']
         child = cli('delegate', parent, 'panel', 'subreview', '3')['child']
+        allocation = dict(member='panel', child=child, budget=3, spent=None)
+        self.assertEqual(cli('show', parent)['delegations'], [allocation])
         cli('join', child, 'reviewer', 'human')
         cli('start', parent)
         cli('start', child)
@@ -37,6 +39,7 @@ class CliTests(unittest.TestCase):
         cli('propose', child, '0', 'approved')
         self.assertEqual(cli('vote', child, '1', 'reviewer', 'yes')['state'], 'RESOLVED')
         self.assertEqual(cli('settle', child)['spent'], 2)
+        self.assertEqual(cli('show', parent)['delegations'], [dict(allocation, spent=2)])
         cli('propose', parent, '0', 'adopted')
         result = cli('vote', parent, '1', 'panel', 'yes')
         self.assertEqual((result['state'], result['credits']), ('RESOLVED', 2))
