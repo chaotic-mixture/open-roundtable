@@ -9,6 +9,7 @@ from unittest.mock import patch
 from urllib.error import URLError
 
 from examples import preference_benchmark as batch
+from examples.compare_panel_receipts import compare
 from examples.user_consult import consult
 from examples.refine_schedule import feasibility
 from examples.verify_preferences import verify
@@ -25,6 +26,31 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_paired_panel_settlement(self):
+        source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
+        with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api', side_effect=provider):
+            direct, nested = (Path(tmp)/name for name in ('direct.db', 'nested.db'))
+            consult(source, direct, 'fixture')
+            panel = consult(source, nested, 'fixture', nested=True)
+            summary = compare(direct, nested)
+            self.assertTrue(summary['same_schedule'])
+            self.assertEqual(summary['nested']['parent_state'], 'RESOLVED')
+            self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
+            with closing(sqlite3.connect(nested)) as db:
+                for sql, error in [
+                    ('UPDATE delegations SET spent=1 WHERE parent=?', 'settlement disagree'),
+                    ('UPDATE messages SET cost=1 WHERE topic=?', 'settlement disagree'),
+                    ('UPDATE delegations SET spent=NULL WHERE parent=?', 'already has a parent delivery'),
+                ]:
+                    with self.subTest(sql=sql):
+                        db.execute(sql, (panel['parent'],))
+                        db.commit()
+                        with self.assertRaisesRegex(ValueError, error):
+                            compare(direct, nested)
+                        db.execute('UPDATE delegations SET spent=2 WHERE parent=?', (panel['parent'],))
+                        db.execute('UPDATE messages SET cost=2 WHERE topic=?', (panel['parent'],))
+                        db.commit()
+
     def test_weekly_worker_rest_capacity_boundary(self):
         rows = [(chr(65+i)+'xu', 16*i, 8) for i in range(11)]
         self.assertEqual(feasibility(rows, lambda p: True, 11)['plan'], [16*i for i in range(11)])
