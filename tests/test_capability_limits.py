@@ -13,6 +13,28 @@ from open_roundtable.data import initialize, ingest, share_public
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_declared_rules_filter_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A"}')
+            db.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8002')")
+            offers = []
+            for source, fields in [('legacy', {}), ('partial', {'rules': ['R']}),
+                                   ('both', {'rules': ['R', 'L']})]:
+                body = dict(kind='capability', node='B', tag='audit', description='Roster audit', **fields)
+                offers.append(dict(source=source, body=json.dumps(body)))
+            with patch('examples.peer_node.fetch_public_subset', return_value=offers), patch('examples.auto_consult.api') as api:
+                missing = find_capability(root, db, required_rules=['V'])
+                self.assertEqual(match_offers('audit', missing['matches'], 'fixture')['calls'], 0)
+                api.assert_not_called()
+                available = find_capability(root, db, required_rules=['R', 'L'])
+                api.return_value = dict(done=True, done_reason='stop', message=dict(content='{"ids":[0]}'),
+                                        prompt_eval_count=20, eval_count=4)
+                selected = match_offers('audit', available['matches'], 'fixture')
+                self.assertEqual([item['source'] for item in selected['matches']], ['both'])
+                menu = json.loads(api.call_args.args[1]['messages'][1]['content'])['offers']
+                self.assertEqual([item['rules'] for item in menu], [['R', 'L']])
+
     def test_read_only_offer_creates_no_repair_job_at_either_node(self):
         spec = json.loads((Path(__file__).resolve().parents[1]/'examples'/'consult_input.json').read_bytes())
         topic = dict(source='https://a.example/topic',body=json.dumps(spec))

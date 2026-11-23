@@ -260,6 +260,8 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 
 运行 python -m examples.capability_execution 可比较两种选择在九张本地合成班表（501–509）上的执行结果。候选为一个排班修复工具和一个只读检查工具。规则直接使用给定操作标签，模型每种需求选择一次，九张表复用选择。两组均修复成功 9/9，逐表改动 3、4、4、6、8、8、19、19、19 班；只读检查均与独立评分器一致，改动为零。模型共用 2 次调用、213 个输入和 14 个输出 tokens。实验覆盖本地执行，跨节点接单仍需另行验证。
 
+发布服务时可重复指定 --rule。例如，match-capability 复核休息和连续工时 --allow-tag audit --require-rule R --require-rule L 只让模型评估同时声明 R 和 L 的服务。没有符合全部规则的候选时，模型调用和 tokens 均为零。运行 python -m examples.rule_discovery 可复现九张表的目录筛选对照。
+
 自然语言查询支持重复指定 `--allow-tag`。例如 `match-capability "只检查排班冲突，保持班次不变" --allow-tag audit` 会先按公开声明的标签缩小候选，再让本机模型判断相关性。没有符合标签的声明时返回空并跳过推理。标签由提供方声明，执行效果仍需独立验证。
 
 候选节点启用双向 TLS 后，可运行 `python -m examples.peer_node NODE_A admission B` 查询 B 此刻是否允许 A 发起新会诊。请求只包含发送节点名；B 按客户端证书、当前授权和余量回答。查询不占用名额；发送议题时仍会原子地复核并扣减额度。

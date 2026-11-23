@@ -319,6 +319,9 @@ def match_offers(need, offers, model, *, allowed_tags=None):
     if not offers:
         return dict(matches=[], calls=0, input_tokens=0, output_tokens=0)
     menu = [dict(id=i, tag=o['tag'], description=o['description']) for i,o in enumerate(offers)]
+    for entry, offer in zip(menu, offers):
+        if 'rules' in offer:
+            entry['rules'] = offer['rules']
     prompt = 'Select all offers explicitly able to fulfill the entire need. Return {"ids": [integer IDs]}, empty if none.'
     reply = api('/api/chat',dict(model=model, stream=False, think=False, format='json',options={'temperature':0},
         messages=[dict(role='system',content=prompt),dict(role='user',content=json.dumps(dict(need=need,offers=menu),ensure_ascii=False))]))
@@ -834,6 +837,7 @@ if __name__=='__main__':
     find.add_argument('--require-rule', action='append', default=[], help='require every listed rule')
     match = commands.add_parser('match-capability')
     match.add_argument('need')
+    match.add_argument('--require-rule', action='append', default=[], help='require every listed rule before model selection')
     match.add_argument('--accepting-only', action='store_true')
     match.add_argument('--allow-tag',action='append',help='only consider this declared operation tag; repeat for alternatives')
     match.add_argument('--model', default='qwen3.5:9b')
@@ -877,7 +881,8 @@ if __name__=='__main__':
                 result = find_capability(args.directory,db,*args.tag,accepting_only=args.accepting_only,
                                          required_rules=args.require_rule)
             elif args.action == 'match-capability':
-                catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only)
+                catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only,
+                                                 required_rules=args.require_rule)
                 result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)
                 result['unavailable'] = catalog_result['unavailable']
                 if args.accepting_only:
