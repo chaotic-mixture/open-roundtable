@@ -51,6 +51,10 @@ class Kernel:
             topic TEXT NOT NULL, member TEXT NOT NULL, label TEXT NOT NULL,
             PRIMARY KEY(topic, member, label),
             FOREIGN KEY(topic, member) REFERENCES members(topic, id))''')
+        self.db.execute("""CREATE TABLE IF NOT EXISTS delegations (
+            parent TEXT NOT NULL, member TEXT NOT NULL, child TEXT PRIMARY KEY REFERENCES topics(id),
+            budget INTEGER NOT NULL, spent INTEGER, UNIQUE(parent,member),
+            FOREIGN KEY(parent,member) REFERENCES members(topic,id))""")
         self.db.commit()
 
     def close(self):
@@ -140,6 +144,10 @@ class Kernel:
             if version != len(current['proposals']):
                 raise ValueError('stale proposal version')
             self._member(topic, member)
+            if self.db.execute('SELECT 1 FROM delegations WHERE child=?',(topic,)).fetchone() and not version:
+                raise ValueError('delegated topic requires a proposal')
+            if self.db.execute('SELECT 1 FROM delegations WHERE parent=? AND spent IS NULL',(topic,)).fetchone():
+                raise ValueError('settle children before voting')
             if current['state'] not in ('ACTIVE', 'PAUSED'):
                 raise ValueError('vote requires an active or paused topic')
             if self.db.execute('SELECT 1 FROM votes WHERE topic=? AND member=?',
@@ -164,6 +172,8 @@ class Kernel:
             self.db.execute('BEGIN IMMEDIATE')
             current = self.get(topic)
             self._member(topic, member)
+            if self.db.execute('SELECT 1 FROM delegations WHERE parent=? AND member=?',(topic,member)).fetchone():
+                raise ValueError('delegated member reports through settlement')
             if current['state'] != 'ACTIVE':
                 raise ValueError('post requires an active topic')
             if cost > current['credits']:
@@ -183,10 +193,64 @@ class Kernel:
             current = self.get(topic)
             if current['state'] == 'RESOLVED':
                 raise ValueError('resolved budget is closed')
-            _credits(current['credits'] + amount)
+            if self.db.execute('SELECT 1 FROM delegations WHERE child=?',(topic,)).fetchone():
+                raise ValueError('delegated budget is fixed')
+            reserved = self.db.execute('SELECT coalesce(sum(budget),0) FROM delegations '
+                                       'WHERE parent=? AND spent IS NULL',(topic,)).fetchone()[0]
+            _credits(current['credits'] + reserved + amount)
             state = 'ACTIVE' if current['state'] == 'PAUSED' else current['state']
             self.db.execute('UPDATE topics SET credits=?, state=? WHERE id=?',
                             (current['credits'] + amount, state, topic))
+
+    def delegate(self, parent, member, title, budget):
+        """Fund a new child topic and seat it on its parent's draft roster."""
+        _text(member, 'member')
+        _text(title, 'title')
+        _credits(budget, minimum=1)
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            current = self.get(parent)
+            prior = self.db.execute('SELECT d.child,d.budget,t.title FROM delegations d '
+                                    'JOIN topics t ON t.id=d.child WHERE parent=? AND member=?',
+                                    (parent,member)).fetchone()
+            if prior and tuple(prior)[1:] == (budget,title):
+                return prior[0]
+            if current['state'] != 'DRAFT' or budget > current['credits']:
+                raise ValueError('delegation requires an affordable draft budget')
+            if any(m['id'] == member for m in current['members']):
+                raise ValueError('member already joined')
+            child = uuid.uuid4().hex
+            self.db.execute("INSERT INTO topics VALUES (?,?,'DRAFT',?,'discussion','normal')",
+                            (child,title,budget))
+            self.db.execute('UPDATE topics SET credits=credits-? WHERE id=?', (budget,parent))
+            self.db.execute("INSERT INTO members VALUES (?,?,'roundtable',?)", (parent,member,child))
+            self.db.execute('INSERT INTO delegations VALUES (?,?,?,?,NULL)', (parent,member,child,budget))
+            return child
+
+    def settle(self, child):
+        """Deliver the resolved proposal, refund unused funds and record inclusive cost once."""
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            row = self.db.execute('SELECT parent,member,budget,spent FROM delegations WHERE child=?',
+                                  (child,)).fetchone()
+            if not row:
+                raise ValueError('unknown delegation')
+            parent, member, budget, spent = row
+            if spent is not None:
+                return spent
+            result = self.get(child)
+            current = self.get(parent)
+            if result['state'] != 'RESOLVED' or current['state'] not in ('ACTIVE','PAUSED'):
+                raise ValueError('start parent and resolve child before settlement')
+            refund = result['credits']
+            spent = budget - refund
+            self.db.execute('UPDATE topics SET credits=0 WHERE id=?', (child,))
+            self.db.execute('UPDATE topics SET credits=credits+?,state=? WHERE id=?',
+                            (refund,'ACTIVE' if refund else current['state'],parent))
+            self.db.execute('INSERT INTO messages(topic,member,body,cost) VALUES (?,?,?,?)',
+                            (parent,member,result['proposals'][-1]['body'],spent))
+            self.db.execute('UPDATE delegations SET spent=? WHERE child=?', (spent,child))
+            return spent
 
     def start(self, topic):
         with self.db:

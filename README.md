@@ -164,3 +164,7 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 接收方须在本机运行 `python -m examples.peer_node NODE_DIR permission PEER allow`，才能受理该节点的会诊。授权绑定已发现的名称和地址，节点地址变化后需要重新授权。用 `revoke` 代替 `allow` 可撤销后续受理和回执重发；已经受理的任务可以继续。旧节点库首次使用此版本时也需要授权。示例自动在 B 授权 A。此控制适用于可信回环环境，发送方名称和地址尚无密码学身份证明。
 
 双节点演练支持第二个中断位置。运行 `python -m examples.two_node_demo run reports/peer-before-receipt --fault before-receipt`，接收节点会在会诊库保存完整回执之后、网络账本登记费用之前退出。重发时先核对权限和公开议题，再从会诊库恢复回执和费用。可用 `python -m examples.two_node_demo verify reports/peer-before-receipt` 离线对账。缺少完整回执的执行仍需本地核对。
+
+### Phase 3 本地子圆桌实验
+
+在源码根目录运行 `python -m examples.nested_consult nested.sqlite3 AXR:20-26 BXR:24-29`，数据库文件须为新路径。父议题从 4 个测试 credits 中划给子圆桌 3 个。子圆桌执行排班检查并表决，花费 1 个，将已通过的提案返回父议题，退回余下 2 个。父议题再花 1 个独立核验结果，最终余额为 2。父级账本中子圆桌发言的费用包含下级消耗，统计总费用时只汇总同一层。此示例检验本地委派、结算与表决；递归对复杂任务完成质量的收益仍待对照实验。
