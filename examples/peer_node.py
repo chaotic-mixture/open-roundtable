@@ -7,8 +7,9 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import ssl
 from urllib.parse import urlsplit
-from urllib.request import ProxyHandler, Request, build_opener
+from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
 from open_roundtable.data import catalog, connect, NoRedirect
 from examples.user_consult import consult
@@ -39,13 +40,29 @@ def trace(db,direction,route,body):
         db.execute('INSERT INTO traffic VALUES (?,?,?)',(direction,route,packed(body).decode()))
 
 
+def tls_context(root, *, server=False):
+    config = json.loads((root/'node.json').read_text())
+    if config.get('transport', 'http') == 'http':
+        return None
+    if config['transport'] != 'mtls':
+        raise ValueError('unknown node transport')
+    purpose = ssl.Purpose.CLIENT_AUTH if server else ssl.Purpose.SERVER_AUTH
+    context = ssl.create_default_context(purpose, cafile=str(root/'ca.pem'))
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_cert_chain(root/'node.pem', root/'node.key')
+    return context
+
+
 def transfer(db,url,data=None):
     u=urlsplit(url)
-    if u.scheme!='http' or u.hostname!='127.0.0.1' or u.username or u.password or not u.port:
+    location = db.execute('PRAGMA database_list').fetchone()[2]
+    context = tls_context(Path(location).parent)
+    scheme = 'https' if context else 'http'
+    if u.scheme!=scheme or u.hostname!='127.0.0.1' or u.username or u.password or not u.port:
         raise ValueError('demo transport requires numeric loopback and an explicit port')
     trace(db,'send',url,data)
     request=Request(url,data=None if data is None else packed(data),headers={'Content-Type':'application/json'})
-    with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=300) as response:
+    with build_opener(ProxyHandler({}),NoRedirect(),HTTPSHandler(context=context)).open(request,timeout=300) as response:
         raw=response.read(1_000_001)
     if len(raw)>1_000_000:
         raise ValueError('oversize response')
@@ -283,6 +300,7 @@ def local_history(root, network, label, job=None):
 
 
 def serve(root,port,interrupt,interrupt_before_receipt=False):
+    context = tls_context(root, server=True)
     class Handler(BaseHTTPRequestHandler):
         def reply(self,code,value):
             raw=packed(value)
@@ -308,6 +326,11 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                 if not 0<size<=100_000:
                     raise ValueError('invalid size')
                 request=json.loads(self.rfile.read(size))
+                if context:
+                    identities = [v for kind,v in self.connection.getpeercert().get('subjectAltName', [])
+                                  if kind=='URI' and v.startswith('urn:roundtable:peer:')]
+                    if identities != ['urn:roundtable:peer:' + request['sender']]:
+                        return self.reply(403, {'error':'sender certificate mismatch'})
                 with closing(ledger(root)) as db:
                     trace(db,'accept',self.path,request)
                     result,fresh=deliver(root,db,request,interrupt_before_receipt=interrupt_before_receipt)
@@ -319,6 +342,8 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                 self.reply(409,{'error':'request could not be completed'})
 
     with ThreadingHTTPServer(('127.0.0.1',port),Handler) as server:
+        if context:
+            server.socket = context.wrap_socket(server.socket, server_side=True)
         (root/'ready').write_text(str(server.server_port))
         server.serve_forever()
 
