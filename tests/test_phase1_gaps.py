@@ -38,6 +38,18 @@ class GapTests(unittest.TestCase):
             self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
             with closing(sqlite3.connect(direct)) as flat:
                 original = flat.execute('SELECT body FROM proposals').fetchone()[0]
+                expert_body = flat.execute("SELECT body FROM messages WHERE member='expert'").fetchone()[0]
+                expert = json.loads(expert_body)
+                proposal = json.loads(original)
+                proposal['schedule'] = expert['input']['shifts']
+                expert['candidates'][proposal['selected']] = proposal['schedule']
+                flat.execute('UPDATE proposals SET body=?', (json.dumps(proposal),))
+                flat.execute("UPDATE messages SET body=? WHERE member='expert'", (json.dumps(expert),))
+                flat.commit()
+                with self.assertRaisesRegex(ValueError, 'violates hard constraints'):
+                    compare(direct, nested)
+                flat.execute('UPDATE proposals SET body=?', (original,))
+                flat.execute("UPDATE messages SET body=? WHERE member='expert'", (expert_body,))
                 flat.execute("UPDATE proposals SET body=json_set(body,'$.schedule[0].start',999)")
                 flat.commit()
                 with self.assertRaisesRegex(ValueError, 'differs from selected expert candidate'):

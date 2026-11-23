@@ -7,6 +7,8 @@ import sqlite3
 
 from examples.select_repair import choice
 from examples.roster_criteria import evaluate
+from examples.overnight_score import expected
+from examples.repair_benchmark import schedule
 from examples.user_consult import validate_roster
 
 
@@ -47,7 +49,20 @@ def read_receipt(path, nested):
                 or proposal.get('schedule') != candidates[selected]):
             raise ValueError('proposal differs from selected expert candidate')
         rows, rules = validate_roster(expert['input'])
-        flags = list(evaluate(rules, rows, [shift['start'] for shift in candidates[selected]]))
+        chosen = candidates[selected]
+        original = expert['input']['shifts']
+        if not isinstance(chosen, list) or len(chosen) != len(rows):
+            raise ValueError('changed shift count in repair')
+        starts = []
+        for shift, item, (_, _, duration) in zip(chosen, original, rows):
+            start = shift.get('start')
+            if (type(start) is not int or type(shift.get('end')) is not int
+                    or not 0 <= start <= 168-duration or shift != dict(item, start=start, end=start+duration)):
+                raise ValueError('invalid shift identity, duration or weekly interval in repair')
+            starts.append(start)
+        if any(expected(schedule(rows, starts)).values()):
+            raise ValueError('selected repair violates hard constraints')
+        flags = list(evaluate(rules, rows, starts))
         saved = proposal.get('criteria_met')
         if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
             raise ValueError('recorded preference scores differ from the selected schedule')
