@@ -302,6 +302,14 @@ class PeerRecoveryTests(unittest.TestCase):
                     source, body = private.execute('SELECT source,body FROM records').fetchone()
                 for value in (source, body):
                     self.assertNotIn(value.encode(), requests[0][1])
+            with closing(sqlite3.connect(folder/'directory'/'network.sqlite3')) as directory:
+                with directory:
+                    injected = directory.execute("INSERT INTO traffic(direction,route,body) VALUES('send','/check',?)", (body,)).lastrowid
+                with self.assertRaisesRegex(ValueError, 'private marker'):
+                    audit(folder)
+                with directory:
+                    directory.execute('DELETE FROM traffic WHERE rowid=?', (injected,))
+            self.assertEqual(result, audit(folder))
             with closing(sqlite3.connect(folder / 'A' / 'network.sqlite3')) as network, network:
                 network.execute("UPDATE jobs SET credits=3")
                 with self.assertRaisesRegex(ValueError, 'endpoints disagree'):

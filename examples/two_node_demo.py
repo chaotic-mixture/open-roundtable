@@ -93,13 +93,19 @@ def audit(folder):
         require(all(r['source']!=source for r in catalog(b)), 'offer still published after interruption')
     received=[json.loads(v) for d,r,v in traffic if d=='receive' and r.endswith('/consult')]
     require(received==[res],'sender receipt')
-    wire=packed([traffic,calls,charges,shared,catalog(b),json.loads((folder/'directory.json').read_text())])
+    fault=json.loads((folder/'interruption.json').read_text())
+    directory_snapshot = json.loads((folder/'directory.json').read_text())
+    directory = folder/'directory'
+    if fault.get('directory_ledger') or directory.exists():
+        published = read(directory,'public.sqlite3','SELECT source,body FROM records WHERE shared=1 ORDER BY source')
+        require([dict(source=s,body=v) for s,v in published] == directory_snapshot, 'directory snapshot mismatch')
+        traffic += read(directory,'network.sqlite3','SELECT direction,route,body FROM traffic')
+    wire=packed([traffic,calls,charges,shared,catalog(b),directory_snapshot])
     for root in (a,b):
         markers=read(root,'private.sqlite3','SELECT source,body FROM records')
         require(bool(markers),'missing private control')
         for source,value in markers:
             require(source.encode() not in wire and value.encode() not in wire,'private marker crossed boundary')
-    fault=json.loads((folder/'interruption.json').read_text())
     require((fault['exit'],fault['receiver_credits']) in ((75,2),(76,0)) and fault['sender_receipt'] is None
             and fault['before_pid']!=fault['after_pid'],'restart checkpoint')
     return dict(discovered=['A','B'],deliveries=2,model_calls=1,expert_calls=1,credits=cost,
@@ -163,7 +169,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
             share_public(b,published['source'],False)
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
-                after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits)))
+                after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits,directory_ledger=True)))
         cli(a,'resume')
         if json.loads(cli(a,'resume').stdout) != {}:
             raise RuntimeError('completed job still pending')
