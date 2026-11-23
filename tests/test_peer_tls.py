@@ -49,6 +49,12 @@ class PeerTLSTests(unittest.TestCase):
                 for record in (registration, topic):
                     share_public(base/'B', record['source'], True)
                 self.assertEqual(transfer(db,url+'/nodes',peer_name='B'), [registration])
+                imported = cli(base/'A', 'import-registration', 'B', registration['source'], url)
+                self.assertEqual(json.loads(imported.stdout)['source'], registration['source'])
+                from open_roundtable.data import connect
+                with closing(connect(base/'A', 'public')) as public:
+                    self.assertEqual(public.execute('SELECT source,body,shared FROM records').fetchall(),
+                                     [(registration['source'], registration['body'], 0)])
                 with self.assertRaises(URLError) as wrong_peer:
                     transfer(db,url+'/consult',dict(sender='A'),peer_name='C')
                 self.assertIsInstance(wrong_peer.exception.reason, ssl.SSLCertVerificationError)

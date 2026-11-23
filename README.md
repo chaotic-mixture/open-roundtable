@@ -211,7 +211,7 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 
 双节点演练可加 `--credentials CERT_DIR` 启用全流程双向 TLS。该目录须含 A、B 和 directory 三个子目录，各含 ca.pem、node.pem、node.key；directory 使用独立的目录服务证书。示例命令为 `python -m examples.two_node_demo run reports/tls-demo --credentials CERT_DIR --fault before-receipt`。密钥直接从指定目录加载，演练目录只记录凭证路径。离线对账命令为 `python -m examples.two_node_demo verify reports/tls-demo`。
 
-节点可运行 `python -m examples.peer_node NODE_B register https://b.example/node https://peer-b.example:8443`，用本机 node.json 中的节点名生成登记。通过 `review-public` 核对内容后，用 `share-public` 和返回的 SHA-256 发布该记录，再将同一来源与正文登记到引导目录。更换地址后重新运行登记命令，更新过的记录需要再次审核共享。
+节点可运行 `python -m examples.peer_node NODE_B register https://b.example/node https://peer-b.example:8443`，用本机 node.json 中的节点名生成登记。通过 `review-public` 核对内容后，用 `share-public` 和返回的 SHA-256 发布该记录，引导节点运行 `python -m examples.peer_node NODE_DIRECTORY import-registration B https://b.example/node https://peer-b.example:8443` 仅取回该条登记，核对节点名及地址后写入本地公开库。目录运营者审核并共享后，其他节点即可发现它。更换地址后重新运行登记命令，更新过的记录需要再次审核共享。
 
 配置跨主机连接时，在 node.json 中设定 `"transport":"mtls"`、本机接口的具体 IPv4 地址 `listen_address`，并在 `allowed_origins` 数组中逐项填写获准连接的 HTTPS 来源（如 `https://peer-b.example:8443`，含端口，无末尾斜线）。目录来源也需要列入。节点证书必须覆盖实际连接的主机名或 IP，同时保留节点名 URI。未配置时沿用回环监听；实际跨机器路由及防火墙条件仍待部署验收。
 

@@ -180,8 +180,7 @@ def set_permission(db, peer, allow, remaining=None):
     return dict(peer=peer, allowed=allow, remaining=remaining)
 
 
-def register(root, source, url):
-    config = json.loads((root/'node.json').read_text())
+def validate_registration_origin(config, source, url):
     endpoint = urlsplit(url)
     scheme = 'https' if config.get('transport') == 'mtls' else 'http'
     if (not source.endswith('/node') or endpoint.scheme != scheme or not endpoint.hostname
@@ -189,9 +188,28 @@ def register(root, source, url):
             or url != f'{scheme}://{endpoint.netloc}'
             or (scheme == 'http' and endpoint.hostname != '127.0.0.1')):
         raise ValueError('provide a /node registration source and a node origin with an explicit port')
+
+
+def register(root, source, url):
+    config = json.loads((root/'node.json').read_text())
+    validate_registration_origin(config, source, url)
     body = packed(dict(name=config['name'], url=url)).decode()
     ingest(root,'public',[dict(source=source,body=body)])
     return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
+
+
+def import_registration(root, db, name, source, url):
+    config = json.loads((root/'node.json').read_text())
+    validate_registration_origin(config, source, url)
+    records = transfer(db, url + '/record?' + urlencode({'source': source}), peer_name=name)
+    if not isinstance(records, list) or len(records) != 1:
+        raise ValueError('expected exactly one published registration')
+    record = records[0]
+    if (not isinstance(record, dict) or record.get('source') != source or not isinstance(record.get('body'), str)
+            or json.loads(record['body']) != dict(name=name, url=url)):
+        raise ValueError('published registration differs from requested identity or origin')
+    ingest(root, 'public', records)
+    return dict(source=source, sha256=hashlib.sha256(record['body'].encode()).hexdigest())
 
 
 def offer(root, source, tag, description):
@@ -737,6 +755,10 @@ if __name__=='__main__':
     registration = commands.add_parser('register')
     registration.add_argument('source')
     registration.add_argument('url')
+    imported = commands.add_parser('import-registration')
+    imported.add_argument('name')
+    imported.add_argument('source')
+    imported.add_argument('url')
     capability = commands.add_parser('offer')
     capability.add_argument('source')
     capability.add_argument('tag')
@@ -781,6 +803,8 @@ if __name__=='__main__':
         with closing(ledger(args.directory)) as db:
             if args.action == 'register':
                 result = register(args.directory, args.source, args.url)
+            elif args.action == 'import-registration':
+                result = import_registration(args.directory, db, args.name, args.source, args.url)
             elif args.action == 'offer':
                 result = offer(args.directory,args.source,args.tag,args.description)
             elif args.action == 'find-capability':
