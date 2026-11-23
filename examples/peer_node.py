@@ -276,6 +276,53 @@ def service_account(root, db):
     return account
 
 
+def partner_statement(root, db, partner):
+    node = json.loads((root/'node.json').read_text())['name']
+    if node == partner or not partner.strip():
+        raise ValueError('choose a distinct partner')
+    entries = []
+    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
+        request = json.loads(raw)
+        if {request['sender'], request['recipient']} != {node,partner}:
+            continue
+        if request['id'] != key or digest({k:v for k,v in request.items() if k!='id'}) != key:
+            raise ValueError('job identity mismatch')
+        receipt_hash = None
+        if saved is not None:
+            receipt = json.loads(saved)
+            validate_receipt(request,receipt)
+            if credits != receipt['credits']:
+                raise ValueError('invalid service charge')
+            receipt_hash = digest(receipt)
+        elif credits:
+            raise ValueError('pending job has a posted charge')
+        entries.append(dict(job=key, provider=request['recipient'], credits=credits, receipt=receipt_hash))
+    return dict(format=1, node=node, partner=partner, entries=entries)
+
+
+def reconcile(local, remote):
+    if (remote.get('format'),remote.get('node'),remote.get('partner')) != (1,local['partner'],local['node']):
+        raise ValueError('statement parties or format mismatch')
+    expected = {entry['job']:entry for entry in local['entries']}
+    reported = {entry['job']:entry for entry in remote['entries']}
+    if len(reported) != len(remote['entries']):
+        raise ValueError('duplicate statement job')
+    differences = []
+    for key in sorted(expected.keys() | reported.keys()):
+        if key not in expected:
+            reason = 'missing locally'
+        elif key not in reported:
+            reason = 'missing at partner'
+        elif packed(expected[key]) != packed(reported[key]):
+            reason = 'receipt or charge differs'
+        elif expected[key]['receipt'] is None:
+            reason = 'pending at both nodes'
+        else:
+            continue
+        differences.append(dict(job=key, reason=reason))
+    return dict(matched=len(expected.keys() | reported.keys())-len(differences), differences=differences)
+
+
 def resume(root, db):
     """Retry pending outbound jobs whose original topic is still shared."""
     name = json.loads((root / 'node.json').read_text())['name']
@@ -399,6 +446,10 @@ if __name__=='__main__':
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
     commands.add_parser('account')
+    for action in ('statement','reconcile'):
+        report = commands.add_parser(action)
+        report.add_argument('partner')
+        report.add_argument('file',type=Path)
     feedback = commands.add_parser('feedback')
     feedback.add_argument('job')
     feedback.add_argument('outcome', choices=['useful','not-useful'])
@@ -425,6 +476,14 @@ if __name__=='__main__':
                                            observation=args.observation_file.read_text(encoding='utf-8-sig'))
             elif args.action == 'quality':
                 result = practice_feedback(args.directory, db, provider=args.provider)
+            elif args.action in ('statement','reconcile'):
+                local = partner_statement(args.directory,db,args.partner)
+                if args.action == 'statement':
+                    with args.file.open('xb') as output:
+                        output.write(packed(local))
+                    result = dict(entries=len(local['entries']))
+                else:
+                    result = reconcile(local,json.loads(args.file.read_bytes()))
             elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':
@@ -436,5 +495,7 @@ if __name__=='__main__':
                     discover(db,args.bootstrap) if args.action=='discover' else
                     send(args.directory,db,args.recipient,args.source))
         print(packed(result).decode())
+        if args.action == 'reconcile' and result['differences']:
+            raise SystemExit(1)
         if args.action == 'resume' and any(v != 'received' for v in result.values()):
             raise SystemExit(1)

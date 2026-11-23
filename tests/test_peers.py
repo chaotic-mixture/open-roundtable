@@ -175,6 +175,18 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual((result['deliveries'], result['credits']), (2, 2))
             self.assertEqual([path for path, _ in requests], ['/api/chat'])
             self.assertEqual(result, audit(folder))
+            statement = folder/'statement.json'
+            cli(folder/'B','statement','A',str(statement))
+            exported = json.loads(statement.read_bytes())
+            self.assertEqual(set(exported['entries'][0]), {'job','provider','credits','receipt'})
+            self.assertEqual(json.loads(cli(folder/'A','reconcile','B',str(statement)).stdout),
+                             dict(matched=1,differences=[]))
+            for entries in ([], [dict(exported['entries'][0],credits=1)],
+                            [dict(exported['entries'][0],receipt='changed')]):
+                statement.write_text(json.dumps(dict(exported,entries=entries)))
+                checked = cli(folder/'A','reconcile','B',str(statement),ok=False)
+                self.assertNotEqual(checked.returncode,0)
+                self.assertEqual(len(json.loads(checked.stdout)['differences']),1)
             accounts = [json.loads(cli(folder / node, 'account').stdout) for node in ('A','B')]
             self.assertEqual(accounts[0]['entries'], accounts[1]['entries'])
             self.assertEqual([(a['contributed'],a['consumed'],a['pending']) for a in accounts],
