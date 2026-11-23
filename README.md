@@ -258,3 +258,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 使用本机已安装的 OpenSSL 和 Ollama 可直接复跑加密演练：`python -m examples.two_node_demo run reports/real-tls-offer --temporary-tls openssl --bind-offer --fault before-receipt`。该模式为 A、B 和目录临时签发测试证书，退出后清理密钥。2026-11-23 同机双向 TLS 与真实 qwen3.5:9b 联合实测：两次投递、专家与模型各一次、2 credits、290 输入和 7 输出 tokens，离线核验一致。演练结束后两端配置指向的临时凭证目录均已清理。
 
 能力查询和发送前的声明复核优先读取对端的 `/offers`，其中只包含该节点明确共享的能力声明。旧节点返回 404 时会兼容读取其完整公开目录；其他错误按查询失败处理。
+
+在上述命令后加 `--with-synonym` 可加入同一修复工具的第二条公开声明。2026-11-23 本机复测中，qwen3.5:9b 对修复需求选中两条修复声明，合并为一次工具执行后成功 9/9；对只读需求也选中了这两条，漏选检查声明，执行前拦截，完成 0/9、改动零班。已知操作标签的规则两项均完成 9/9。三声明组两次模型选择共用 273 个输入和 20 个输出 tokens。每种需求只选择一次并在九表复用，因此只读组的九次拦截源于同一次误选。该实验未经过 credits 账本。
