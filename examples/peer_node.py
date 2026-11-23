@@ -420,8 +420,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         k.execute('INSERT INTO peer_receipt VALUES (?,?)', (key, packed(result).decode()))
     if interrupt_before_receipt:
         os._exit(76)  # Durable kernel checkpoint, network ledger still pending.
-    with db:
-        db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?',(packed(result).decode(),credits,key))
+    settle_job(db, packed(request).decode(), result)
     return result,True
 
 
@@ -470,6 +469,12 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
                 raise ValueError('invalid service charge')
     result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
     validate_receipt(request, result)
+    settle_job(db, stored, result)
+    return result
+
+
+def settle_job(db, stored, result):
+    """Post a receipt once while preserving any intervening ledger discrepancy."""
     encoded = packed(result).decode()
     with db:
         posted = db.execute('UPDATE jobs SET result=?,credits=? WHERE id=? AND request=? AND result IS NULL AND credits=0',
@@ -477,8 +482,7 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
         if not posted:
             saved = db.execute('SELECT request,result,credits FROM jobs WHERE id=?',(result['id'],)).fetchone()
             if saved != (stored,encoded,result['credits']):
-                raise ValueError('conflicting receipt for a settled job')
-    return result
+                raise ValueError('conflicting receipt or changed job record')
 
 
 def service_account(root, db):

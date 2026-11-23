@@ -13,11 +13,33 @@ from unittest.mock import patch
 
 from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
+from examples.user_consult import NoFeasibleCandidate
 from examples.peer_node import partner_statement, reconcile, reconcile_online, service_account
 from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_receiver_preserves_charge_changed_while_consulting(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"B","model":"fixture"}')
+            spec = json.loads((Path(__file__).resolve().parents[1]/'examples'/'consult_input.json').read_bytes())
+            body = dict(sender='A', recipient='B', source='public', spec=spec)
+            request = dict(body, id=digest(body))
+            db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+            set_permission(db,'A',True,1)
+
+            def finish_search(*args):
+                with closing(sqlite3.connect(root/'network.sqlite3')) as other, other:
+                    other.execute('UPDATE jobs SET credits=1 WHERE id=?',(request['id'],))
+                raise NoFeasibleCandidate(dict(status='unknown',nodes=1))
+
+            published = [dict(source='public',body=json.dumps(spec))]
+            with patch('examples.peer_node.transfer',return_value=published), patch('examples.peer_node.consult',finish_search):
+                with self.assertRaisesRegex(ValueError,'changed job record'):
+                    deliver(root,db,request)
+                self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchone(),(None,1))
+
     def test_invalid_kernel_receipt_leaves_network_job_pending(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
