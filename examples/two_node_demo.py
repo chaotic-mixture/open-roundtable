@@ -137,6 +137,8 @@ def audit(folder):
             require(source.encode() not in wire and value.encode() not in wire,'private marker crossed boundary')
     require((fault['exit'],fault['receiver_credits']) in ((75,2),(76,0)) and fault['sender_receipt'] is None
             and fault['before_pid']!=fault['after_pid'],'restart checkpoint')
+    if 'kernel_receipt_sha256' in fault:
+        require(fault['kernel_receipt_sha256'] == digest(res), 'recovered receipt differs from pre-restart checkpoint')
     return dict(discovered=['A','B'],deliveries=2,model_calls=1,expert_calls=1,credits=cost,
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
                 state=state,private_markers_found=0,request_id=key)
@@ -194,12 +196,15 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         with closing(sqlite3.connect(a/'network.sqlite3')) as db:
             receipt=db.execute('SELECT result FROM jobs').fetchone()[0]
         with closing(sqlite3.connect(b/'network.sqlite3')) as db:
-            credits=db.execute('SELECT credits FROM jobs').fetchone()[0]
+            key,credits=db.execute('SELECT id,credits FROM jobs').fetchone()
+        with closing(sqlite3.connect((b/(key+'.sqlite3')).resolve().as_uri()+'?mode=ro',uri=True)) as db:
+            checkpoint = json.loads(db.execute('SELECT result FROM peer_receipt WHERE id=?',(key,)).fetchone()[0])
         if bind_offer:
             share_public(b,published['source'],False)
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
-                after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits,directory_ledger=True)))
+                after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits,directory_ledger=True,
+                kernel_receipt_sha256=digest(checkpoint))))
         cli(a,'resume')
         if json.loads(cli(a,'resume').stdout) != {}:
             raise RuntimeError('completed job still pending')
