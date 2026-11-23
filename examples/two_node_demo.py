@@ -77,25 +77,28 @@ def audit(folder):
     require(any(r['source']==req['source'] and json.loads(r['body'])==req['spec'] for r in shared),
             'unpublished request')
     require(req['spec']==json.loads(charges[0][1])['input'],'worker received different topic')
-    traffic=[]
+    endpoint_traffic = {}
     for root,other in [(a,'B'),(b,'A')]:
         require(other in dict(read(root,'network.sqlite3','SELECT name,url FROM peers')),'discovery')
-        traffic+=read(root,'network.sqlite3','SELECT direction,route,body FROM traffic')
-    accepted=[json.loads(v) for d,r,v in traffic if d=='accept' and r=='/consult']
-    replies=[json.loads(v) for d,r,v in traffic if d=='reply' and r=='/consult']
-    require(accepted==[req,req] and replies==[res],'lost-receipt replay sequence')
-    received=[json.loads(v) for d,r,v in traffic if d=='receive' and r.endswith('/consult')]
-    require(received==[res],'sender receipt')
+        endpoint_traffic[root]=read(root,'network.sqlite3','SELECT direction,route,body FROM traffic ORDER BY rowid')
+    traffic = endpoint_traffic[a] + endpoint_traffic[b]
     fault=json.loads((folder/'interruption.json').read_text())
     directory_snapshot = json.loads((folder/'directory.json').read_text())
+    registrations = [json.loads(r['body']) for r in directory_snapshot]
+    recipient = req['recipient']
+    origins = [r['url'] for r in registrations if r['name'] == recipient]
+    require(len(origins) == 1, 'missing unique recipient registration')
+    origin = origins[0]
+    route = origin + '/consult'
+    def consultation_events(root):
+        return [(d, r, json.loads(v)) for d, r, v in endpoint_traffic[root] if r.endswith('/consult')]
+    require(consultation_events(a) == [('send',route,req), ('send',route,req), ('receive',route,res)],
+            'sender replay sequence')
+    require(consultation_events(b) == [('accept','/consult',req), ('accept','/consult',req), ('reply','/consult',res)],
+            'receiver replay sequence')
     if 'offer' in req:
-        recipient = req['recipient']
-        registrations = [json.loads(r['body']) for r in directory_snapshot]
-        origins = [r['url'] for r in registrations if r['name'] == recipient]
-        require(len(origins) == 1, 'missing unique offer owner registration')
-        origin = origins[0]
         observed = []
-        for direction, route, value in read(a,'network.sqlite3','SELECT direction,route,body FROM traffic ORDER BY rowid'):
+        for direction, route, value in endpoint_traffic[a]:
             if direction == 'send' and route == origin + '/consult' and json.loads(value) == req:
                 break
             if direction == 'receive' and route in (origin + '/offers', origin + '/catalog'):
