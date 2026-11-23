@@ -664,7 +664,7 @@ def resume(root, db):
             continue
         try:
             send(root, db, request['recipient'], request['source'], original=request,offer_ref=request.get('offer'))
-        except (ValueError, OSError) as error:
+        except (ValueError, OSError, HTTPException) as error:
             outcomes[key] = str(error)
         else:
             outcomes[key] = 'received'
