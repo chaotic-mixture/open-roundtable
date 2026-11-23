@@ -32,6 +32,9 @@ def main():
     start = commands.add_parser('start', help='start a draft with seated members')
     start.add_argument('db', type=Path)
     start.add_argument('topic')
+    show = commands.add_parser('show', help='display the saved topic, balance, messages and ballots')
+    show.add_argument('db', type=Path)
+    show.add_argument('topic')
     post = commands.add_parser('post', help='record a member message and its cost in local credits')
     post.add_argument('db', type=Path)
     post.add_argument('topic')
@@ -73,7 +76,7 @@ def main():
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)
-        elif args.command in ('create','join','start','post','top-up','delegate','settle','cite','propose','vote'):
+        elif args.command in ('create','show','join','start','post','top-up','delegate','settle','cite','propose','vote'):
             if args.command != 'create' and not args.db.is_file():
                 raise ValueError('database missing')
             with closing(Kernel(args.db)) as k:
@@ -98,7 +101,7 @@ def main():
                         k.cite(args.topic,args.source)
                     elif args.command=='propose':
                         k.propose(args.topic,args.body,previous_version=args.version)
-                    else:
+                    elif args.command=='vote':
                         k.vote(args.topic,args.member,args.ballot=='yes',version=args.version)
                     result=k.get(args.topic)
         else:

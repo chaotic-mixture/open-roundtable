@@ -178,7 +178,7 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 
 ### Phase 3 本地子圆桌实验
 
-运行 `python -m open_roundtable create DB TITLE CREDITS` 可在新库或已有库中创建父议题，返回的 `id` 用作 PARENT。用 `python -m open_roundtable delegate DB PARENT MEMBER TITLE BUDGET` 委派预算，返回的 `child` 用作 CHILD。用 `python -m open_roundtable join DB CHILD REVIEWER human` 加入评审成员，再对父、子议题分别运行 `python -m open_roundtable start DB ID`。成员可用 `python -m open_roundtable post DB CHILD REVIEWER BODY --cost 2` 登记工作记录及所用的本地测试 credits，省略费用时计 1。独立出资的议题因余额不足暂停后，可用 `python -m open_roundtable top-up DB TOPIC AMOUNT` 追加预算，再重试未入账的工作记录。子议题遵循委派时确定的固定预算。子议题通过 propose 和 vote 完成表决后，运行 `python -m open_roundtable settle DB CHILD` 交付提案并取回未用预算。重复同一委派或结算返回已有结果。
+运行 `python -m open_roundtable create DB TITLE CREDITS` 可在新库或已有库中创建父议题，返回的 `id` 用作 PARENT。用 `python -m open_roundtable delegate DB PARENT MEMBER TITLE BUDGET` 委派预算，返回的 `child` 用作 CHILD。用 `python -m open_roundtable join DB CHILD REVIEWER human` 加入评审成员，再对父、子议题分别运行 `python -m open_roundtable start DB ID`。成员可用 `python -m open_roundtable post DB CHILD REVIEWER BODY --cost 2` 登记工作记录及所用的本地测试 credits，省略费用时计 1。重启或提交失败后，运行 `python -m open_roundtable show DB TOPIC` 查看已保存的状态、余额、发言和表决。独立出资的议题因余额不足暂停后，可用 `python -m open_roundtable top-up DB TOPIC AMOUNT` 追加预算，再重试未入账的工作记录。子议题遵循委派时确定的固定预算。子议题通过 propose 和 vote 完成表决后，运行 `python -m open_roundtable settle DB CHILD` 交付提案并取回未用预算。重复同一委派或结算返回已有结果。
 
 在源码根目录运行 `python -m examples.nested_consult nested.sqlite3 AXR:20-26 BXR:24-29`，数据库文件须为新路径。父议题从 4 个测试 credits 中划给子圆桌 3 个。子圆桌执行排班检查并表决，花费 1 个，将已通过的提案返回父议题，退回余下 2 个。父议题再花 1 个独立核验结果，最终余额为 2。父级账本中子圆桌发言的费用包含下级消耗，统计总费用时只汇总同一层。此示例检验本地委派、结算与表决；递归对复杂任务完成质量的收益仍待对照实验。
 

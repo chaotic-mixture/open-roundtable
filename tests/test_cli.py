@@ -51,10 +51,13 @@ class CliTests(unittest.TestCase):
         invoke('start', topic).check_returncode()
         rejected = invoke('post', topic, 'expert', 'inspection', '--cost', '2')
         self.assertEqual(rejected.returncode, 2)
+        paused = json.loads(invoke('show', topic).stdout)
+        self.assertEqual((paused['state'], paused['credits'], paused['messages']), ('PAUSED', 1, []))
         resumed = json.loads(invoke('top-up', topic, '2').stdout)
         self.assertEqual((resumed['state'], resumed['credits'], resumed['messages']), ('ACTIVE', 3, []))
         posted = json.loads(invoke('post', topic, 'expert', 'inspection', '--cost', '2').stdout)
         self.assertEqual((posted['credits'], len(posted['messages'])), (1, 1))
+        self.assertEqual(json.loads(invoke('show', topic).stdout), posted)
 
     def test_demo_refuses_existing_database_without_touching_bytes(self):
         first = self.run_demo()
