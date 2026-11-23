@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import unittest
 from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.peer_node import ledger, transfer
 from examples.two_node_demo import audit, run, start
@@ -36,17 +36,20 @@ class PeerTLSTests(unittest.TestCase):
             for name in ('A','B','directory'):
                 root = base/name
                 initialize(root)
-                (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls')))
+                (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls',listen_address='127.0.0.1')))
                 shutil.copyfile(base/'ca.pem',root/'ca.pem')
                 issue('req','-new','-newkey','rsa:2048','-nodes','-subj','/CN='+name,
                       '-keyout',str(root/'node.key'),'-out','node.csr')
-                (base/'extensions').write_text('subjectAltName=IP:127.0.0.1,URI:urn:roundtable:peer:'+name+
+                (base/'extensions').write_text('subjectAltName=IP:127.0.0.1,DNS:localhost,URI:urn:roundtable:peer:'+name+
                     '\nextendedKeyUsage=serverAuth,clientAuth\nbasicConstraints=CA:FALSE\n')
                 issue('x509','-req','-in','node.csr','-CA','ca.pem','-CAkey','ca.key','-CAcreateserial',
                       '-days','1','-extfile','extensions','-out',str(root/'node.pem'))
             _, port = start(stack,base/'B',0)
-            url = f'https://127.0.0.1:{port}'
+            url = f'https://localhost:{port}'
             with closing(ledger(base/'A')) as db:
+                with self.assertRaisesRegex(ValueError,'remote origin'):
+                    transfer(db,url+'/catalog',peer_name='B')
+                (base/'A'/'node.json').write_text(json.dumps(dict(name='A',transport='mtls',allowed_origins=[url])))
                 self.assertEqual(transfer(db,url+'/catalog',peer_name='B'), [])
                 with self.assertRaises(URLError) as wrong_peer:
                     transfer(db,url+'/consult',dict(sender='A'),peer_name='C')
@@ -61,7 +64,7 @@ class PeerTLSTests(unittest.TestCase):
                     transfer(db,url.replace('https:', 'http:')+'/catalog')
             client = ssl.create_default_context(cafile=str(base/'ca.pem'))
             with self.assertRaises((OSError,HTTPException)):
-                urlopen(url+'/catalog',context=client,timeout=3)
+                build_opener(ProxyHandler({}),HTTPSHandler(context=client)).open(url+'/catalog',timeout=3)
 
             calls = []
             class Model(BaseHTTPRequestHandler):

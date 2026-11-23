@@ -1,7 +1,8 @@
-"""Loopback-only two-node transport for the synthetic Phase 2 experiment."""
+"""Two-node consultation transport with optional mutually authenticated remote endpoints."""
 import argparse
 from contextlib import closing
 import hashlib
+from ipaddress import IPv4Address
 from functools import partial
 from http.client import HTTPSConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -86,10 +87,16 @@ class PeerHTTPSHandler(HTTPSHandler):
 def transfer(db,url,data=None,*,peer_name=None):
     u=urlsplit(url)
     location = db.execute('PRAGMA database_list').fetchone()[2]
-    context = tls_context(Path(location).parent)
+    root = Path(location).parent
+    config = json.loads((root/'node.json').read_text())
+    context = tls_context(root)
     scheme = 'https' if context else 'http'
-    if u.scheme!=scheme or u.hostname!='127.0.0.1' or u.username or u.password or not u.port:
-        raise ValueError('demo transport requires numeric loopback and an explicit port')
+    if u.scheme!=scheme or not u.hostname or u.username is not None or u.password is not None or not u.port:
+        raise ValueError('invalid transport endpoint')
+    if u.hostname != '127.0.0.1':
+        origins = config.get('allowed_origins', [])
+        if not context or not isinstance(origins, list) or f'https://{u.netloc}' not in origins:
+            raise ValueError('remote origin is not authorized')
     trace(db,'send',url,data)
     request=Request(url,data=None if data is None else packed(data),headers={'Content-Type':'application/json'})
     handler = PeerHTTPSHandler(context,peer_name) if context and peer_name is not None else HTTPSHandler(context=context)
@@ -370,7 +377,11 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):
                 self.reply(409,{'error':'request could not be completed'})
 
-    with ThreadingHTTPServer(('127.0.0.1',port),Handler) as server:
+    config = json.loads((root/'node.json').read_text())
+    address = IPv4Address(config.get('listen_address', '127.0.0.1'))
+    if address.is_unspecified or address.is_multicast or (not context and str(address) != '127.0.0.1'):
+        raise ValueError('an explicit interface and mutual TLS are required for remote service')
+    with ThreadingHTTPServer((str(address),port),Handler) as server:
         if context:
             server.socket = context.wrap_socket(server.socket, server_side=True)
         (root/'ready').write_text(str(server.server_port))
