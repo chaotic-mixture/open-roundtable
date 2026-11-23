@@ -203,6 +203,28 @@ def resume(root, db):
     return outcomes
 
 
+def practice_feedback(root, network, *, job=None, useful=None, observation=None, provider=None):
+    account = service_account(root, network)
+    consumed = {e['job']: e for e in account['entries'] if e['consumer'] == account['node']}
+    with closing(connect(root, 'private')) as db, db:
+        db.execute("""CREATE TABLE IF NOT EXISTS practice_feedback (
+            job TEXT PRIMARY KEY, useful INTEGER NOT NULL CHECK(useful IN (0,1)), observation TEXT NOT NULL)""")
+        if job is not None:
+            if job not in consumed:
+                raise ValueError('feedback requires a received consultation at its consumer')
+            if type(useful) is not bool or not isinstance(observation, str) or not observation.strip():
+                raise ValueError('record a practical observation and its outcome')
+            db.execute('INSERT OR IGNORE INTO practice_feedback VALUES (?,?,?)', (job,useful,observation))
+            saved = db.execute('SELECT useful,observation FROM practice_feedback WHERE job=?', (job,)).fetchone()
+            if saved != (useful,observation):
+                raise ValueError('different feedback already recorded for this receipt')
+            provider = consumed[job]['provider']
+        jobs = {key for key,entry in consumed.items() if entry['provider'] == provider}
+        ratings = [value for key,value in db.execute('SELECT job,useful FROM practice_feedback') if key in jobs]
+        return dict(provider=provider, received=len(jobs), reviewed=len(ratings), useful=sum(ratings),
+                    useful_fraction=sum(ratings)/len(ratings) if ratings else None)
+
+
 def local_history(root, network, label, job=None):
     label = label.strip()
     if not label:
@@ -276,6 +298,11 @@ if __name__=='__main__':
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
     commands.add_parser('account')
+    feedback = commands.add_parser('feedback')
+    feedback.add_argument('job')
+    feedback.add_argument('outcome', choices=['useful','not-useful'])
+    feedback.add_argument('observation_file', type=Path)
+    commands.add_parser('quality').add_argument('provider')
     access = commands.add_parser('permission')
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
@@ -291,7 +318,12 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:
-            if args.action == 'account':
+            if args.action == 'feedback':
+                result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',
+                                           observation=args.observation_file.read_text(encoding='utf-8-sig'))
+            elif args.action == 'quality':
+                result = practice_feedback(args.directory, db, provider=args.provider)
+            elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':
                 result = set_permission(db, args.peer, args.mode == 'allow')

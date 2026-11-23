@@ -176,3 +176,5 @@ python -m examples.peer_node reports/release-peer-run/A revisit weekend
 ### Phase 4 本地贡献与消费账本
 
 对同一次双节点演练，分别运行 `python -m examples.peer_node reports/release-peer-run/A account` 和 `python -m examples.peer_node reports/release-peer-run/B account`。两端输出可按任务编号核对的服务明细，列出供给方、消费方、会诊状态和内部测试 credits。接收节点记录贡献，发起节点记录消费。只有已保存回执的任务计入费用，待处理任务单独计数。此命令离线统计；回执中的会诊状态只表示流程结果，服务质量仍须通过实践反馈评估。
+
+消费方可将实际使用后的观察写入本地 UTF-8 文本，再运行 `python -m examples.peer_node NODE_DIR feedback JOB_ID useful observation.txt`（未起作用时选 `not-useful`）。`python -m examples.peer_node NODE_DIR quality PROVIDER` 汇总本节点收到的服务笔数、已评价笔数和已评价样本中的有用比例。无评价时比例为 null。每张回执最多计一次，观察正文保存在消费方私库。统计反映该消费方的使用经验，尚无跨身份防刷或全网评分。

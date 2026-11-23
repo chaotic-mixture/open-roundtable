@@ -129,6 +129,19 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual([(a['contributed'],a['consumed'],a['pending']) for a in accounts],
                              [(0,2,0),(2,0,0)])
             key = result['request_id']
+            note = folder / 'note.txt'
+            note.write_text('private-practice-observation')
+            self.assertIsNone(json.loads(cli(folder/'A','quality','B').stdout)['useful_fraction'])
+            for _ in range(2):
+                rating = json.loads(cli(folder/'A','feedback',key,'useful',str(note)).stdout)
+                self.assertEqual((rating['received'],rating['reviewed'],rating['useful']), (1,1,1))
+                self.assertNotIn(note.read_text(), str(rating))
+            for node, outcome in [('A','not-useful'), ('B','useful')]:
+                self.assertNotEqual(cli(folder/node,'feedback',key,outcome,str(note),ok=False).returncode, 0)
+            self.assertEqual(json.loads(cli(folder/'A','quality','B').stdout), rating)
+            with closing(sqlite3.connect(folder/'A'/'private.sqlite3')) as private:
+                self.assertEqual(private.execute('SELECT observation FROM practice_feedback').fetchone(),
+                                 (note.read_text(),))
             label = 'personal-revisit-label'
             for _ in range(2):
                 cli(folder / 'A', 'mark', key, label)
