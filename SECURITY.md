@@ -4,9 +4,11 @@ Phase 0 is an offline research prototype, not a sandbox, authorization service, 
 
 ## Current defaults
 
+The data management CLI assumes a single owner with trusted filesystem access per directory. Configure OS account permissions, encrypted storage and backups for customer deployments. SQLite files are plaintext. Database policies govern this CLI; other processes with filesystem access can read or copy the files. Only the public catalog has a feed command. Sealed maintenance runs without a network request. Local model mode trusts the operator's loopback Ollama installation and its configuration; use locally installed weights and disable cloud forwarding there. API mode explicitly authorizes the configured service to receive the selected private record. Private summaries stay in the private database. Operators should use trusted URLs for public imports.
+
 The optional Phase 1 consultation sends the synthetic schedule and expert proposal to the local Ollama service on loopback port 11434. Its local evidence directory contains the full request and reply. The synthetic example runs entirely offline.
 
-- No API keys, network listeners, paid calls, account sharing, blockchain transactions, or shell execution on behalf of a participant.
+- The offline kernel needs no API key. Owner-selected API maintenance can incur the provider's charges.
 - No automatic source-code changes and no self-improvement daemon.
 - A passed vote is a procedural result, not proof of truth or permission to execute.
 - Runtime databases and private reference conversations are excluded from Git and public packaging.

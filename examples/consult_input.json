@@ -1,0 +1,12 @@
+{
+  "title": "周末值班协调",
+  "preference": "优先让接孩子的同事在周六十八点前结束早班；同等情况下尽量保留晚班原来的开始时间。",
+  "shifts": [
+    {"id":"早班","worker":"小林","room":"东室","start":8,"end":14},
+    {"id":"晚班","worker":"小林","room":"东室","start":12,"end":18}
+  ],
+  "criteria": [
+    {"shift":"早班","field":"end","min":0,"max":18},
+    {"shift":"晚班","field":"delta","min":0,"max":0}
+  ]
+}

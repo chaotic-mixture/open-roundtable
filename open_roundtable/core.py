@@ -40,6 +40,13 @@ class Kernel:
             id INTEGER PRIMARY KEY, topic TEXT NOT NULL, member TEXT NOT NULL,
             body TEXT NOT NULL, source TEXT NOT NULL,
             FOREIGN KEY(topic, member) REFERENCES members(topic, id))''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS proposals (
+            topic TEXT NOT NULL REFERENCES topics(id), version INTEGER NOT NULL,
+            body TEXT NOT NULL, PRIMARY KEY(topic,version))''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS prior_votes (
+            topic TEXT NOT NULL, version INTEGER NOT NULL, member TEXT NOT NULL,
+            agree INTEGER NOT NULL, PRIMARY KEY(topic,version,member),
+            FOREIGN KEY(topic,member) REFERENCES members(topic,id))''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS tags (
             topic TEXT NOT NULL, member TEXT NOT NULL, label TEXT NOT NULL,
             PRIMARY KEY(topic, member, label),
@@ -80,6 +87,11 @@ class Kernel:
             'SELECT * FROM messages WHERE topic=? ORDER BY id', (topic,))]
         result['votes'] = [dict(r) for r in self.db.execute(
             'SELECT * FROM votes WHERE topic=? ORDER BY member', (topic,))]
+        result['proposals'] = [dict(r) for r in self.db.execute(
+            'SELECT version,body FROM proposals WHERE topic=? ORDER BY version', (topic,))]
+        result['current_version'] = len(result['proposals'])
+        result['prior_votes'] = [dict(r) for r in self.db.execute(
+            'SELECT version,member,agree FROM prior_votes WHERE topic=? ORDER BY version,member', (topic,))]
         result['feedback'] = [dict(r) for r in self.db.execute(
             'SELECT * FROM feedback WHERE topic=? ORDER BY id', (topic,))]
         result['tags'] = [dict(r) for r in self.db.execute(
@@ -104,12 +116,29 @@ class Kernel:
             self.db.execute('INSERT INTO feedback(topic, member, body, source) VALUES (?, ?, ?, ?)',
                             (topic, member, body, source))
 
-    def vote(self, topic, member, agree):
+    def propose(self, topic, body, *, previous_version):
+        """Archive the prior ballot and open a new vote. Version zero is the original topic."""
+        _text(body, 'proposal')
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            current = self.get(topic)
+            version = len(current['proposals'])
+            if current['state'] not in ('ACTIVE','PAUSED') or previous_version != version:
+                raise ValueError('closed topic or stale proposal')
+            self.db.execute('INSERT INTO prior_votes SELECT topic,?,member,agree FROM votes WHERE topic=?',
+                            (version,topic))
+            self.db.execute('DELETE FROM votes WHERE topic=?',(topic,))
+            self.db.execute('INSERT INTO proposals VALUES (?,?,?)',(topic,version+1,body))
+            return version+1
+
+    def vote(self, topic, member, agree, *, version=0):
         if type(agree) is not bool:
             raise ValueError('agree must be a bool')
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
             current = self.get(topic)
+            if version != len(current['proposals']):
+                raise ValueError('stale proposal version')
             self._member(topic, member)
             if current['state'] not in ('ACTIVE', 'PAUSED'):
                 raise ValueError('vote requires an active or paused topic')

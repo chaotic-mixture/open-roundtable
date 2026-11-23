@@ -1,5 +1,7 @@
 # Contributing
 
+Implement repeatable tasks with well-defined inputs and outputs as directly callable commands or scripts. Keep the business rules in testable functions and document the command, input format and failure behavior. Reserve skills for workflows that require judgment across steps.
+
 This is an early independent research/DIY project, not a ready-made global AI service.
 
 Read PROJECT_CHARTER.md and docs/DECISIONS_AND_OPEN_QUESTIONS.md first. Preserve the distinction between original goals, provisional prototype choices, tested behavior and unverified hypotheses. A proposal to change consensus, pricing, participant rights or recursion semantics should include an explicit design decision and counterexamples.

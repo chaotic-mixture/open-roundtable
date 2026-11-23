@@ -4,6 +4,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import sqlite3
@@ -17,7 +18,7 @@ from open_roundtable.schedule_expert import check
 
 
 RULES = ('P', 'V', 'R', 'L')
-HOST = 'http://127.0.0.1:11434'
+HOST = 'http://127.0.0.1:' + str(int(os.environ.get('ROUNDTABLE_OLLAMA_PORT','11434')))
 SOURCES = ('examples/auto_consult.py', 'examples/generate_overnight.py',
            'examples/overnight_score.py', 'open_roundtable/core.py',
            'open_roundtable/schedule_expert.py')

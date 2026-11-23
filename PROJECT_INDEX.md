@@ -1,5 +1,7 @@
 # Open Roundtable — 项目入口
 
+**v0.0.6 发布同机双节点会诊与断线恢复。** [验收摘要与复现步骤](docs/V0.0.6.md)
+
 工作名：开放圆桌。v0.0.5 新增[自然语言排班偏好对照](examples/preference_results.md)。[排班修复](examples/repair_results.md)和[排班检查](examples/paired_benchmark.md)可独立运行。
 
 ## 读取顺序

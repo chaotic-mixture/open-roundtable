@@ -6,6 +6,8 @@ import json
 from contextlib import closing
 from pathlib import Path
 from time import perf_counter
+from urllib.error import URLError
+from open_roundtable.run_journal import single_writer, initialize, dispatch
 
 from examples.auto_consult import api, assert_post, encoded, save
 from examples.generate_overnight import generate
@@ -37,16 +39,39 @@ def rule_key(profile, f, moved, index):
     return top,middle,low,-moved,-index
 
 
-def run(folder, model):
-    folder.mkdir(parents=True,exist_ok=False)
-    design = dict(briefs=BRIEFS, seeds=list(range(501,510)), profiles='rotate 0,1,2',
+def run(folder, model, *, expand=False):
+    with single_writer(folder):
+        _run(folder, model, expand)
+
+
+def _run(folder, model, expand):
+    design = dict(expand=expand, briefs=BRIEFS, seeds=list(range(501,510)), profiles='rotate 0,1,2',
                   weights=[4,2,1], ties='fewest changed shifts, then lowest ID',
                   rubric_sha256=hashlib.sha256(Path(__file__).with_name('preference_rubric.py').read_bytes()).hexdigest(),
-                  model=next(m for m in api('/api/tags')['models'] if m['name']==model),
-                  ollama=api('/api/version'))
-    save(folder,'design.json',design)
-    with closing(Kernel(folder/'ledger.sqlite3')) as k, (folder/'results.csv').open('x',newline='') as out:
-        writer = None
+                  model={'name':model})
+    root=Path(__file__).resolve().parents[1]
+    design['implementation']={name:hashlib.sha256((root/name).read_bytes()).hexdigest()
+                              for name in ('examples/preference_benchmark.py','examples/refine_schedule.py',
+                                           'examples/repair_benchmark.py','examples/generate_overnight.py',
+                                           'open_roundtable/schedule_expert.py','open_roundtable/run_journal.py')}
+    if (folder/'design.json').exists():
+        prior=json.loads((folder/'design.json').read_text(encoding='utf8'))
+        if prior.get('format') != 2 or prior['model']['name']!=model or any(
+                prior[key]!=value for key,value in design.items() if key!='model'):
+            raise ValueError('incompatible run directory')
+        design=prior
+    else:
+        if (folder/'ledger.sqlite3').exists():
+            raise ValueError('existing ledger without matching design')
+        try:
+            design['model']=next((m for m in api('/api/tags')['models'] if m['name']==model),design['model'])
+            design['ollama']=api('/api/version')
+        except (URLError,TimeoutError,ConnectionError) as exc:
+            design['ollama']={'unavailable':repr(exc)}
+        design['format']=2
+        save(folder,'design.json',design)
+    with closing(Kernel(folder/'ledger.sqlite3')) as k:
+        initialize(k.db)
         for i,seed in enumerate(design['seeds']):
             size,profile=(7,11,22)[i//3],i%3
             original=generate(seed,size)
@@ -58,13 +83,29 @@ def run(folder, model):
             old=[r[1] for r in rows]
             durations=[r[2] for r in rows]
             for arm in ('default','rules','model'):
-                topic=k.create(f'{seed}/{arm}',credits=2)
-                k.join(topic,'expert',kind='expert',source='verified candidate generator')
-                if arm=='model':
+                title=f'{seed}/{arm}'
+                existing=k.db.execute('SELECT id FROM topics WHERE title=?',(title,)).fetchone()
+                topic=existing[0] if existing else k.create(title,credits=2)
+                outcome=k.db.execute('SELECT metrics FROM outcomes WHERE topic=?',(topic,)).fetchone()
+                if outcome and not json.loads(outcome[0])['retryable']:
+                    continue
+                current=k.get(topic)
+                joined={m['id'] for m in current['members']}
+                if 'expert' not in joined:
+                    k.join(topic,'expert',kind='expert',source='verified candidate generator')
+                if arm=='model' and 'model' not in joined:
                     k.join(topic,'model',kind='model',source=model)
-                k.start(topic)
+                if current['state']=='DRAFT':
+                    k.start(topic)
+                posted={m['member'] for m in current['messages']}
                 t=perf_counter()
                 plans=candidates(rows)
+                if expand:
+                    from examples.refine_schedule import refine
+                    def rank(plan):
+                        moved = sum(s!=o for s,o in zip(plan,old))
+                        return rule_key(profile,facts(plan,rows),moved,0)
+                    plans=refine(rows,plans,rank,range(3))
                 if not plans or any(any(check(schedule(rows,p)).values()) or any(
                         not 0<=s<=168-d for s,d in zip(p,durations)) for p in plans):
                     raise ValueError('candidate verification failed')
@@ -74,7 +115,8 @@ def run(folder, model):
                 if arm=='rules':
                     idx=max(range(len(plans)),key=lambda j:rule_key(profile,menu[j]['shifts'],changed[j],j))
                 elapsed=perf_counter()-t
-                assert_post(k,topic,'expert',encoded(dict(plans=plans,tool_choice=idx)))
+                if 'expert' not in posted:
+                    assert_post(k,topic,'expert',encoded(dict(plans=plans,tool_choice=idx)))
                 request=response=None
                 fallback=''
                 if arm=='model':
@@ -86,38 +128,58 @@ def run(folder, model):
                                  messages=[dict(role='user',content=msg)],format={'type':'object',
                                  'required':['plan'],'additionalProperties':False,'properties':{
                                  'plan':{'type':'integer','enum':list(range(len(plans)))}}})
-                    t=perf_counter()
-                    response=api('/api/chat',request)
-                    try:
-                        idx=choice(response,len(plans))
-                    except (TypeError,ValueError,KeyError) as err:
-                        fallback=repr(err)
-                    elapsed+=perf_counter()-t
-                    assert_post(k,topic,'model',encoded(response))
+                    response,fallback,duration=dispatch(k,topic,request,api)
+                    elapsed+=k.db.execute('SELECT coalesce(sum(seconds),0) FROM attempts WHERE topic=?',
+                                          (topic,)).fetchone()[0]
+                    if response is not None:
+                        try:
+                            idx=choice(response,len(plans))
+                        except (TypeError,ValueError,KeyError) as err:
+                            fallback=repr(err)
+                        if 'model' not in posted:
+                            assert_post(k,topic,'model',encoded(response))
                 decisions=assess(profile,old,durations,plans[idx])
                 score=sum(w*int(b) for w,b in zip(design['weights'],decisions))
                 valid=not any(expected(schedule(rows,plans[idx])).values())
                 result=dict(id=idx,priorities=decisions,score=score,hard_pass=valid,changed=changed[idx])
-                k.feedback(topic,'expert',encoded(result),source='independent hourly check and priority rubric')
-                save(folder,f'{seed}-{arm}.json',dict(original=original,plans=plans,topic=topic,
-                     request=request,response=response,fallback=fallback,result=result))
+                evidence=dict(original=original,plans=plans,topic=topic,
+                     request=request,response=response,fallback=fallback,result=result)
                 messages=k.get(topic)['messages']
                 usage=response or {}
                 row=dict(seed=seed,size=size,brief=profile+1,arm=arm,selected=idx,hard_pass=int(valid),
                          high=int(decisions[0]),medium=int(decisions[1]),low=int(decisions[2]),
-                         points=score,changed=changed[idx],calls=len(messages),credits=sum(m['cost'] for m in messages),
+                         points=score,changed=changed[idx],calls=1+k.db.execute(
+                             'SELECT count(*) FROM attempts WHERE topic=?',(topic,)).fetchone()[0],credits=sum(m['cost'] for m in messages),
                          input_tokens=usage.get('prompt_eval_count',0),output_tokens=usage.get('eval_count',0),
                          seconds=elapsed,fallback=int(bool(fallback)))
-                if writer is None:
-                    writer=csv.DictWriter(out,fieldnames=list(row))
-                    writer.writeheader()
-                writer.writerow(row)
-                out.flush()
+                row['retryable']=int(arm=='model' and response is None)
+                with k.db:
+                    k.db.execute('INSERT INTO feedback(topic,member,body,source) VALUES (?,?,?,?)',
+                                 (topic,'expert',encoded(result),'independent hourly check and priority rubric'))
+                    k.db.execute('INSERT OR REPLACE INTO outcomes VALUES (?,?,?)',
+                                 (topic,encoded(evidence),json.dumps(row)))
+                export(folder,k)
+        export(folder,k)
+
+
+def export(folder,k):
+    items=k.db.execute('SELECT evidence,metrics FROM outcomes ORDER BY rowid').fetchall()
+    with (folder/'results.tmp').open('w',newline='') as out:
+        writer=None
+        for item in items:
+            row=json.loads(item['metrics'])
+            if writer is None:
+                writer=csv.DictWriter(out,fieldnames=list(row))
+                writer.writeheader()
+            writer.writerow(row)
+            save(folder,f"{row['seed']}-{row['arm']}.json",json.loads(item['evidence']))
+    (folder/'results.tmp').replace(folder/'results.csv')
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
+    parser.add_argument('--expand',action='store_true',help='search additional feasible schedules')
     args=parser.parse_args()
-    run(args.directory,args.model)
+    run(args.directory,args.model,expand=args.expand)

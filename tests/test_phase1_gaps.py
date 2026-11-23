@@ -1,0 +1,107 @@
+import csv
+import json
+from contextlib import closing
+from pathlib import Path
+import sqlite3
+import tempfile
+import unittest
+from unittest.mock import patch
+from urllib.error import URLError
+
+from examples import preference_benchmark as batch
+from examples.user_consult import consult
+from examples.refine_schedule import feasibility
+from examples.verify_preferences import verify
+from open_roundtable.core import Kernel
+
+
+def provider(path, payload=None):
+    if path=='/api/tags':
+        return {'models':[{'name':'fixture'}]}
+    if path=='/api/version':
+        return {}
+    return dict(done=True,done_reason='stop',message={'content':'{"plan":0}'},
+                prompt_eval_count=10,eval_count=3)
+
+
+class GapTests(unittest.TestCase):
+    def test_exhausted_domain_differs_from_exhausted_budget(self):
+        rows=[('Axu',8,4)]
+        impossible=lambda plan:plan[0]>168
+        self.assertEqual(feasibility(rows,impossible,200)['status'],'infeasible')
+        self.assertEqual(feasibility(rows,impossible,3)['status'],'unknown')
+        self.assertEqual(feasibility(rows,lambda p:p[0]==10,200)['plan'],[10])
+
+    def test_disagreement_revision_and_stale_ballot(self):
+        with closing(Kernel(':memory:')) as k:
+            topic=k.create('budget',2)
+            for member in 'ab':
+                k.join(topic,member,kind='human')
+            k.start(topic)
+            k.vote(topic,'a',False)
+            first=k.propose(topic,'first',previous_version=0)
+            k.vote(topic,'a',False,version=first)
+            k.vote(topic,'b',True,version=first)
+            second=k.propose(topic,'second',previous_version=first)
+            with self.assertRaises(ValueError):
+                k.vote(topic,'a',True,version=first)
+            for member in 'ab':
+                k.vote(topic,member,True,version=second)
+            state=k.get(topic)
+            self.assertEqual(state['state'],'RESOLVED')
+            self.assertEqual(len(state['prior_votes']),3)
+            self.assertEqual([p['body'] for p in state['proposals']],['first','second'])
+
+    def test_recovery_search_reconciliation_and_idempotence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/'batch'
+            with patch.object(batch,'api',side_effect=URLError('offline')):
+                batch.run(folder,'fixture',expand=True)
+            self.assertEqual(verify(folder),{'verified_rows':27,'retryable':9})
+            with patch.object(batch,'api',side_effect=provider) as mock:
+                batch.run(folder,'fixture',expand=True)
+                self.assertEqual(mock.call_count,9)
+                batch.run(folder,'fixture',expand=True)
+                self.assertEqual(mock.call_count,9)
+            self.assertEqual(verify(folder),{'verified_rows':27,'retryable':0})
+            with (folder/'results.csv').open() as stream:
+                rows=list(csv.DictReader(stream))
+            self.assertTrue(all((r['calls'],r['credits'])==('3','2') for r in rows if r['arm']=='model'))
+            for r in rows:
+                if r['arm']=='rules' and r['seed'] in ('502','508'):
+                    self.assertEqual((r['high'],r['points'],r['hard_pass']),('1','5','1'))
+            record=folder/'502-rules.json'
+            data=json.loads(record.read_text(encoding='utf8'))
+            data['result']['score']=0
+            record.write_text(json.dumps(data),encoding='utf8')
+            with self.assertRaises(ValueError):
+                verify(folder)
+
+    def test_receipt_survives_interruption_before_charge(self):
+        from examples.auto_consult import assert_post
+        def interrupt(k,topic,member,body):
+            if member=='model':
+                raise KeyboardInterrupt
+            assert_post(k,topic,member,body)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/'batch'
+            with patch.object(batch,'api',side_effect=provider), patch.object(batch,'assert_post',side_effect=interrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    batch.run(folder,'fixture')
+            with patch.object(batch,'api',side_effect=provider) as mock:
+                batch.run(folder,'fixture')
+                self.assertEqual(mock.call_count,8)
+            self.assertEqual(verify(folder)['verified_rows'],27)
+
+    def test_custom_roster_and_named_preferences(self):
+        with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api',side_effect=provider):
+            folder=Path(tmp)
+            source=folder/'source.json'
+            source.write_text(json.dumps({'title':'Weekend','preference':'Keep the late shift if possible',
+                'shifts':[dict(id='Early shift',worker='Kai',room='East',start=8,end=12),
+                          dict(id='Late shift',worker='Kai',room='East',start=10,end=15)]}))
+            result=consult(source,folder/'test.db','fixture')
+            self.assertEqual(result['state'],'RESOLVED')
+            self.assertEqual([r['id'] for r in result['schedule']],['Early shift','Late shift'])
+            with closing(sqlite3.connect(folder/'test.db')) as db:
+                self.assertEqual(db.execute('SELECT status FROM attempts').fetchone(),('returned',))
