@@ -39,6 +39,20 @@
 | 4 资源交换 | 两端可核对消费与贡献，限制受理次数，消费方凭回执记录私有实践反馈。[节点命令](../examples/peer_node.py) | 跨身份防刷，以及不同资源供给者之间的权益核验。 |
 | 5 改进实验 | 元议题预先登记通过条件，再在九张新表上比较排序策略。偏好分从 32/63 增至 44/63，两组全部通过硬约束。[复现实验](../examples/meta_consult.py) | 本机操作者可启用与撤回实验排序规则；多人身份鉴别和跨节点应用仍待验证。 |
 
+### Phase 2 源码快照复验
+
+2026-11-23 从提交 `66f58b46c985ca34b8ccd6dc8990dfa12ecf077c` 导出的 ZIP 文件 SHA-256 为 `9c348346a547ff09fae4c955f0b32ade17a0f951b82db411e28a29fe2a425b78`。在解压目录清空 PYTHONPATH 后，72 项测试全部通过，SQLite 独立回读通过。
+
+同一快照中，两个本机进程用双向 TLS 连接。接收方在保存内核回执后、更新传输账本前退出。恢复后，同一请求送达两次，专家和真实模型各调用一次，两端确认同一笔 2 credits。议题状态为 RESOLVED，模型输入 290 tokens、输出 7 tokens。离线复核得到相同结果，所查记录中私有标记命中数为零。跨物理主机部署仍待验收。
+
+复现时先解压该提交的源码归档，在解压目录运行以下命令。使用 Python 3.11 或更高版本，准备可执行的 OpenSSL、本机 Ollama 和 qwen3.5:9b。为完整运行 TLS 回归，将 ROUNDTABLE_TEST_OPENSSL 指向 OpenSSL 程序。run 使用新的输出目录，verify 可在模型服务关闭后运行。
+
+```sh
+python tests/verify_core.py
+python -m examples.two_node_demo run reports/model-replay --model qwen3.5:9b --temporary-tls openssl --fault before-receipt --bind-offer
+python -m examples.two_node_demo verify reports/model-replay
+```
+
 ## 公开发布检查
 
 独立测试、许可证范围、无私有会话/凭证、干净白名单快照、依赖与素材血缘、准确能力说明。源码发布流程见 [公开发布清单](PUBLIC_RELEASE_CHECKLIST.md)。
