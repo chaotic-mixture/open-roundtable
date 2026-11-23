@@ -109,6 +109,14 @@ def audit(folder):
             require(imports.get(route) == [record], 'directory registration import mismatch')
         served = [json.loads(body) for direction,route,body in directory_traffic if direction == 'serve' and route == '/nodes']
         require(served == [directory_snapshot, directory_snapshot], 'directory discovery responses mismatch')
+        discovery_routes = set()
+        for root in (a, b):
+            receipts = read(root, 'network.sqlite3',
+                            "SELECT route,body FROM traffic WHERE direction='receive' AND route LIKE '%/nodes'")
+            require(len(receipts) == 1 and json.loads(receipts[0][1]) == directory_snapshot,
+                    f'{root.name} directory receipt mismatch')
+            discovery_routes.add(receipts[0][0])
+        require(len(discovery_routes) == 1, 'nodes used different discovery endpoints')
         traffic += directory_traffic
     wire=packed([traffic,calls,charges,shared,catalog(b),directory_snapshot])
     for root in (a,b):

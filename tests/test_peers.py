@@ -317,6 +317,12 @@ class PeerRecoveryTests(unittest.TestCase):
                     directory.execute("UPDATE traffic SET route='/nodes' WHERE route='/missing'")
             self.assertEqual(result, audit(folder))
             with closing(sqlite3.connect(folder / 'A' / 'network.sqlite3')) as network, network:
+                with network:
+                    network.execute("UPDATE traffic SET direction='hidden' WHERE direction='receive' AND route LIKE '%/nodes'")
+                with self.assertRaisesRegex(ValueError, 'A directory receipt mismatch'):
+                    audit(folder)
+                with network:
+                    network.execute("UPDATE traffic SET direction='receive' WHERE direction='hidden'")
                 network.execute("UPDATE jobs SET credits=3")
                 with self.assertRaisesRegex(ValueError, 'endpoints disagree'):
                     network.commit()
