@@ -13,7 +13,7 @@ import uuid
 from urllib.parse import urlencode
 
 from examples.peer_node import packed,digest
-from open_roundtable.data import initialize, ingest, connect, catalog, share_public
+from open_roundtable.data import initialize, ingest, catalog, share_public
 
 
 SOURCE='https://roundtable.example/topics/weekend'
@@ -166,16 +166,17 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         spec=json.loads(Path(__file__).with_name('consult_input.json').read_text(encoding='utf8'))
         spec.pop('criteria',None)
         ingest(a,'public',[dict(source=SOURCE,body=packed(spec).decode())])
-        with closing(connect(a,'public')) as db,db:
-            db.execute('UPDATE records SET shared=1 WHERE source=?',(SOURCE,))
+        share_public(a,SOURCE,True,digest(spec))
         offer_args = []
+        recipient = 'B'
         if bind_offer:
             published = json.loads(cli(b,'offer','https://b.example/offers/weekend','repair','Repair weekly shifts').stdout)
             share_public(b,published['source'],True,published['sha256'])
             candidates = json.loads(cli(a,'find-capability','repair').stdout)['matches']
             selected, = candidates
+            recipient = selected['node']
             offer_args = ['--offer', selected['source'], selected['sha256']]
-        failed=cli(a,'send','B',SOURCE,*offer_args,ok=False)
+        failed=cli(a,'send',recipient,SOURCE,*offer_args,ok=False)
         exit_code = proc.wait(timeout=10)
         if failed.returncode==0 or exit_code!=(76 if fault=='before-receipt' else 75):
             raise RuntimeError('forced disconnect did not occur')
