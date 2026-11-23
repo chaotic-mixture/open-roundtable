@@ -1,6 +1,5 @@
 """Exercise real peers through a lost receipt and audit the resulting evidence."""
 import argparse
-import hashlib
 from contextlib import closing, ExitStack
 import json
 from pathlib import Path
@@ -12,7 +11,7 @@ import time
 import uuid
 from urllib.parse import urlencode
 
-from examples.peer_node import packed,digest
+from examples.peer_node import packed,digest,verify_offer
 from open_roundtable.data import initialize, ingest, catalog, share_public
 
 
@@ -85,17 +84,26 @@ def audit(folder):
     accepted=[json.loads(v) for d,r,v in traffic if d=='accept' and r=='/consult']
     replies=[json.loads(v) for d,r,v in traffic if d=='reply' and r=='/consult']
     require(accepted==[req,req] and replies==[res],'lost-receipt replay sequence')
-    if 'offer' in req:
-        source, checksum = req['offer']
-        observed = [record for direction,route,value in traffic if direction=='receive' and route.endswith(('/catalog','/offers'))
-                    for record in json.loads(value) if record['source']==source]
-        require(any(hashlib.sha256(r['body'].encode()).hexdigest()==checksum for r in observed),
-                'missing published offer revision')
-        require(all(r['source']!=source for r in catalog(b)), 'offer still published after interruption')
     received=[json.loads(v) for d,r,v in traffic if d=='receive' and r.endswith('/consult')]
     require(received==[res],'sender receipt')
     fault=json.loads((folder/'interruption.json').read_text())
     directory_snapshot = json.loads((folder/'directory.json').read_text())
+    if 'offer' in req:
+        recipient = req['recipient']
+        registrations = [json.loads(r['body']) for r in directory_snapshot]
+        origins = [r['url'] for r in registrations if r['name'] == recipient]
+        require(len(origins) == 1, 'missing unique offer owner registration')
+        origin = origins[0]
+        observed = []
+        for direction, route, value in read(a,'network.sqlite3','SELECT direction,route,body FROM traffic ORDER BY rowid'):
+            if direction == 'send' and route == origin + '/consult' and json.loads(value) == req:
+                break
+            if direction == 'receive' and route in (origin + '/offers', origin + '/catalog'):
+                observed.extend(json.loads(value))
+        else:
+            raise ValueError('missing dispatch to registered offer owner')
+        verify_offer(observed, recipient, req['offer'])
+        require(all(r['source'] != req['offer'][0] for r in catalog(b)), 'offer still published after interruption')
     directory = folder/'directory'
     if fault.get('directory_ledger') or directory.exists():
         published = read(directory,'public.sqlite3','SELECT source,body FROM records WHERE shared=1 ORDER BY source')
