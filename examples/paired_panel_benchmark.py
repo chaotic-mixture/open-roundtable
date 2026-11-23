@@ -47,7 +47,8 @@ def run(directory, model, *, verify_only=False, reverse_order=False):
 
 def summarize_rounds(first, second):
     totals = {mode: dict(model_seconds=0.0, consultation_seconds=0.0, credits=0,
-                         input_tokens=0, output_tokens=0) for mode in ('direct', 'nested')}
+                         input_tokens=0, output_tokens=0, changed_shifts=0) for mode in ('direct', 'nested')}
+    preferences = {mode: dict(met=0, evaluated=0, all_met_runs=0) for mode in totals}
     pairs = same_schedule = 0
     changed_selections = {mode: [] for mode in totals}
     for left, right in zip(run(first, None, verify_only=True), run(second, None, verify_only=True), strict=True):
@@ -61,9 +62,15 @@ def summarize_rounds(first, second):
                                                      second=right[mode]['selected']))
             for field in values:
                 values[field] += left[mode][field] + right[mode][field]
+            for result in (left[mode], right[mode]):
+                flags = result['criteria_met']
+                preferences[mode]['met'] += sum(flags)
+                preferences[mode]['evaluated'] += len(flags)
+                preferences[mode]['all_met_runs'] += all(flags)
         pairs += 2
         same_schedule += left['same_schedule'] + right['same_schedule']
-    return dict(pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections, totals=totals)
+    return dict(pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections,
+                preferences=preferences, totals=totals)
 
 
 if __name__ == '__main__':
