@@ -586,6 +586,14 @@ def reconcile_online(root, db, partner):
         remote = transfer(db,row[0]+'/statement',request,peer_name=partner)
         batch = statement_entries(remote, partner, config['name'])
         revision = remote.get('revision')
+        if 'revision' in remote or 'next' in remote:
+            if not isinstance(revision, str) or not revision or 'next' not in remote:
+                raise ValueError('incomplete statement pagination')
+            previous = request['after']
+            for entry in batch:
+                if entry['job'] <= previous:
+                    raise ValueError('statement entries out of cursor order')
+                previous = entry['job']
         if request['revision'] is not None and revision != request['revision']:
             raise ValueError('statement changed during reconciliation')
         entries.extend(batch)

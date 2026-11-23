@@ -13,11 +13,24 @@ from unittest.mock import patch
 
 from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
-from examples.peer_node import partner_statement, reconcile, service_account
+from examples.peer_node import partner_statement, reconcile, reconcile_online, service_account
 from open_roundtable.data import connect, ingest, initialize
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A","transport":"mtls"}')
+            db.execute("INSERT INTO peers VALUES ('B','https://b.example')")
+            entry = dict(job='2'*64, provider='B', credits=0, receipt=None)
+            first = dict(format=1, node='B', partner='A', entries=[entry], revision='r', next=entry['job'])
+            for last, error in [(dict(first, entries=[dict(entry, job='1'*64)], next=None), 'cursor order'),
+                                ({k:v for k,v in first.items() if k != 'next'}, 'incomplete statement pagination')]:
+                with self.subTest(error=error), patch('examples.peer_node.transfer', side_effect=[first,last]):
+                    with self.assertRaisesRegex(ValueError, error):
+                        reconcile_online(root, db, 'B')
+
     def test_malformed_statement_is_rejected_before_matching(self):
         local = dict(node='A', partner='B', entries=[])
         entry = dict(job='1'*64, provider='B', credits=0, receipt=None)
