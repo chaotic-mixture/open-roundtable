@@ -1,5 +1,6 @@
 from contextlib import closing
 from http.client import IncompleteRead
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -33,5 +34,5 @@ class CapabilityLimitsTests(unittest.TestCase):
             replies = [None, IncompleteRead(b''), [dict(body=body),dict(source='published',body=body)]]
             with patch('examples.peer_node.transfer',side_effect=replies):
                 result = find_capability(root,db,'audit')
-            self.assertEqual(result,dict(matches=[dict(node='D',source='published',description='check only')],
+            self.assertEqual(result,dict(matches=[dict(node='D',source='published',description='check only',sha256=hashlib.sha256(body.encode()).hexdigest())],
                                          unavailable=['B','C']))

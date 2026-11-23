@@ -113,7 +113,7 @@ class PeerTLSTests(unittest.TestCase):
                 return json.loads(cli(folder/'A','find-capability','repair').stdout)
             self.assertEqual(lookup(), dict(matches=[],unavailable=[]))
             share_public(receiver,source,True,draft['sha256'])
-            self.assertEqual(lookup()['matches'], [dict(node='B',source=source,description='Repair weekly shifts')])
+            self.assertEqual(lookup()['matches'], [dict(node='B',source=source,description='Repair weekly shifts',sha256=draft['sha256'])])
             cli(receiver,'permission','A','allow','--remaining','0')
             blocked = json.loads(cli(folder/'A','match-capability','repair shifts','--accepting-only').stdout)
             self.assertEqual((blocked['matches'],blocked['declined'],blocked['calls']), ([],['B'],0))
@@ -123,6 +123,10 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(eligible['declined'],[])
             share_public(receiver,source,False)
             self.assertEqual(lookup()['matches'], [])
+            rejected = cli(folder/'A','send','B','https://roundtable.example/topics/weekend',
+                           '--offer',source,draft['sha256'],ok=False)
+            self.assertIn(b'selected offer is no longer published',rejected.stderr)
+
             self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
                              dict(matched=1,differences=[]))
             with closing(ledger(folder/'A')) as db:

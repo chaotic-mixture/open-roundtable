@@ -189,7 +189,8 @@ def find_capability(root, db, tag=None, *, accepting_only=False):
             if (isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == peer
                     and isinstance(item.get('tag'),str) and tag in (None,item['tag'])
                     and isinstance(item.get('description'),str)):
-                match = dict(node=peer,source=record['source'],description=item['description'])
+                match = dict(node=peer,source=record['source'],description=item['description'],
+                             sha256=hashlib.sha256(record['body'].encode()).hexdigest())
                 if tag is None:
                     match['tag'] = item['tag']
                 matches.append(match)
@@ -231,6 +232,16 @@ def match_offers(need, offers, model, *, allowed_tags=None):
                 input_tokens=reply.get('prompt_eval_count'), output_tokens=reply.get('eval_count'))
 
 
+def verify_offer(records, node, reference):
+    source, checksum = reference
+    for record in records:
+        if record['source'] == source and hashlib.sha256(record['body'].encode()).hexdigest() == checksum:
+            item = json.loads(record['body'])
+            if isinstance(item,dict) and item.get('kind') == 'capability' and item.get('node') == node:
+                return
+    raise ValueError('selected offer is no longer published at the requested revision')
+
+
 def envelope(root,recipient,source):
     config=json.loads((root/'node.json').read_text())
     record=next((r for r in catalog(root) if r['source']==source),None)
@@ -243,6 +254,8 @@ def envelope(root,recipient,source):
 def deliver(root,db,request,*,interrupt_before_receipt=False):
     key=request['id']
     body={k:request[k] for k in ('sender','recipient','source','spec')}
+    if 'offer' in request:
+        body['offer'] = request['offer']
     if set(request)!=set(body)|{'id'} or key!=digest(body):
         raise ValueError('invalid envelope')
     config=json.loads((root/'node.json').read_text())
@@ -281,6 +294,8 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
             result = json.loads(checkpoint[0])
             db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
             return result, False
+        if 'offer' in request:
+            verify_offer(catalog(root),config['name'],request['offer'])
         limit = db.execute('SELECT remaining FROM grant_limits WHERE name=?', (request['sender'],)).fetchone()
         if limit is not None:
             if limit[0] == 0:
@@ -313,13 +328,18 @@ def validate_receipt(request, receipt):
         raise ValueError('invalid service outcome')
 
 
-def send(root,db,recipient,source,*,original=None):
+def send(root,db,recipient,source,*,original=None,offer_ref=None):
     request=envelope(root,recipient,source)
+    if offer_ref is not None:
+        request['offer'] = list(offer_ref)
+        request['id'] = digest({k:v for k,v in request.items() if k!='id'})
     if original is not None and original != request:
         raise ValueError('published topic changed')
     peer=db.execute('SELECT url FROM peers WHERE name=?',(recipient,)).fetchone()
     if not peer:
         raise ValueError('discover recipient first')
+    if offer_ref is not None and original is None:
+        verify_offer(transfer(db,peer[0]+'/catalog',peer_name=recipient),recipient,offer_ref)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
     result=transfer(db,peer[0]+'/consult',request,peer_name=recipient)
@@ -421,7 +441,7 @@ def resume(root, db):
         if request['sender'] != name:
             continue
         try:
-            send(root, db, request['recipient'], request['source'], original=request)
+            send(root, db, request['recipient'], request['source'], original=request,offer_ref=request.get('offer'))
         except (ValueError, OSError) as error:
             outcomes[key] = str(error)
         else:
@@ -636,6 +656,7 @@ if __name__=='__main__':
     submit=commands.add_parser('send')
     submit.add_argument('recipient')
     submit.add_argument('source')
+    submit.add_argument('--offer',nargs=2,metavar=('SOURCE','SHA256'))
     args=parser.parse_args()
     if args.action=='serve':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
@@ -677,7 +698,7 @@ if __name__=='__main__':
             else:
                 result=(resume(args.directory,db) if args.action=='resume' else
                     discover(db,args.bootstrap) if args.action=='discover' else
-                    send(args.directory,db,args.recipient,args.source))
+                    send(args.directory,db,args.recipient,args.source,offer_ref=args.offer))
         print(packed(result).decode())
         if args.action in ('reconcile','reconcile-online') and result['differences']:
             raise SystemExit(1)
