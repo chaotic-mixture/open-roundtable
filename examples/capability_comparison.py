@@ -16,6 +16,15 @@ def run(model):
         print(dict(tag=tag, exact_missed=len(expected-exact),exact_extra=len(exact-expected),
                    model_missed=len(expected-selected),model_extra=len(selected-expected),
                    **{k:v for k,v in result.items() if k!='matches'}))
+        # The operator permits read-only work for audits and either editing service for repairs.
+        allowed = {'repair': ['repair', 'reschedule'], 'audit': ['audit'], 'payroll': ['payroll']}[tag]
+        permitted = {i for i, offer in enumerate(offers) if offer['tag'] in allowed}
+        constrained = match_offers(need, offers, model, allowed_tags=allowed)
+        chosen = {offers.index(o) for o in constrained['matches']}
+        print(dict(tag=tag, allowed_tags=allowed, rule_missed=len(expected-permitted),
+                   rule_extra=len(permitted-expected), model_missed=len(expected-chosen),
+                   model_extra=len(chosen-expected),
+                   **{k:v for k,v in constrained.items() if k!='matches'}))
 
 
 if __name__ == '__main__':
