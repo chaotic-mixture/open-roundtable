@@ -10,6 +10,39 @@ from open_roundtable.core import Kernel
 
 
 class DelegationTests(unittest.TestCase):
+    def test_top_up_and_refund_share_integer_limit(self):
+        maximum = 2**63 - 1
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'refund.sqlite3'
+            with closing(Kernel(path)) as k:
+                parent = k.create('review', maximum - 1)
+                child = k.delegate(parent, 'panel', 'review finding', 4)
+                k.join(child, 'reviewer', kind='human')
+                k.start(parent)
+                k.start(child)
+                version = k.propose(child, 'accepted', previous_version=0)
+                k.vote(child, 'reviewer', True, version=version)
+                with self.assertRaises(ValueError):
+                    k.top_up(parent, 2)
+            ready = Barrier(2)
+
+            def apply(operation):
+                with closing(Kernel(path)) as k:
+                    ready.wait(timeout=10)
+                    return operation(k)
+
+            with ThreadPoolExecutor(2) as pool:
+                refund = pool.submit(apply, lambda k: k.settle(child))
+                deposit = pool.submit(apply, lambda k: k.top_up(parent, 1))
+                self.assertEqual(refund.result(), 0)
+                deposit.result()
+            with closing(Kernel(path)) as k:
+                self.assertEqual(k.get(parent)['credits'], maximum)
+                self.assertIs(type(k.get(parent)['credits']), int)
+                self.assertEqual(k.get(child)['credits'], 0)
+                with self.assertRaises(ValueError):
+                    k.top_up(parent, 1)
+
     def test_simultaneous_settlement_refunds_once(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'concurrent.sqlite3'
