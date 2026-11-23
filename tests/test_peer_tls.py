@@ -12,6 +12,7 @@ import ssl
 import tempfile
 import unittest
 from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, urlsplit
 from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.demo_certificates import issue_certificates
@@ -77,10 +78,14 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(audit(folder), result)
             self.assertEqual((result['deliveries'], result['credits'], calls), (2, 2, ['/api/chat']))
             with closing(ledger(folder/'B')) as db:
-                fetched = db.execute("SELECT body FROM traffic WHERE direction='receive' AND route LIKE '%/record?%'").fetchall()
-                self.assertTrue(fetched)
-                for body, in fetched:
-                    self.assertEqual([r['source'] for r in json.loads(body)], ['https://roundtable.example/topics/weekend'])
+                fetched = db.execute("SELECT route,body FROM traffic WHERE direction='receive' AND route LIKE '%/record?%'").fetchall()
+                sources = set()
+                for route, body in fetched:
+                    requested = parse_qs(urlsplit(route).query)['source']
+                    self.assertEqual([r['source'] for r in json.loads(body)], requested)
+                    sources.update(requested)
+                self.assertIn('https://roundtable.example/topics/weekend', sources)
+                self.assertTrue(any(source.endswith('/node') for source in sources))
             for name in ('A','B'):
                 with closing(ledger(folder/name)) as db:
                     routes = db.execute("SELECT route FROM traffic WHERE direction='send'").fetchall()

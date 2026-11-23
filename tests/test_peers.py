@@ -113,6 +113,9 @@ class PeerRecoveryTests(unittest.TestCase):
             with patch('examples.peer_node.transfer', side_effect=[feed,feed]):
                 discover(db, 'directory')
             set_permission(db, 'A', True, 1)
+            other_source = [dict(feed[0], source='https://other.example/node')]
+            with patch('examples.peer_node.transfer', side_effect=[feed,other_source]), self.assertRaises(ValueError):
+                discover(db, 'directory')
             with patch('examples.peer_node.transfer', side_effect=[feed,[]]), self.assertRaises(ValueError):
                 discover(db, 'directory')
             self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))

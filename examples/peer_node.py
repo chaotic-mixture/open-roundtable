@@ -126,12 +126,16 @@ def transfer(db,url,data=None,*,peer_name=None):
 
 def discover(db,bootstrap):
     feed=transfer(db,bootstrap+'/catalog')
-    descriptors=[json.loads(r['body']) for r in feed if r['source'].endswith('/node')]
-    if not isinstance(feed, list) or len({p['name'] for p in descriptors})!=len(descriptors):
+    if not isinstance(feed, list):
         raise ValueError('invalid public directory snapshot')
-    for peer in descriptors:
-        published=transfer(db,peer['url']+'/catalog',peer_name=peer['name'])
-        if not any(r['source'].endswith('/node') and json.loads(r['body'])==peer for r in published):
+    registrations = [(r['source'], json.loads(r['body'])) for r in feed if r['source'].endswith('/node')]
+    descriptors = [peer for source, peer in registrations]
+    if len({p['name'] for p in descriptors})!=len(descriptors):
+        raise ValueError('invalid public directory snapshot')
+    for source, peer in registrations:
+        route = '/record?' + urlencode({'source': source})
+        published = fetch_public_subset(db, peer['url'], peer['name'], route)
+        if not any(r['source'] == source and json.loads(r['body']) == peer for r in published):
             raise ValueError('advertised node did not confirm registration')
     with db:
         db.execute('BEGIN IMMEDIATE')
