@@ -13,6 +13,14 @@ from open_roundtable.data import initialize, ingest, share_public
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_dispatch_verifies_selected_revision_in_mixed_catalog(self):
+        body = json.dumps(dict(kind='capability', node='B', tag='audit', description='Check shifts'))
+        records = [None, {}, dict(source='audit', body=None), dict(source='audit', body=body)]
+        checksum = hashlib.sha256(body.encode()).hexdigest()
+        self.assertEqual(verify_offer(records, 'B', ['audit', checksum]), json.loads(body))
+        with self.assertRaisesRegex(ValueError, 'no longer published'):
+            verify_offer(records, 'B', ['audit', 'old-revision'])
+
     def test_declared_rules_filter_before_inference(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)

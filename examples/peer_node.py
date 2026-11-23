@@ -342,14 +342,26 @@ def match_offers(need, offers, model, *, allowed_tags=None):
 
 
 def verify_offer(records, node, reference, *, repair_only=False):
+    if (not isinstance(reference, (list, tuple)) or len(reference) != 2
+            or not all(isinstance(value, str) for value in reference)):
+        raise ValueError('invalid offer reference')
+    if not isinstance(records, list):
+        raise ValueError('expected a catalog list')
     source, checksum = reference
     for record in records:
-        if record['source'] == source and hashlib.sha256(record['body'].encode()).hexdigest() == checksum:
-            item = json.loads(record['body'])
-            if valid_offer(item, node):
-                if repair_only and item['tag'] not in ('repair', 'reschedule'):
-                    raise ValueError('selected offer does not declare schedule repair')
-                return item
+        if not isinstance(record, dict) or record.get('source') != source:
+            continue
+        body = record.get('body')
+        if not isinstance(body, str) or hashlib.sha256(body.encode()).hexdigest() != checksum:
+            continue
+        try:
+            item = json.loads(body)
+        except ValueError:
+            continue
+        if valid_offer(item, node):
+            if repair_only and item['tag'] not in ('repair', 'reschedule'):
+                raise ValueError('selected offer does not declare schedule repair')
+            return item
     raise ValueError('selected offer is no longer published at the requested revision')
 
 
