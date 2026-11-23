@@ -46,6 +46,10 @@ def connect(root, scope):
     try:
         if db.execute('SELECT scope FROM metadata').fetchall() != [(scope,)]:
             raise ValueError('store identity mismatch')
+        if scope == 'private':
+            db.execute("""CREATE TABLE IF NOT EXISTS record_limits (
+                source TEXT PRIMARY KEY REFERENCES records(source),
+                mode TEXT NOT NULL CHECK(mode IN ('sealed','local')), model TEXT)""")
         return db
     except BaseException:
         db.close()
@@ -65,6 +69,23 @@ def configure(root, mode, model=None, endpoint=None):
         raise ValueError('choose a model')
     with closing(connect(root,'private')) as db, db:
         db.execute('UPDATE policy SET mode=?,model=?,endpoint=? WHERE id=1',(mode,model,endpoint))
+
+
+def limit_record(root, source, mode, model=None):
+    if mode not in ('inherit','sealed','local'):
+        raise ValueError('unknown record limit')
+    if mode == 'local' and not (model and model.strip()):
+        raise ValueError('choose a local model')
+    if mode != 'local' and model is not None:
+        raise ValueError('model applies only to local maintenance')
+    with closing(connect(root,'private')) as db, db:
+        db.execute('BEGIN IMMEDIATE')
+        if not db.execute('SELECT 1 FROM records WHERE source=?',(source,)).fetchone():
+            raise ValueError('unknown private record')
+        if mode == 'inherit':
+            db.execute('DELETE FROM record_limits WHERE source=?',(source,))
+        else:
+            db.execute('INSERT OR REPLACE INTO record_limits VALUES (?,?,?)',(source,mode,model))
 
 
 def ingest(root, scope, records):
@@ -103,6 +124,12 @@ def maintain(root, source):
         # Serialize permission changes with the entire authorized operation.
         db.execute('BEGIN IMMEDIATE')
         mode,model,endpoint=db.execute('SELECT mode,model,endpoint FROM policy WHERE id=1').fetchone()
+        limit = db.execute('SELECT mode,model FROM record_limits WHERE source=?',(source,)).fetchone()
+        if mode not in ('sealed','local','api'):
+            raise ValueError('invalid stored policy')
+        if limit and mode != 'sealed':
+            mode, model = limit
+            endpoint = None
         record=db.execute('SELECT body FROM records WHERE source=?',(source,)).fetchone()
         if record is None:
             raise ValueError('unknown record')
@@ -171,6 +198,10 @@ def main():
     policy.add_argument('mode',choices=['sealed','local','api'])
     policy.add_argument('--model')
     policy.add_argument('--endpoint')
+    limit=commands.add_parser('record-limit')
+    limit.add_argument('source')
+    limit.add_argument('mode', choices=['inherit','sealed','local'])
+    limit.add_argument('--model')
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -194,6 +225,8 @@ def main():
             print(json.dumps(catalog(root),ensure_ascii=True))
         elif args.action=='policy':
             configure(root,args.mode,args.model,args.endpoint)
+        elif args.action=='record-limit':
+            limit_record(root,args.source,args.mode,args.model)
         elif args.action=='maintain-private':
             maintain(root,args.source)
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:

@@ -67,6 +67,26 @@ class DataTests(unittest.TestCase):
         with patch.object(data,'exchange',side_effect=AssertionError):
             data.maintain(self.root,'profile')
 
+    def test_record_limits_survive_updates_and_respect_sealed_store(self):
+        data.configure(self.root,'api','remote','https://example.org/chat')
+        data.limit_record(self.root,'profile','sealed')
+        data.ingest(self.root,'private',[dict(source='profile',body='replacement')])
+        with patch.object(data,'exchange',side_effect=AssertionError):
+            data.maintain(self.root,'profile')
+        data.limit_record(self.root,'profile','local','owner-model')
+        with patch.object(data,'exchange',return_value='{"message":{"content":"local result"}}') as send:
+            data.maintain(self.root,'profile')
+            self.assertEqual(send.call_args.args[0],'http://127.0.0.1:11434/api/chat')
+            self.assertEqual(send.call_args.args[1]['model'],'owner-model')
+        data.configure(self.root,'sealed')
+        with patch.object(data,'exchange',side_effect=AssertionError):
+            data.maintain(self.root,'profile')
+        data.limit_record(self.root,'profile','inherit')
+        data.configure(self.root,'api','remote','https://example.org/chat')
+        with patch.object(data,'exchange',return_value='{"choices":[{"message":{"content":"summary"}}]}') as send:
+            data.maintain(self.root,'profile')
+            self.assertEqual(send.call_args.args[0],'https://example.org/chat')
+
     def test_swapped_database_refused(self):
         with closing(data.connect(self.root,'public')) as db, db:
             db.execute("UPDATE metadata SET scope='private'")
