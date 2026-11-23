@@ -299,3 +299,8 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 节点的 `send --offer` 当前执行排班修复。新请求绑定的公开声明须使用 `repair` 或 `reschedule` 标签；发送方在投递前、接收方在受理新任务时均检查所选声明的具体版本。节点可以同时发布只读检查等其他声明供发现。已受理任务按原有回执恢复。
 
 运行 `find-capability repair reschedule` 可在一次目录查询中列出任一修复标签的声明；每个匹配项包含实际标签、发布节点和声明摘要。单独查询只读检查仍可用 `find-capability audit`。多标签查询支持与 `--accepting-only` 组合。
+### 远端排班审查
+
+提供方可用 `offer SOURCE audit "检查休息与工时" --rule R --rule L` 登记能力并共享该记录。发起方显式共享审查议题，例如 `{"operation":"schedule-audit-v1","rules":["R","L"],"shifts":["Axv:22-26","Bxu:29-33"]}`。用 `find-capability audit --require-rule R --require-rule L` 获取服务来源和摘要，再用 `send NODE TOPIC --offer SOURCE SHA256` 派单。回执中的 R 项会报告 `x@26-29`。此入口接受一周以内的合成班表编码，提供方每次新审查使用一个授权名额，规则工具扣费为零。
+
+运行 `python -m unittest tests.test_peer_audit` 可复现同机双进程的九表审查、独立评分和重复派单核账。

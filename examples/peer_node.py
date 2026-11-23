@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
 from open_roundtable.data import catalog, connect, ingest, NoRedirect
+from open_roundtable.schedule_expert import check
 from examples.user_consult import NoFeasibleCandidate, consult, validate_roster
 
 
@@ -348,8 +349,33 @@ def verify_offer(records, node, reference, *, repair_only=False):
             if valid_offer(item, node):
                 if repair_only and item['tag'] not in ('repair', 'reschedule'):
                     raise ValueError('selected offer does not declare schedule repair')
-                return
+                return item
     raise ValueError('selected offer is no longer published at the requested revision')
+
+
+def audit_rules(spec):
+    if not isinstance(spec, dict) or spec.get('operation') != 'schedule-audit-v1':
+        return None
+    rules = spec.get('rules')
+    shifts = spec.get('shifts')
+    if (not isinstance(rules, list) or not rules or
+            not all(isinstance(rule, str) and rule in ('P', 'V', 'R', 'L') for rule in rules)):
+        raise ValueError('invalid audit rules')
+    if not isinstance(shifts, list) or not 1 <= len(shifts) <= 52:
+        raise ValueError('provide 1 to 52 audit shifts')
+    ids = set()
+    for shift in shifts:
+        match = re.fullmatch(r'([A-Za-z])[A-Za-z][A-Za-z]:(\d{1,3})-(\d{1,3})', shift) if isinstance(shift, str) else None
+        if not match or match[1] in ids or not 0 <= int(match[2]) < int(match[3]) <= 168:
+            raise ValueError('invalid audit shift')
+        ids.add(match[1])
+    return rules
+
+
+def verify_dispatch(records, node, reference, rules):
+    item = verify_offer(records, node, reference, repair_only=rules is None)
+    if rules is not None and (item['tag'] != 'audit' or not set(rules).issubset(item.get('rules', []))):
+        raise ValueError('selected offer does not cover the requested audit rules')
 
 
 def envelope(root,recipient,source):
@@ -417,15 +443,25 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
                         raise ValueError('checkpoint charge differs from kernel ledger')
             db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?', (checkpoint[0], result['credits'], key))
             return result, False
+        rules = audit_rules(request['spec'])
+        if rules and 'offer' not in request:
+            raise ValueError('audits require a published offer')
         if 'offer' in request:
-            verify_offer(catalog(root),config['name'],request['offer'],repair_only=True)
+            verify_dispatch(catalog(root),config['name'],request['offer'],rules)
         limit = db.execute('SELECT remaining FROM grant_limits WHERE name=?', (request['sender'],)).fetchone()
         if limit is not None:
             if limit[0] == 0:
                 raise ValueError('consultation allowance exhausted')
-        validate_roster(request['spec'])
+        if rules is None:
+            validate_roster(request['spec'])
         if limit is not None:
             db.execute('UPDATE grant_limits SET remaining=remaining-1 WHERE name=?', (request['sender'],))
+        if rules:
+            findings = check(request['spec']['shifts'], rules=rules)
+            outcome = dict(state='AUDITED', findings={k: sorted(v) for k, v in findings.items()})
+            result = dict(id=key, sender=config['name'], recipient=request['sender'], credits=0, outcome=outcome)
+            db.execute('UPDATE jobs SET result=? WHERE id=?', (packed(result).decode(), key))
+            return result, True
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))
     try:
@@ -455,6 +491,14 @@ def validate_receipt(request, receipt):
     if type(charge) is not int or not 0 <= charge <= 2:
         raise ValueError('invalid service charge')
     outcome = receipt.get('outcome')
+    rules = audit_rules(request.get('spec'))
+    if rules:
+        findings = outcome.get('findings') if isinstance(outcome, dict) else None
+        if (charge or 'offer' not in request or not isinstance(findings, dict) or outcome.get('state') != 'AUDITED'
+                or set(findings) != set(rules) or any(not isinstance(v, list) or
+                not all(isinstance(x, str) for x in v) or v != sorted(set(v)) for v in findings.values())):
+            raise ValueError('invalid audit receipt')
+        return
     if isinstance(outcome, dict) and outcome.get('state') == 'NO_PLAN':
         if (charge != 0 or outcome.get('feasibility') not in ('infeasible', 'unknown')
                 or type(outcome.get('nodes')) is not int or outcome['nodes'] < 0):
@@ -474,8 +518,11 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
     peer=db.execute('SELECT url FROM peers WHERE name=?',(recipient,)).fetchone()
     if not peer:
         raise ValueError('discover recipient first')
+    rules = audit_rules(request['spec'])
+    if rules and offer_ref is None:
+        raise ValueError('audits require a published offer')
     if offer_ref is not None and original is None:
-        verify_offer(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref,repair_only=True)
+        verify_dispatch(fetch_public_subset(db,peer[0],recipient,'/offers'),recipient,offer_ref,rules)
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
         stored, saved, credits = db.execute('SELECT request,result,credits FROM jobs WHERE id=?',
