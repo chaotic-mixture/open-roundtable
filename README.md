@@ -316,3 +316,4 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 运行 `python -m unittest tests.test_peer_audit` 可复现同机双进程的九表审查、独立评分和重复派单核账。
 
 运行 `python -m examples.rule_discovery --dispatch` 可用一个发起方和四个提供方在本机比较两种发现方式。对每张公开合成班表，两组都向全部入选服务尝试派单，并逐份与独立评分器核对。九张表中，仅按标签筛选产生 36 次尝试，其中 21 次在发送班表前被服务声明检查拦下。要求全部规则匹配产生 15 次尝试，全部取得正确回执。两组各有 36 次初始目录请求，之后发起方的网络请求分别为 51 次和 30 次，两组各登记 15 份回执、0 credits。
+在双向 TLS 模式下，运行 `python -m examples.peer_node NODE_DIR discover BOOTSTRAP_URL --directory-name directory` 可要求引导服务的证书标明节点名 `directory`。名称不匹配时终止此次发现，保留上次同步的节点名单。双节点会诊演练的 TLS 模式为 A、B 两端启用了这项校验。

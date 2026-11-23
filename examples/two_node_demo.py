@@ -173,8 +173,11 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         (folder/'directory.json').write_bytes(packed(catalog(directory)))
         _, directory_port = start(stack,directory,0)
         bootstrap=f'{scheme}://127.0.0.1:{directory_port}'
+        discovery = ['discover', bootstrap]
+        if credentials:
+            discovery.extend(['--directory-name', directory_config['name']])
         for root in (a,b):
-            cli(root,'discover',bootstrap)
+            cli(root, *discovery)
         cli(b,'permission','A','allow','--remaining','1')
         spec=json.loads(Path(__file__).with_name('consult_input.json').read_text(encoding='utf8'))
         spec.pop('criteria',None)
