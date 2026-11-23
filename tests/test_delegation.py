@@ -1,6 +1,8 @@
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import tempfile
+from threading import Barrier
 import unittest
 
 from examples.nested_consult import run
@@ -8,6 +10,33 @@ from open_roundtable.core import Kernel
 
 
 class DelegationTests(unittest.TestCase):
+    def test_simultaneous_settlement_refunds_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'concurrent.sqlite3'
+            with closing(Kernel(path)) as k:
+                parent = k.create('review', 5)
+                child = k.delegate(parent, 'panel', 'check', 4)
+                k.join(child, 'expert', kind='expert')
+                k.start(parent)
+                k.start(child)
+                k.post(child, 'expert', 'findings', cost=1)
+                version = k.propose(child, 'verified result', previous_version=0)
+                k.vote(child, 'expert', True, version=version)
+            ready = Barrier(2)
+
+            def settle():
+                with closing(Kernel(path)) as connection:
+                    ready.wait(timeout=10)
+                    return connection.settle(child)
+
+            with ThreadPoolExecutor(2) as pool:
+                attempts = [pool.submit(settle) for _ in range(2)]
+                self.assertEqual([attempt.result() for attempt in attempts], [1, 1])
+            with closing(Kernel(path)) as k:
+                outcome = k.get(parent)
+                self.assertEqual((outcome['credits'], k.get(child)['credits']), (4, 0))
+                self.assertEqual([(m['body'], m['cost']) for m in outcome['messages']], [('verified result', 1)])
+
     def test_reopen_and_settle_once(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'example.sqlite3'
