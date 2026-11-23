@@ -7,11 +7,24 @@ from contextlib import closing, redirect_stdout
 from pathlib import Path
 
 from examples.auto_consult import run, verify
+from examples.overnight_score import expected
 from examples.synthetic_consult import MODEL, fixture
 from open_roundtable.schedule_expert import check
 
 
 class ConsultationTests(unittest.TestCase):
+    def test_scoped_expert_matches_hourly_oracle_on_nine_rosters(self):
+        path = Path(__file__).resolve().parents[1] / 'examples' / 'overnight_inputs.txt'
+        tables = [line.split() for line in path.read_text().splitlines() if line[:1].isdigit()]
+        self.assertEqual(len(tables), 9)
+        for table, *shifts in tables:
+            truth = expected(shifts)
+            for scope in ('P', 'V', 'R', 'L', 'PV', 'RL', 'PVRL'):
+                with self.subTest(table=table, rules=scope):
+                    self.assertEqual(check(shifts, rules=scope), {rule: truth[rule] for rule in scope})
+        with self.assertRaisesRegex(ValueError, 'unknown scheduling rule'):
+            check([], rules=['unknown'])
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
