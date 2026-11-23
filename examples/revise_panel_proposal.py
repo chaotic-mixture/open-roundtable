@@ -2,8 +2,10 @@
 import argparse
 from contextlib import closing
 import json
+import os
 from pathlib import Path
 import sqlite3
+import tempfile
 
 from examples.compare_panel_receipts import candidate_score, read_receipt
 from examples.user_consult import validate_roster
@@ -11,8 +13,7 @@ from open_roundtable.core import Kernel
 
 
 def revise(source, destination):
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=destination.parent) as tmp:
         snapshot = Path(tmp)/'revision.sqlite3'
         with closing(sqlite3.connect(source.resolve().as_uri()+'?mode=ro', uri=True)) as original:
             with closing(sqlite3.connect(snapshot)) as copy:
@@ -40,9 +41,11 @@ def revise(source, destination):
             kernel.vote(topic,'expert',True,version=version)
             result = dict(topic=topic, version=version, state=kernel.get(topic)['state'],
                           selected=selected, criteria_met=flags, changed_shifts=-negative_changes)
-        with destination.open('xb') as output, snapshot.open('rb') as finished:
-            import shutil
-            shutil.copyfileobj(finished,output)
+        # Publish the closed SQLite file atomically without replacing an existing revision.
+        if os.name == 'nt':
+            snapshot.rename(destination)
+        else:
+            os.link(snapshot, destination)
     return result
 
 
