@@ -8,7 +8,7 @@ from examples.generate_overnight import generate
 from examples.user_consult import consult
 
 
-def run(directory, model, *, verify_only=False):
+def run(directory, model, *, verify_only=False, reverse_order=False):
     if not verify_only:
         directory.mkdir(parents=True, exist_ok=False)
     for index, size in enumerate((7, 7, 7, 11, 11, 11, 22, 22, 22)):
@@ -30,7 +30,8 @@ def run(directory, model, *, verify_only=False):
                     raise FileNotFoundError(f'missing consultation ledger: {path}')
         else:
             source.write_text(json.dumps(spec), encoding='utf8')
-            for nested in (bool(index % 2), not bool(index % 2)):
+            nested_first = bool(index % 2) != reverse_order
+            for nested in (nested_first, not nested_first):
                 consult(source, paths[int(nested)], model, nested=nested)
         yield dict(seed=seed, shifts=size, **compare(*paths, expected_input=spec))
 
@@ -39,7 +40,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
     parser.add_argument('--model', default='qwen3.5:9b')
-    parser.add_argument('--verify-only', action='store_true', help='read existing ledgers without calling a model')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--verify-only', action='store_true', help='read existing ledgers without calling a model')
+    mode.add_argument('--reverse-order', action='store_true', help='swap which consultation runs first on each roster')
     args = parser.parse_args()
-    for result in run(args.directory, args.model, verify_only=args.verify_only):
+    for result in run(args.directory, args.model, verify_only=args.verify_only, reverse_order=args.reverse_order):
         print(json.dumps(result), flush=True)
