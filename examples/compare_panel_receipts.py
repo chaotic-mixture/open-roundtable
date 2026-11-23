@@ -12,6 +12,21 @@ from examples.repair_benchmark import schedule
 from examples.user_consult import validate_roster
 
 
+def candidate_score(chosen, original, rows, rules):
+    if not isinstance(chosen, list) or len(chosen) != len(rows):
+        raise ValueError('changed shift count in repair')
+    starts = []
+    for shift, item, (_, _, duration) in zip(chosen, original, rows):
+        start = shift.get('start')
+        if (type(start) is not int or type(shift.get('end')) is not int
+                or not 0 <= start <= 168-duration or shift != dict(item, start=start, end=start+duration)):
+            raise ValueError('invalid shift identity, duration or weekly interval in repair')
+        starts.append(start)
+    if any(expected(schedule(rows, starts)).values()):
+        raise ValueError('selected repair violates hard constraints')
+    return list(evaluate(rules, rows, starts))
+
+
 def read_receipt(path, nested):
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
@@ -49,25 +64,16 @@ def read_receipt(path, nested):
                 or proposal.get('schedule') != candidates[selected]):
             raise ValueError('proposal differs from selected expert candidate')
         rows, rules = validate_roster(expert['input'])
-        chosen = candidates[selected]
         original = expert['input']['shifts']
-        if not isinstance(chosen, list) or len(chosen) != len(rows):
-            raise ValueError('changed shift count in repair')
-        starts = []
-        for shift, item, (_, _, duration) in zip(chosen, original, rows):
-            start = shift.get('start')
-            if (type(start) is not int or type(shift.get('end')) is not int
-                    or not 0 <= start <= 168-duration or shift != dict(item, start=start, end=start+duration)):
-                raise ValueError('invalid shift identity, duration or weekly interval in repair')
-            starts.append(start)
-        if any(expected(schedule(rows, starts)).values()):
-            raise ValueError('selected repair violates hard constraints')
-        flags = list(evaluate(rules, rows, starts))
+        scores = [candidate_score(candidate, original, rows, rules) for candidate in candidates]
+        flags = scores[selected]
         saved = proposal.get('criteria_met')
         if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
             raise ValueError('recorded preference scores differ from the selected schedule')
         result = dict(state=state, selected=proposal['selected'], criteria_met=flags,
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
+        result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
+        result['can_meet_all'] = any(all(score) for score in scores)
         if nested:
             parent, _, spent, member = links[0]
             deliveries = db.execute('SELECT body,cost FROM messages WHERE topic=? AND member=?',
