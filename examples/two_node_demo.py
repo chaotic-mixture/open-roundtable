@@ -130,7 +130,10 @@ def audit(folder):
         require(len(discovery_routes) == 1, 'nodes used different discovery endpoints')
         traffic += directory_traffic
     wire=packed([traffic,calls,charges,shared,catalog(b),directory_snapshot])
-    for root in (a,b):
+    marker_roots = [a, b]
+    if fault.get('directory_private_control'):
+        marker_roots.append(directory)
+    for root in marker_roots:
         markers=read(root,'private.sqlite3','SELECT source,body FROM records')
         require(bool(markers),'missing private control')
         for source,value in markers:
@@ -153,6 +156,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         scheme = 'https' if credentials else 'http'
         directory = folder/'directory'
         initialize(directory)
+        ingest(directory,'private',[dict(source='private-key-'+uuid.uuid4().hex,body='secret-'+uuid.uuid4().hex)])
         directory_config = dict(name='directory')
         if credentials:
             directory_config.update(transport='mtls', credentials=str((credentials/'directory').resolve()))
@@ -207,6 +211,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=exit_code,before_pid=proc.pid,
                 after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits,directory_ledger=True,
+                directory_private_control=True,
                 kernel_receipt_sha256=digest(checkpoint))))
         cli(a,'resume')
         if json.loads(cli(a,'resume').stdout) != {}:

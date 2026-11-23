@@ -475,7 +475,7 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(json.loads(cli(folder / 'B', 'revisit', label).stdout), [])
             self.assertNotEqual(cli(folder / 'A', 'mark', 'missing', label, ok=False).returncode, 0)
             self.assertEqual(result, audit(folder))
-            for node in ('A', 'B'):
+            for node in ('A', 'B', 'directory'):
                 with closing(sqlite3.connect(folder / node / 'private.sqlite3')) as private:
                     source, body = private.execute('SELECT source,body FROM records').fetchone()
                 for value in (source, body):
