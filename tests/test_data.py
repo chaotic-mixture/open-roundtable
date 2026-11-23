@@ -137,6 +137,15 @@ class DataTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT summary FROM records').fetchone(),('private content',))
         self.assertEqual(data.catalog(self.root),[])
 
+    def test_long_sealed_record_preserves_final_exception(self):
+        body = '周末安排待确认。' * 80 + '\n  例外：本周五不接晚班。'
+        data.ingest(self.root, 'private', [dict(source='long', body=body)])
+        with patch.object(data, 'exchange', side_effect=AssertionError):
+            data.maintain(self.root, 'long')
+        with closing(data.connect(self.root, 'private')) as db:
+            record = db.execute("SELECT body,summary FROM records WHERE source='long'").fetchone()
+        self.assertEqual(record, (body, ' '.join(body.split())))
+
     def test_incomplete_provider_responses_preserve_previous_private_summary(self):
         data.maintain(self.root, 'profile')
         for mode, response in [

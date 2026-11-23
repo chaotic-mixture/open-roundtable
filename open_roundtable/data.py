@@ -164,7 +164,7 @@ def maintain(root, source, *, only_pending=False):
         mode,model,endpoint = route['mode'],route['model'],route['endpoint']
         body = db.execute('SELECT body FROM records WHERE source=?',(source,)).fetchone()[0]
         if mode=='sealed':
-            summary=' '.join(body.split())[:500]
+            summary=' '.join(body.split())
         elif mode in ('local','api'):
             messages=[{'role':'system','content':(
                 'Summarize this record concisely for its owner in the original language. '
