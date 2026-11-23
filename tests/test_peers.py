@@ -11,7 +11,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import deliver, digest, ledger, resume, set_permission
+from examples.peer_node import deliver, digest, ledger, resume, send, set_permission
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from open_roundtable.data import connect, ingest, initialize
 
@@ -86,6 +86,26 @@ class PeerRecoveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'allowance exhausted'):
                     deliver(root, db, request)
                 self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+
+    def test_sender_preserves_first_valid_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            db.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8001')")
+            request = dict(id='job', sender='A', recipient='B')
+            receipt = dict(id='job', sender='B', recipient='A', credits=2, outcome=dict(state='RESOLVED'))
+            with patch('examples.peer_node.envelope', return_value=request), patch('examples.peer_node.transfer') as call:
+                for fields in [dict(credits=True),dict(credits=-1),dict(credits=3),dict(outcome={}),dict(sender='C')]:
+                    call.return_value = dict(receipt, **fields)
+                    with self.assertRaises(ValueError):
+                        send(Path(tmp), db, 'B', 'source')
+                    self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchone(), (None,0))
+                call.return_value = receipt
+                for _ in range(2):
+                    self.assertEqual(send(Path(tmp), db, 'B', 'source'), receipt)
+                call.return_value = dict(receipt, credits=1)
+                with self.assertRaisesRegex(ValueError, 'conflicting receipt'):
+                    send(Path(tmp), db, 'B', 'source')
+                saved, cost = db.execute('SELECT result,credits FROM jobs').fetchone()
+                self.assertEqual((json.loads(saved),cost), (receipt,2))
 
     def test_receiver_permission(self):
         with tempfile.TemporaryDirectory() as tmp:

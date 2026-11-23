@@ -155,6 +155,18 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
     return result,True
 
 
+def validate_receipt(request, receipt):
+    if not isinstance(receipt, dict) or (receipt.get('id'),receipt.get('sender'),receipt.get('recipient')) != (
+            request['id'],request['recipient'],request['sender']):
+        raise ValueError('service receipt identity mismatch')
+    charge = receipt.get('credits')
+    if type(charge) is not int or not 0 <= charge <= 2:
+        raise ValueError('invalid service charge')
+    outcome = receipt.get('outcome')
+    if not isinstance(outcome, dict) or outcome.get('state') not in ('ACTIVE','PAUSED','RESOLVED'):
+        raise ValueError('invalid service outcome')
+
+
 def send(root,db,recipient,source,*,original=None):
     request=envelope(root,recipient,source)
     if original is not None and original != request:
@@ -165,11 +177,15 @@ def send(root,db,recipient,source,*,original=None):
     with db:
         db.execute('INSERT OR IGNORE INTO jobs(id,request) VALUES (?,?)',(request['id'],packed(request).decode()))
     result=transfer(db,peer[0]+'/consult',request)
-    if (result['id'],result['sender'],result['recipient'])!=(request['id'],recipient,request['sender']):
-        raise ValueError('receipt mismatch')
+    validate_receipt(request, result)
+    encoded = packed(result).decode()
     with db:
-        db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?',
-                   (packed(result).decode(),result['credits'],result['id']))
+        posted = db.execute('UPDATE jobs SET result=?,credits=? WHERE id=? AND result IS NULL',
+                            (encoded,result['credits'],result['id'])).rowcount
+        if not posted:
+            saved = db.execute('SELECT result,credits FROM jobs WHERE id=?',(result['id'],)).fetchone()
+            if saved != (encoded,result['credits']):
+                raise ValueError('conflicting receipt for a settled job')
     return result
 
 
@@ -190,9 +206,8 @@ def service_account(root, db):
             account['pending'] += 1
             continue
         receipt = json.loads(saved)
-        if (receipt['id'],receipt['sender'],receipt['recipient']) != (key,provider,sender):
-            raise ValueError('service receipt identity mismatch')
-        if type(receipt['credits']) is not int or not 0 <= receipt['credits'] <= 2 or credits != receipt['credits']:
+        validate_receipt(request, receipt)
+        if credits != receipt['credits']:
             raise ValueError('invalid service charge')
         side = 'contributed' if node == provider else 'consumed'
         account[side] += credits
