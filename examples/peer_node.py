@@ -455,6 +455,19 @@ def local_history(root, network, label, job=None):
         return matches
 
 
+def admission(root, db, partner):
+    config = json.loads((root/'node.json').read_text())
+    if config.get('transport') != 'mtls':
+        raise ValueError('admission lookup requires mutual TLS')
+    row = db.execute('SELECT url FROM peers WHERE name=?',(partner,)).fetchone()
+    if row is None:
+        raise ValueError('discover partner before checking admission')
+    response = transfer(db,row[0]+'/admission',dict(sender=config['name']),peer_name=partner)
+    if not isinstance(response,dict) or type(response.get('accepting')) is not bool:
+        raise ValueError('invalid admission response')
+    return dict(node=partner,accepting=response['accepting'])
+
+
 def reconcile_online(root, db, partner):
     config = json.loads((root/'node.json').read_text())
     if config.get('transport') != 'mtls':
@@ -503,9 +516,9 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             self.reply(200,result)
 
         def do_POST(self):
-            if self.path == '/statement' and not context:
+            if self.path in ('/statement','/admission') and not context:
                 return self.reply(403, {'error':'mutual TLS required'})
-            if self.path not in ('/consult','/statement'):
+            if self.path not in ('/consult','/statement','/admission'):
                 return self.reply(404,{})
             try:
                 size=int(self.headers.get('Content-Length','0'))
@@ -516,6 +529,11 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                     if not certificate_matches(self.connection.getpeercert(), request['sender']):
                         return self.reply(403, {'error':'sender certificate mismatch'})
                 with closing(ledger(root)) as db:
+                    if self.path == '/admission':
+                        eligible = db.execute('''SELECT 1 FROM peers JOIN consult_grants USING(name,url)
+                            LEFT JOIN grant_limits USING(name) WHERE name=? AND (remaining IS NULL OR remaining>0)''',
+                            (request['sender'],)).fetchone()
+                        return self.reply(200,dict(accepting=eligible is not None))
                     if self.path == '/statement':
                         partner = request['sender']
                         permitted = config.get('statement_partners', [])
@@ -576,6 +594,7 @@ if __name__=='__main__':
     match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
     commands.add_parser('account')
+    commands.add_parser('admission').add_argument('partner')
     commands.add_parser('reconcile-online').add_argument('partner')
     for action in ('statement','reconcile'):
         report = commands.add_parser(action)
@@ -623,6 +642,8 @@ if __name__=='__main__':
                     result = dict(entries=len(local['entries']))
                 else:
                     result = reconcile(local,json.loads(args.file.read_bytes()))
+            elif args.action == 'admission':
+                result = admission(args.directory,db,args.partner)
             elif args.action == 'reconcile-online':
                 result = reconcile_online(args.directory,db,args.partner)
             elif args.action == 'account':

@@ -221,3 +221,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 使用 `match-capability "自然语言需求"` 可让本机模型从当前公开声明中推荐候选。查询只返回候选，不发起会诊。运行 `python -m examples.capability_comparison` 可复现三组小样本比较：精确标签在同义修复能力上漏选一次；qwen3.5:9b 找到了两个修复候选，但在“只检查不改班”上漏选一项、误选两项。两组在无供给需求上均返回空。三次模型调用共用 405 个输入和 26 个输出 tokens。每组只运行一次，尚未检验接单成功率。
 
 自然语言查询支持重复指定 `--allow-tag`。例如 `match-capability "只检查排班冲突，保持班次不变" --allow-tag audit` 会先按公开声明的标签缩小候选，再让本机模型判断相关性。没有符合标签的声明时返回空并跳过推理。标签由提供方声明，执行效果仍需独立验证。
+
+候选节点启用双向 TLS 后，可运行 `python -m examples.peer_node NODE_A admission B` 查询 B 此刻是否允许 A 发起新会诊。请求只包含发送节点名；B 按客户端证书、当前授权和余量回答。查询不占用名额；发送议题时仍会原子地复核并扣减额度。

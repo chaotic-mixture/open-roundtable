@@ -97,6 +97,16 @@ class PeerTLSTests(unittest.TestCase):
             _, new_port = start(stack,receiver,0)
             with closing(ledger(folder/'A')) as db, db:
                 db.execute('UPDATE peers SET url=? WHERE name=?',(f'https://127.0.0.1:{new_port}','B'))
+            def accepting():
+                return json.loads(cli(folder/'A','admission','B').stdout)['accepting']
+            self.assertFalse(accepting())  # Earlier consultation exhausted the single grant.
+            cli(receiver,'permission','A','allow','--remaining','1')
+            self.assertTrue(accepting())
+            self.assertTrue(accepting())
+            with closing(ledger(receiver)) as db:
+                self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (1,))
+            cli(receiver,'permission','A','revoke')
+            self.assertFalse(accepting())
             source = 'https://b.example/offers/repair'
             draft = json.loads(cli(receiver,'offer',source,'repair','Repair weekly shifts').stdout)
             def lookup():
