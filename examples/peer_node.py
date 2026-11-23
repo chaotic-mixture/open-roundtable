@@ -16,7 +16,7 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
-from open_roundtable.data import catalog, connect, ingest, NoRedirect
+from open_roundtable.data import catalog, connect, https_url, ingest, NoRedirect
 from open_roundtable.schedule_expert import check
 from examples.user_consult import NoFeasibleCandidate, consult, validate_roster
 
@@ -199,6 +199,7 @@ def set_permission(db, peer, allow, remaining=None):
 
 
 def validate_registration_origin(config, source, url):
+    https_url(source)
     endpoint = urlsplit(url)
     scheme = 'https' if config.get('transport') == 'mtls' else 'http'
     if (not source.endswith('/node') or endpoint.scheme != scheme or not endpoint.hostname
@@ -223,8 +224,7 @@ def import_registration(root, db, name, source, url):
     if not isinstance(records, list) or len(records) != 1:
         raise ValueError('expected exactly one published registration')
     record = records[0]
-    if (not isinstance(record, dict) or record.get('source') != source or not isinstance(record.get('body'), str)
-            or json.loads(record['body']) != dict(name=name, url=url)):
+    if not confirms_public_record(records, source, dict(name=name, url=url)):
         raise ValueError('published registration differs from requested identity or origin')
     ingest(root, 'public', records)
     return dict(source=source, sha256=hashlib.sha256(record['body'].encode()).hexdigest())

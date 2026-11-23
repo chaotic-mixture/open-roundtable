@@ -14,11 +14,32 @@ from unittest.mock import patch
 from examples.peer_node import confirms_public_record, deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from examples.user_consult import NoFeasibleCandidate
-from examples.peer_node import partner_statement, reconcile, reconcile_online, service_account
+from examples.peer_node import import_registration, partner_statement, reconcile, reconcile_online, service_account
 from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_rejected_import_preserves_reviewed_registration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'A'
+            initialize(root)
+            (root/'node.json').write_text('{"name":"A"}')
+            source, url = 'https://b.example/node', 'http://127.0.0.1:8123'
+            record = dict(source=source, body=json.dumps(dict(name='B', url=url)))
+            ingest(root, 'public', [record])
+            share_public(root, source, True)
+            with closing(ledger(root)) as db, patch('examples.peer_node.transfer') as fetch:
+                with self.assertRaises(ValueError):
+                    import_registration(root, db, 'B', 'relative/node', url)
+                fetch.assert_not_called()
+                for snapshot in ([record, record], [{}], [dict(record, body='null')]):
+                    fetch.return_value = snapshot
+                    with self.assertRaises(ValueError):
+                        import_registration(root, db, 'B', source, url)
+            with closing(connect(root, 'public')) as public:
+                self.assertEqual(public.execute('SELECT source,body,shared FROM records').fetchall(),
+                                 [(source, record['body'], 1)])
+
     def test_shared_record_confirmation_in_a_mixed_catalog(self):
         record = dict(source='topic', body='{"hours":1}')
         mixed = [None, {}, dict(source='other', body='plain text'), record]
