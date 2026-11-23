@@ -459,7 +459,7 @@ def send(root,db,recipient,source,*,original=None,offer_ref=None):
 def service_account(root, db):
     """Summarize each durable service receipt once from this node's perspective."""
     node = json.loads((root / 'node.json').read_text())['name']
-    account = dict(node=node, contributed=0, consumed=0, pending=0, entries=[])
+    account = dict(node=node, contributed=0, consumed=0, pending=0, pending_jobs=[], entries=[])
     for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
         request = json.loads(raw)
         sender, provider = request['sender'], request['recipient']
@@ -471,6 +471,7 @@ def service_account(root, db):
             if credits != 0:
                 raise ValueError('pending job has a posted charge')
             account['pending'] += 1
+            account['pending_jobs'].append(dict(job=key, provider=provider, consumer=sender))
             continue
         receipt = json.loads(saved)
         validate_receipt(request, receipt)

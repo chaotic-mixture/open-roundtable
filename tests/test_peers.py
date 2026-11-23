@@ -59,7 +59,17 @@ class PeerRecoveryTests(unittest.TestCase):
                 self.assertNotEqual(cli(a,'send','B',SOURCE,ok=False).returncode,0)
             for root in (a,b):
                 with closing(ledger(root)) as db:
-                    self.assertEqual(db.execute('SELECT result,credits FROM jobs').fetchall(),[(None,0)])
+                    [(key, receipt, credits)] = db.execute('SELECT id,result,credits FROM jobs').fetchall()
+                    self.assertEqual((receipt,credits),(None,0))
+                account = json.loads(cli(root,'account').stdout)
+                self.assertEqual(account['pending_jobs'], [dict(job=key, provider='B', consumer='A')])
+                self.assertEqual((account['pending'], account['entries']), (1, []))
+            statement = Path(tmp)/'statement.json'
+            cli(b,'statement','A',str(statement))
+            outcome = cli(a,'reconcile','B',str(statement),ok=False)
+            self.assertNotEqual(outcome.returncode,0)
+            self.assertEqual(json.loads(outcome.stdout), dict(matched=0,
+                differences=[dict(job=key, reason='pending at both nodes')]))
             self.assertEqual(calls,['/api/chat'])
 
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
