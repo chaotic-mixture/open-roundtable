@@ -384,6 +384,17 @@ def local_history(root, network, label, job=None):
         return matches
 
 
+def reconcile_online(root, db, partner):
+    config = json.loads((root/'node.json').read_text())
+    if config.get('transport') != 'mtls':
+        raise ValueError('online reconciliation requires mutual TLS')
+    row = db.execute('SELECT url FROM peers WHERE name=?', (partner,)).fetchone()
+    if not row:
+        raise ValueError('discover partner before reconciling')
+    remote = transfer(db,row[0]+'/statement',dict(sender=config['name']),peer_name=partner)
+    return reconcile(partner_statement(root,db,partner), remote)
+
+
 def serve(root,port,interrupt,interrupt_before_receipt=False):
     context = tls_context(root, server=True)
     class Handler(BaseHTTPRequestHandler):
@@ -404,7 +415,9 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             self.reply(200,result)
 
         def do_POST(self):
-            if self.path!='/consult':
+            if self.path == '/statement' and not context:
+                return self.reply(403, {'error':'mutual TLS required'})
+            if self.path not in ('/consult','/statement'):
                 return self.reply(404,{})
             try:
                 size=int(self.headers.get('Content-Length','0'))
@@ -415,6 +428,12 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                     if not certificate_matches(self.connection.getpeercert(), request['sender']):
                         return self.reply(403, {'error':'sender certificate mismatch'})
                 with closing(ledger(root)) as db:
+                    if self.path == '/statement':
+                        partner = request['sender']
+                        permitted = config.get('statement_partners', [])
+                        if not isinstance(permitted,list) or partner not in permitted:
+                            return self.reply(403, {'error':'statement sharing not enabled'})
+                        return self.reply(200,partner_statement(root,db,partner))
                     trace(db,'accept',self.path,request)
                     result,fresh=deliver(root,db,request,interrupt_before_receipt=interrupt_before_receipt)
                     if fresh and interrupt:
@@ -446,6 +465,7 @@ if __name__=='__main__':
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
     commands.add_parser('account')
+    commands.add_parser('reconcile-online').add_argument('partner')
     for action in ('statement','reconcile'):
         report = commands.add_parser(action)
         report.add_argument('partner')
@@ -484,6 +504,8 @@ if __name__=='__main__':
                     result = dict(entries=len(local['entries']))
                 else:
                     result = reconcile(local,json.loads(args.file.read_bytes()))
+            elif args.action == 'reconcile-online':
+                result = reconcile_online(args.directory,db,args.partner)
             elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':
@@ -495,7 +517,7 @@ if __name__=='__main__':
                     discover(db,args.bootstrap) if args.action=='discover' else
                     send(args.directory,db,args.recipient,args.source))
         print(packed(result).decode())
-        if args.action == 'reconcile' and result['differences']:
+        if args.action in ('reconcile','reconcile-online') and result['differences']:
             raise SystemExit(1)
         if args.action == 'resume' and any(v != 'received' for v in result.values()):
             raise SystemExit(1)

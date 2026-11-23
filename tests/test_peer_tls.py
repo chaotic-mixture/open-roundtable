@@ -16,7 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.peer_node import ledger, transfer
-from examples.two_node_demo import audit, run, start
+from examples.two_node_demo import audit, cli, run, start
 from open_roundtable.data import initialize
 
 
@@ -89,3 +89,18 @@ class PeerTLSTests(unittest.TestCase):
                 with closing(ledger(folder/name)) as db:
                     routes = db.execute("SELECT route FROM traffic WHERE direction='send'").fetchall()
                     self.assertTrue(routes and all(url.startswith('https://') for url, in routes))
+
+            receiver = folder/'B'
+            configuration = json.loads((receiver/'node.json').read_text())
+            configuration['statement_partners'] = ['A']
+            (receiver/'node.json').write_text(json.dumps(configuration))
+            _, new_port = start(stack,receiver,0)
+            with closing(ledger(folder/'A')) as db, db:
+                db.execute('UPDATE peers SET url=? WHERE name=?',(f'https://127.0.0.1:{new_port}','B'))
+            self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
+                             dict(matched=1,differences=[]))
+            with closing(ledger(folder/'A')) as db:
+                with self.assertRaises(HTTPError) as denied:
+                    transfer(db,f'https://127.0.0.1:{new_port}/statement',dict(sender='C'),peer_name='B')
+                denied.exception.close()
+                self.assertEqual(denied.exception.code,403)

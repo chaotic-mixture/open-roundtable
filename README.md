@@ -203,3 +203,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 配置跨主机连接时，在 node.json 中设定 `"transport":"mtls"`、本机接口的具体 IPv4 地址 `listen_address`，并在 `allowed_origins` 数组中逐项填写获准连接的 HTTPS 来源（如 `https://peer-b.example:8443`，含端口，无末尾斜线）。目录来源也需要列入。节点证书必须覆盖实际连接的主机名或 IP，同时保留节点名 URI。未配置时沿用回环监听；实际跨机器路由及防火墙条件仍待部署验收。
 
 分端对账时，在 B 运行 `python -m examples.peer_node NODE_B statement A B-for-A.json`，通过双方认可的渠道将新建文件交给 A，再在 A 运行 `python -m examples.peer_node NODE_A reconcile B B-for-A.json`。文件只列双方交易的任务编号、服务方、测试费用与完整回执的 SHA-256 摘要。待处理交易的摘要为 null。核对输出匹配数量和逐笔差异；缺单、未结算和回执不一致都会导致非零退出。该文件用于核对两份记录，来源真实性依赖交付渠道。
+
+双方启用双向 TLS 后，B 的操作者可在 node.json 中设置 `"statement_partners":["A"]` 并重启服务，允许证书名为 A 的节点查询 A 与 B 的账目摘要。A 完成发现后运行 `python -m examples.peer_node NODE_A reconcile-online B`。命令核对 B 的证书名，并按本地回执报告差异。默认共享名单为空，查询权限与会诊次数额度分别设置。
