@@ -1,6 +1,7 @@
 """Owner-operated public catalog and private personalization store."""
 import argparse
 import hashlib
+from .local_model import ollama_origin
 from contextlib import closing
 import json
 import os
@@ -131,7 +132,7 @@ def effective_policy(db, source):
     mode = 'sealed' if store=='sealed' else limit or store
     if mode == 'local':
         model = local_model if limit=='local' else model
-        endpoint = 'http://127.0.0.1:11434/api/chat'
+        endpoint = ollama_origin() + '/api/chat'
     elif mode == 'sealed':
         model,endpoint = None,None
     else:

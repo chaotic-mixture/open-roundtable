@@ -4,7 +4,6 @@ from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import platform
 import sqlite3
@@ -18,7 +17,7 @@ from open_roundtable.schedule_expert import check
 
 
 RULES = ('P', 'V', 'R', 'L')
-HOST = 'http://127.0.0.1:' + str(int(os.environ.get('ROUNDTABLE_OLLAMA_PORT','11434')))
+from open_roundtable.local_model import ollama_origin
 SOURCES = ('examples/auto_consult.py', 'examples/generate_overnight.py',
            'examples/overnight_score.py', 'open_roundtable/core.py',
            'open_roundtable/schedule_expert.py')
@@ -52,7 +51,7 @@ def prompt(shifts, findings, version):
 
 def api(path, payload=None):
     data = None if payload is None else encoded(payload).encode()
-    req = Request(HOST+path, data=data, headers={'Content-Type':'application/json'})
+    req = Request(ollama_origin()+path, data=data, headers={'Content-Type':'application/json'})
     with urlopen(req, timeout=300) as response:
         return json.load(response)
 

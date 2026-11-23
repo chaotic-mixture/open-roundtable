@@ -9,6 +9,9 @@ from open_roundtable import data
 
 class DataTests(unittest.TestCase):
     def setUp(self):
+        port = patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='11434')
+        port.start()
+        self.addCleanup(port.stop)
         tmp=tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root=Path(tmp.name)/'owner'
@@ -99,6 +102,18 @@ class DataTests(unittest.TestCase):
                 dict(store='sealed',limit='local',mode='sealed',model=None,destination=None))
             with self.assertRaises(ValueError):
                 data.preview_private(self.root,'missing')
+
+    def test_custom_local_model_port(self):
+        data.configure(self.root,'local','local-model')
+        with patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='49001'):
+            self.assertEqual(data.preview_private(self.root,'profile')['destination'],'http://127.0.0.1:49001')
+            with patch.object(data,'exchange',return_value='{"message":{"content":"summary"}}') as send:
+                data.maintain(self.root,'profile')
+                self.assertEqual(send.call_args.args[0],'http://127.0.0.1:49001/api/chat')
+        with patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='65536'), patch.object(data,'exchange') as send:
+            with self.assertRaises(ValueError):
+                data.maintain(self.root,'profile')
+            send.assert_not_called()
 
     def test_swapped_database_refused(self):
         with closing(data.connect(self.root,'public')) as db, db:
