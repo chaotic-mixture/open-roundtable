@@ -12,6 +12,7 @@ from examples import preference_benchmark as batch
 from examples.compare_panel_receipts import compare
 from examples.user_consult import consult
 from examples.refine_schedule import feasibility
+from examples.revise_panel_proposal import revise
 from examples.verify_preferences import verify
 from open_roundtable.core import Kernel
 
@@ -26,6 +27,43 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_revision_archives_ballots_and_preserves_source(self):
+        spec = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
+        def choose_second(path, payload=None):
+            reply = provider(path, payload)
+            if path == '/api/chat':
+                reply['message']['content'] = '{"plan":1}'
+            return reply
+
+        with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api', side_effect=choose_second) as api:
+            for nested in (False, True):
+                with self.subTest(nested=nested):
+                    source = Path(tmp)/f'original-{nested}.db'
+                    target = Path(tmp)/f'revised-{nested}.db'
+                    first = consult(spec, source, 'fixture', nested=nested)
+                    self.assertEqual(first['state'], 'PAUSED')
+                    before = source.read_bytes()
+                    api.reset_mock()
+                    with patch.object(Kernel, 'vote', side_effect=OSError('interrupted')):
+                        with self.assertRaises(OSError):
+                            revise(source, target)
+                    self.assertFalse(target.exists())
+                    second = revise(source, target)
+                    self.assertEqual((second['topic'], second['version'], second['state']),
+                                     (first['topic'], 2, 'PAUSED'))
+                    with closing(sqlite3.connect(target)) as db:
+                        self.assertEqual(dict(db.execute('SELECT member,agree FROM prior_votes WHERE version=1')),
+                                         {'expert':0, 'model':1})
+                        self.assertEqual(db.execute('SELECT member,agree FROM votes').fetchall(), [('expert',1)])
+                        self.assertEqual(db.execute('SELECT count(*) FROM attempts').fetchone(), (1,))
+                        self.assertEqual(db.execute('SELECT sum(cost) FROM messages').fetchone(), (2,))
+                    saved = target.read_bytes()
+                    with self.assertRaises(FileExistsError):
+                        revise(source, target)
+                    self.assertEqual(target.read_bytes(), saved)
+                    self.assertEqual(source.read_bytes(), before)
+                    api.assert_not_called()
+
     def test_paired_panel_settlement(self):
         source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
         with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api', side_effect=provider):
