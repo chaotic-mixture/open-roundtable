@@ -180,6 +180,20 @@ def set_permission(db, peer, allow, remaining=None):
     return dict(peer=peer, allowed=allow, remaining=remaining)
 
 
+def register(root, source, url):
+    config = json.loads((root/'node.json').read_text())
+    endpoint = urlsplit(url)
+    scheme = 'https' if config.get('transport') == 'mtls' else 'http'
+    if (not source.endswith('/node') or endpoint.scheme != scheme or not endpoint.hostname
+            or not endpoint.port or endpoint.username is not None or endpoint.password is not None
+            or url != f'{scheme}://{endpoint.netloc}'
+            or (scheme == 'http' and endpoint.hostname != '127.0.0.1')):
+        raise ValueError('provide a /node registration source and a node origin with an explicit port')
+    body = packed(dict(name=config['name'], url=url)).decode()
+    ingest(root,'public',[dict(source=source,body=body)])
+    return dict(source=source,sha256=hashlib.sha256(body.encode()).hexdigest())
+
+
 def offer(root, source, tag, description):
     node = json.loads((root/'node.json').read_text())['name']
     if not tag.strip() or not description.strip():
@@ -720,6 +734,9 @@ if __name__=='__main__':
     server.add_argument('--interrupt-after-commit',action='store_true')
     server.add_argument('--interrupt-before-receipt',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
+    registration = commands.add_parser('register')
+    registration.add_argument('source')
+    registration.add_argument('url')
     capability = commands.add_parser('offer')
     capability.add_argument('source')
     capability.add_argument('tag')
@@ -762,7 +779,9 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:
-            if args.action == 'offer':
+            if args.action == 'register':
+                result = register(args.directory, args.source, args.url)
+            elif args.action == 'offer':
                 result = offer(args.directory,args.source,args.tag,args.description)
             elif args.action == 'find-capability':
                 result = find_capability(args.directory,db,args.tag,accepting_only=args.accepting_only)

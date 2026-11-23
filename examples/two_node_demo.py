@@ -126,10 +126,9 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
                 config.update(transport='mtls', credentials=str((credentials/name).resolve()))
             (root/'node.json').write_bytes(packed(config))
             proc,port=start(stack,root,0,interrupt=fault if name=='B' else False)
-            desc=dict(name=name,url=f'{scheme}://127.0.0.1:{port}')
-            ingest(root,'public',[dict(source=f'https://{name.lower()}.example/node',body=packed(desc).decode())])
-            with closing(connect(root,'public')) as db,db:
-                db.execute('UPDATE records SET shared=1')
+            source = f'https://{name.lower()}.example/node'
+            registration = json.loads(cli(root,'register',source,f'{scheme}://127.0.0.1:{port}').stdout)
+            share_public(root,source,True,registration['sha256'])
             descriptors.extend(catalog(root))
         (folder/'directory.json').write_bytes(packed(descriptors))
         class Directory(BaseHTTPRequestHandler):
