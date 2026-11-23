@@ -19,6 +19,19 @@ def main():
     consult.add_argument('--model',default='qwen3.5:9b')
     verify = commands.add_parser('verify-batch',help='reconcile preference results offline')
     verify.add_argument('directory',type=Path)
+    create = commands.add_parser('create', help='create a draft in a new or existing database')
+    create.add_argument('db', type=Path)
+    create.add_argument('title')
+    create.add_argument('credits', type=int)
+    join = commands.add_parser('join', help='seat a member on a draft topic')
+    join.add_argument('db', type=Path)
+    join.add_argument('topic')
+    join.add_argument('member')
+    join.add_argument('kind', choices=['expert','human','model','roundtable'])
+    join.add_argument('--source')
+    start = commands.add_parser('start', help='start a draft with seated members')
+    start.add_argument('db', type=Path)
+    start.add_argument('topic')
     cite = commands.add_parser('cite', help='attach a resolved local proposal as historical evidence')
     cite.add_argument('db', type=Path)
     cite.add_argument('topic')
@@ -50,17 +63,23 @@ def main():
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)
-        elif args.command in ('delegate','settle','cite','propose','vote'):
-            if not args.db.is_file():
+        elif args.command in ('create','join','start','delegate','settle','cite','propose','vote'):
+            if args.command != 'create' and not args.db.is_file():
                 raise ValueError('database missing')
             with closing(Kernel(args.db)) as k:
-                if args.command=='delegate':
+                if args.command=='create':
+                    result = k.get(k.create(args.title,args.credits))
+                elif args.command=='delegate':
                     child = k.delegate(args.parent,args.member,args.title,args.budget)
                     result = dict(parent=args.parent, child=child, budget=args.budget)
                 elif args.command=='settle':
                     result = dict(child=args.child, spent=k.settle(args.child))
                 else:
-                    if args.command=='cite':
+                    if args.command=='join':
+                        k.join(args.topic,args.member,kind=args.kind,source=args.source)
+                    elif args.command=='start':
+                        k.start(args.topic)
+                    elif args.command=='cite':
                         k.cite(args.topic,args.source)
                     elif args.command=='propose':
                         k.propose(args.topic,args.body,previous_version=args.version)

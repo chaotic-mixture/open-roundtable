@@ -21,6 +21,24 @@ class CliTests(unittest.TestCase):
         return subprocess.run([sys.executable, '-m', 'open_roundtable', 'demo', '--db', str(self.path)],
                               cwd=ROOT, capture_output=True, text=True)
 
+    def test_delegate_from_new_database(self):
+        def cli(command, *args):
+            output = subprocess.check_output([sys.executable, '-m', 'open_roundtable', command,
+                                              str(self.path), *args], cwd=ROOT)
+            return json.loads(output)
+
+        parent = cli('create', 'review', '4')['id']
+        child = cli('delegate', parent, 'panel', 'subreview', '3')['child']
+        cli('join', child, 'reviewer', 'human')
+        cli('start', parent)
+        cli('start', child)
+        cli('propose', child, '0', 'approved')
+        self.assertEqual(cli('vote', child, '1', 'reviewer', 'yes')['state'], 'RESOLVED')
+        self.assertEqual(cli('settle', child)['spent'], 0)
+        cli('propose', parent, '0', 'adopted')
+        result = cli('vote', parent, '1', 'panel', 'yes')
+        self.assertEqual((result['state'], result['credits']), ('RESOLVED', 4))
+
     def test_demo_refuses_existing_database_without_touching_bytes(self):
         first = self.run_demo()
         self.assertEqual(first.returncode, 0, first.stderr)
