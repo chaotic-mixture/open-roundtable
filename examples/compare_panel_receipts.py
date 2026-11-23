@@ -74,6 +74,12 @@ def read_receipt(path, nested):
                       credits=credits, input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
         result['can_meet_all'] = any(all(score) for score in scores)
+        changes = [sum(shift['start'] != before['start'] for shift, before in zip(candidate, original, strict=True))
+                   for candidate in candidates]
+        result['changed_shifts'] = changes[selected]
+        result['min_changes_at_selected_score'] = min(n for n, score in zip(changes, scores) if score == flags)
+        result['min_changes_at_best_score'] = min(n for n, score in zip(changes, scores)
+                                                  if score == result['best_criteria_met'])
         if nested:
             parent, _, spent, member = links[0]
             deliveries = db.execute('SELECT body,cost FROM messages WHERE topic=? AND member=?',
