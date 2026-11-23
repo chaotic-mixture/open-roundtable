@@ -1,6 +1,7 @@
 """Route two public needs once, then execute each recommendation on nine local schedules."""
 import argparse
 import csv
+import re
 import sys
 
 from examples.generate_overnight import generate
@@ -9,6 +10,15 @@ from examples.overnight_score import expected
 from examples.peer_node import match_offers
 from examples.repair_benchmark import schedule
 from open_roundtable.schedule_expert import check
+
+
+def literal_matches(need, offers):
+    """Select all offers tied for the most distinct shared English words."""
+    words = set(re.findall(r'[a-z]+', need.lower()))
+    scores = [len(words.intersection(re.findall(r'[a-z]+', (o['tag'] + ' ' + o['description']).lower())))
+              for o in offers]
+    best = max(scores, default=0)
+    return [offer['tag'] for offer, score in zip(offers, scores) if best and score == best]
 
 
 def execute_selection(tag, selected, original):
@@ -36,9 +46,11 @@ def run(with_synonym=False):
                       ('audit', 'Identify overlapping shifts; keep every shift unchanged.')]:
         result = match_offers(need, offers, 'qwen3.5:9b')
         print(tag, {k:v for k,v in result.items() if k != 'matches'}, file=sys.stderr)
+        choices = [('rule', [tag]), ('literal', literal_matches(need, offers)),
+                   ('model', [o['tag'] for o in result['matches']])]
         for seed in range(501, 510):
             original = generate(seed, (7, 11, 22)[(seed-501)//3])
-            for router, selected in [('rule', [tag]), ('model', [o['tag'] for o in result['matches']])]:
+            for router, selected in choices:
                 # Both repair declarations refer to the same local tool in this fixture.
                 operations = sorted({'repair' if item == 'reschedule' else item for item in selected})
                 passed, changed = execute_selection(tag, operations, original)
