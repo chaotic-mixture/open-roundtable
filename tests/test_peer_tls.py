@@ -139,9 +139,22 @@ class PeerTLSTests(unittest.TestCase):
                 wire = db.execute("SELECT body FROM traffic WHERE direction='receive' AND route LIKE '%/offers' ORDER BY rowid DESC LIMIT 1").fetchone()
                 self.assertEqual([r['source'] for r in json.loads(wire[0])], [source])
             cli(receiver,'permission','A','allow','--remaining','0')
+            alternate = json.loads(cli(receiver,'offer',source+'-alternate','reschedule','Adjust shift times').stdout)
+            share_public(receiver,alternate['source'],True,alternate['sha256'])
+            def available_repairs():
+                with closing(ledger(folder/'A')) as db:
+                    query = "SELECT count(*) FROM traffic WHERE direction='send' AND route LIKE '%/admission'"
+                    before = db.execute(query).fetchone()[0]
+                    result = json.loads(cli(folder/'A','find-capability','repair','reschedule','--accepting-only').stdout)
+                    self.assertEqual(db.execute(query).fetchone()[0] - before, 1)
+                    return result
+            self.assertEqual(available_repairs(), dict(matches=[],declined=['B'],unavailable=[]))
             blocked = json.loads(cli(folder/'A','match-capability','repair shifts','--accepting-only').stdout)
             self.assertEqual((blocked['matches'],blocked['declined'],blocked['calls']), ([],['B'],0))
             cli(receiver,'permission','A','allow','--remaining','1')
+            self.assertEqual({m['tag'] for m in available_repairs()['matches']}, {'repair','reschedule'})
+            with closing(ledger(receiver)) as db:
+                self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (1,))
             eligible = json.loads(cli(folder/'A','find-capability','repair','--accepting-only').stdout)
             self.assertEqual(eligible['matches'],lookup()['matches'])
             self.assertEqual(eligible['declined'],[])
