@@ -95,6 +95,14 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(audit(folder), result)
             self.assertEqual(result['private_stores_checked'], ['A', 'B', 'directory'])
             self.assertEqual((result['remaining_at_disconnect'], result['remaining_after_replay']), (0, 0))
+            checkpoint = folder/'interruption.json'
+            original = checkpoint.read_bytes()
+            for field, value in [('remaining_at_disconnect', False), ('receiver_credits', False), ('exit', 76.0)]:
+                with self.subTest(field=field):
+                    checkpoint.write_bytes(packed(json.loads(original) | {field: value}))
+                    with self.assertRaises(ValueError):
+                        audit(folder)
+            checkpoint.write_bytes(original)
             with closing(ledger(folder/'B')) as db:
                 with db:
                     db.execute("UPDATE grant_limits SET remaining=1 WHERE name='A'")

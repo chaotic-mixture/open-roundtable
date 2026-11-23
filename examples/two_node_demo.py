@@ -86,7 +86,8 @@ def audit(folder):
     allowance = {}
     if 'remaining_at_disconnect' in fault:
         remaining = read(b, 'network.sqlite3', "SELECT remaining FROM grant_limits WHERE name='A'")
-        require(fault['remaining_at_disconnect'] == 0 and remaining == [(0,)], 'receiver allowance mismatch')
+        require(type(fault['remaining_at_disconnect']) is int and fault['remaining_at_disconnect'] == 0
+                and remaining == [(0,)], 'receiver allowance mismatch')
         allowance = dict(remaining_at_disconnect=fault['remaining_at_disconnect'], remaining_after_replay=remaining[0][0])
     directory_snapshot = json.loads((folder/'directory.json').read_text())
     registrations = [json.loads(r['body']) for r in directory_snapshot]
@@ -143,7 +144,8 @@ def audit(folder):
         require(bool(markers),'missing private control')
         for source,value in markers:
             require(source.encode() not in wire and value.encode() not in wire,'private marker crossed boundary')
-    require((fault['exit'],fault['receiver_credits']) in ((75,2),(76,0)) and fault['sender_receipt'] is None
+    require(type(fault['exit']) is int and type(fault['receiver_credits']) is int
+            and (fault['exit'],fault['receiver_credits']) in ((75,2),(76,0)) and fault['sender_receipt'] is None
             and fault['before_pid']!=fault['after_pid'],'restart checkpoint')
     if 'kernel_receipt_sha256' in fault:
         require(fault['kernel_receipt_sha256'] == digest(res), 'recovered receipt differs from pre-restart checkpoint')
