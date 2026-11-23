@@ -211,3 +211,5 @@ python -m examples.selector_policy meta.sqlite3 TOPIC status
 库主可以先用 `python -m open_roundtable.data NODE_DIR review-public SOURCE` 查看本地公开库中的正文、共享状态和 SHA-256，再用 `share-public SOURCE --if-sha256 HASH` 只发布已核对的内容。若期间导入了新版正文，发布操作会失败，需重新核对。使用 `share-public SOURCE --off` 可直接撤回当前共享。
 
 私有库可按来源进一步收紧维护权限。运行 `python -m open_roundtable.data NODE_DIR record-limit SOURCE sealed`，该来源今后的更新也只在库内处理。选 `local --model MODEL` 可指定本机模型；整库切换为 sealed 时，这些记录也停止调用模型。用 `inherit` 恢复跟随整库设置。已有数据库在首次打开私有库时自动支持该命令。
+
+运行 `python -m open_roundtable.data NODE_DIR preview-private SOURCE` 可在维护前查看整库权限、该来源的限制、实际生效方式、模型和目的服务地址。预览只显示地址的协议与主机（含显式端口），无需读取正文或调用模型。实际维护会在执行时重新读取并锁定权限。

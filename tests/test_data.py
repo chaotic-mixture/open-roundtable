@@ -87,6 +87,19 @@ class DataTests(unittest.TestCase):
             data.maintain(self.root,'profile')
             self.assertEqual(send.call_args.args[0],'https://example.org/chat')
 
+    def test_preview_shows_effective_destination_without_sending(self):
+        with patch.object(data,'exchange',side_effect=AssertionError):
+            data.configure(self.root,'api','remote','https://example.org/private/path?key=hidden')
+            self.assertEqual(data.preview_private(self.root,'profile'),
+                dict(store='api',limit='inherit',mode='api',model='remote',destination='https://example.org'))
+            data.limit_record(self.root,'profile','local','owner-model')
+            self.assertEqual(data.preview_private(self.root,'profile')['destination'],'http://127.0.0.1:11434')
+            data.configure(self.root,'sealed')
+            self.assertEqual(data.preview_private(self.root,'profile'),
+                dict(store='sealed',limit='local',mode='sealed',model=None,destination=None))
+            with self.assertRaises(ValueError):
+                data.preview_private(self.root,'missing')
+
     def test_swapped_database_refused(self):
         with closing(data.connect(self.root,'public')) as db, db:
             db.execute("UPDATE metadata SET scope='private'")

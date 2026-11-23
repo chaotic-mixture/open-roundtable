@@ -119,21 +119,45 @@ def exchange(url, payload=None, token=None):
         return raw.decode('utf-8')
 
 
+def effective_policy(db, source):
+    row = db.execute("""SELECT p.mode,p.model,p.endpoint,l.mode,l.model
+        FROM records r CROSS JOIN policy p LEFT JOIN record_limits l ON l.source=r.source
+        WHERE r.source=? AND p.id=1""",(source,)).fetchone()
+    if row is None:
+        raise ValueError('unknown record or missing policy')
+    store,model,endpoint,limit,local_model = row
+    if store not in ('sealed','local','api') or limit not in (None,'sealed','local'):
+        raise ValueError('invalid stored policy')
+    mode = 'sealed' if store=='sealed' else limit or store
+    if mode == 'local':
+        model = local_model if limit=='local' else model
+        endpoint = 'http://127.0.0.1:11434/api/chat'
+    elif mode == 'sealed':
+        model,endpoint = None,None
+    else:
+        endpoint = https_url(endpoint)
+    return dict(store=store,limit=limit or 'inherit',mode=mode,model=model,endpoint=endpoint)
+
+
+def preview_private(root, source):
+    with closing(connect(root,'private')) as db:
+        route = effective_policy(db,source)
+    endpoint = route.pop('endpoint')
+    if endpoint:
+        url = urlsplit(endpoint)
+        route['destination'] = f'{url.scheme}://{url.netloc}'
+    else:
+        route['destination'] = None
+    return route
+
+
 def maintain(root, source):
     with closing(connect(root,'private')) as db, db:
         # Serialize permission changes with the entire authorized operation.
         db.execute('BEGIN IMMEDIATE')
-        mode,model,endpoint=db.execute('SELECT mode,model,endpoint FROM policy WHERE id=1').fetchone()
-        limit = db.execute('SELECT mode,model FROM record_limits WHERE source=?',(source,)).fetchone()
-        if mode not in ('sealed','local','api'):
-            raise ValueError('invalid stored policy')
-        if limit and mode != 'sealed':
-            mode, model = limit
-            endpoint = None
-        record=db.execute('SELECT body FROM records WHERE source=?',(source,)).fetchone()
-        if record is None:
-            raise ValueError('unknown record')
-        body=record[0]
+        route = effective_policy(db,source)
+        mode,model,endpoint = route['mode'],route['model'],route['endpoint']
+        body = db.execute('SELECT body FROM records WHERE source=?',(source,)).fetchone()[0]
         if mode=='sealed':
             summary=' '.join(body.split())[:500]
         elif mode in ('local','api'):
@@ -141,10 +165,10 @@ def maintain(root, source):
                       {'role':'user','content':body}]
             payload=dict(model=model,messages=messages,stream=False)
             if mode=='local':
-                answer=json.loads(exchange('http://127.0.0.1:11434/api/chat',payload))
+                answer=json.loads(exchange(endpoint,payload))
                 summary=answer['message']['content']
             else:
-                answer=json.loads(exchange(https_url(endpoint),payload,os.getenv('ROUNDTABLE_API_KEY')))
+                answer=json.loads(exchange(endpoint,payload,os.getenv('ROUNDTABLE_API_KEY')))
                 summary=answer['choices'][0]['message']['content']
         else:
             raise ValueError('invalid stored policy')
@@ -202,6 +226,7 @@ def main():
     limit.add_argument('source')
     limit.add_argument('mode', choices=['inherit','sealed','local'])
     limit.add_argument('--model')
+    commands.add_parser('preview-private').add_argument('source')
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -227,6 +252,8 @@ def main():
             configure(root,args.mode,args.model,args.endpoint)
         elif args.action=='record-limit':
             limit_record(root,args.source,args.mode,args.model)
+        elif args.action=='preview-private':
+            print(json.dumps(preview_private(root,args.source),ensure_ascii=True))
         elif args.action=='maintain-private':
             maintain(root,args.source)
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
