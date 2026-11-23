@@ -11,12 +11,31 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission
+from examples.peer_node import deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
 from open_roundtable.data import connect, ingest, initialize
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_search_limit_returns_replayable_zero_charge(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"B","model":"fixture"}')
+            spec = dict(title='crowded week', preference='keep starts', search_nodes=1,
+                        shifts=[dict(id=str(i), worker='w', room='r', start=0, end=8) for i in range(22)])
+            body = dict(sender='A', recipient='B', source='public', spec=spec)
+            request = dict(body, id=digest(body))
+            db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+            set_permission(db, 'A', True, 1)
+            with patch('examples.peer_node.transfer', return_value=[dict(source='public', body=json.dumps(spec))]), patch('examples.user_consult.api') as model:
+                receipt, fresh = deliver(root, db, request)
+                self.assertTrue(fresh)
+                validate_receipt(request, receipt)
+                self.assertEqual((receipt['outcome']['feasibility'], receipt['credits']), ('unknown', 0))
+                self.assertEqual(deliver(root, db, request), (receipt, False))
+                self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
+                model.assert_not_called()
+
     def test_simultaneous_consultations_and_duplicate(self):
         both_started = threading.Event()
         release = threading.Event()

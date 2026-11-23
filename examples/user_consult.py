@@ -11,6 +11,13 @@ from open_roundtable.core import Kernel
 from open_roundtable.run_journal import initialize, dispatch
 
 
+class NoFeasibleCandidate(ValueError):
+    def __init__(self, attempt):
+        self.status = attempt['status']
+        self.nodes = attempt['nodes']
+        super().__init__(f'hard-constraint feasibility {self.status} after {self.nodes} nodes')
+
+
 def validate_roster(spec):
     if not isinstance(spec,dict) or any(not isinstance(spec.get(k),str) or not spec[k].strip()
                                        for k in ('title','preference')):
@@ -54,7 +61,7 @@ def consult(source, database, model):
     if not plans:
         attempt=feasibility(rows,lambda p:True,spec.get('search_nodes',10000))
         if attempt['plan'] is None:
-            raise ValueError(f"hard-constraint feasibility {attempt['status']} after {attempt['nodes']} nodes")
+            raise NoFeasibleCandidate(attempt)
         plans=[attempt['plan']]
     proof=None
     if rules:

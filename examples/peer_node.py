@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
 from open_roundtable.data import catalog, connect, ingest, NoRedirect
-from examples.user_consult import consult, validate_roster
+from examples.user_consult import NoFeasibleCandidate, consult, validate_roster
 
 
 def packed(value):
@@ -337,9 +337,15 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
             db.execute('UPDATE grant_limits SET remaining=remaining-1 WHERE name=?', (request['sender'],))
     source=root/(key+'.json')
     source.write_bytes(packed(request['spec']))
-    outcome=consult(source,database,config['model'])
+    try:
+        outcome=consult(source,database,config['model'])
+        credits = None
+    except NoFeasibleCandidate as error:
+        outcome = dict(state='NO_PLAN', feasibility=error.status, nodes=error.nodes)
+        credits = 0
     with closing(sqlite3.connect(database)) as k, k:
-        credits=k.execute('SELECT sum(cost) FROM messages').fetchone()[0]
+        if credits is None:
+            credits=k.execute('SELECT sum(cost) FROM messages').fetchone()[0]
         result=dict(id=key,sender=config['name'],recipient=request['sender'],outcome=outcome,credits=credits)
         k.execute('CREATE TABLE peer_receipt (id TEXT PRIMARY KEY, result TEXT NOT NULL)')
         k.execute('INSERT INTO peer_receipt VALUES (?,?)', (key, packed(result).decode()))
@@ -358,6 +364,11 @@ def validate_receipt(request, receipt):
     if type(charge) is not int or not 0 <= charge <= 2:
         raise ValueError('invalid service charge')
     outcome = receipt.get('outcome')
+    if isinstance(outcome, dict) and outcome.get('state') == 'NO_PLAN':
+        if (charge != 0 or outcome.get('feasibility') not in ('infeasible', 'unknown')
+                or type(outcome.get('nodes')) is not int or outcome['nodes'] < 0):
+            raise ValueError('invalid feasibility receipt')
+        return
     if not isinstance(outcome, dict) or outcome.get('state') not in ('ACTIVE','PAUSED','RESOLVED'):
         raise ValueError('invalid service outcome')
 
