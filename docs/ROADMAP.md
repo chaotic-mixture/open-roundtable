@@ -70,3 +70,8 @@ python -m examples.compare_panel_receipts direct.sqlite3 nested.sqlite3
 ## 公开发布检查
 
 独立测试、许可证范围、无私有会话/凭证、干净白名单快照、依赖与素材血缘、准确能力说明。源码发布流程见 [公开发布清单](PUBLIC_RELEASE_CHECKLIST.md)。
+## 同一模型直接与委派会诊对照
+
+运行 `python -m examples.paired_panel_benchmark reports/panel-nine-new`，指定一个尚不存在的目录，并在本机 Ollama 提供 `qwen3.5:9b`。种子 501–509 分为 7、11、22 个班次各三表，逐表交替两种调用顺序。脚本为每组保留输入与两份 SQLite 回执。
+
+本轮九对模型请求逐对一致，九对选出的排班也逐对相同，全部通过硬约束。两边各满足 9/18 项偏好，各消耗 29,529 输入 tokens、63 输出 tokens 和 18 credits。全部停在 PAUSED，委派方尚待父议题结算。每表每种方式各跑一次，只改变委派层级，无法据此评价新增专长不同的议员能带来多少收益。
