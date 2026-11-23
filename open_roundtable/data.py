@@ -166,7 +166,11 @@ def maintain(root, source, *, only_pending=False):
         if mode=='sealed':
             summary=' '.join(body.split())[:500]
         elif mode in ('local','api'):
-            messages=[{'role':'system','content':'Summarize this personal record for its owner.'},
+            messages=[{'role':'system','content':(
+                'Summarize this record concisely for its owner in the original language. '
+                'Preserve qualifications that affect meaning, including fictional or hypothetical status, '
+                'negation, exceptions, uncertainty, and whose preference is described. '
+                'If the record is already a concise sentence, repeat it verbatim.')},
                       {'role':'user','content':body}]
             payload=dict(model=model,messages=messages,stream=False)
             if mode=='local':
