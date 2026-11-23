@@ -3,11 +3,37 @@ from contextlib import closing
 import json
 from pathlib import Path
 from statistics import median
-import subprocess
 from tempfile import TemporaryDirectory
 from time import perf_counter
 
 from examples import peer_node
+
+
+# Scan baseline from commit 23d8fbe.
+def scan_statement(root, db, partner, *, after='', limit=None):
+    node = json.loads((root/'node.json').read_text())['name']
+    if node == partner or not partner.strip():
+        raise ValueError('choose a distinct partner')
+    entries = []
+    for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs WHERE id>? ORDER BY id',(after,)):
+        request = json.loads(raw)
+        if {request['sender'], request['recipient']} != {node,partner}:
+            continue
+        if request['id'] != key or peer_node.digest({k:v for k,v in request.items() if k!='id'}) != key:
+            raise ValueError('job identity mismatch')
+        receipt_hash = None
+        if saved is not None:
+            receipt = json.loads(saved)
+            peer_node.validate_receipt(request,receipt)
+            if credits != receipt['credits']:
+                raise ValueError('invalid service charge')
+            receipt_hash = peer_node.digest(receipt)
+        elif credits:
+            raise ValueError('pending job has a posted charge')
+        entries.append(dict(job=key, provider=request['recipient'], credits=credits, receipt=receipt_hash))
+        if limit is not None and len(entries) >= limit:
+            break
+    return dict(format=1, node=node, partner=partner, entries=entries)
 
 
 def pages(reader, root, db):
@@ -21,12 +47,8 @@ def pages(reader, root, db):
         after = batch[-1]['job']
 
 
-def run():
-    repo = Path(__file__).resolve().parents[1]
-    source = subprocess.check_output(['git', 'show', '23d8fbe:examples/peer_node.py'], cwd=repo)
-    previous = {'__name__': 'baseline'}
-    exec(compile(source, 'baseline_peer_node.py', 'exec'), previous)
-    readers = {'scan': previous['partner_statement'], 'index': peer_node.partner_statement}
+def run(settled=False):
+    readers = {'scan': scan_statement, 'index': peer_node.partner_statement}
     for stride in (1, 10, 100):
         with TemporaryDirectory() as tmp, closing(peer_node.ledger(Path(tmp))) as db:
             root = Path(tmp)
@@ -36,8 +58,12 @@ def run():
                 sender, recipient = ('A', partner) if (i // stride) % 2 else (partner, 'A')
                 request = dict(sender=sender, recipient=recipient, source='synthetic', spec=dict(case=i))
                 key = peer_node.digest(request)
-                db.execute('INSERT INTO jobs(id,request) VALUES (?,?)',
-                           (key, peer_node.packed(dict(request, id=key)).decode()))
+                receipt = None
+                if settled:
+                    receipt = peer_node.packed(dict(id=key, sender=recipient, recipient=sender,
+                                                    credits=2, outcome=dict(state='RESOLVED'))).decode()
+                db.execute('INSERT INTO jobs(id,request,result,credits) VALUES (?,?,?,?)',
+                           (key, peer_node.packed(dict(request, id=key)).decode(), receipt, 2 if settled else 0))
             db.commit()
             expected = pages(readers['scan'], root, db)
             if len(expected) != 10000 // stride:
@@ -52,9 +78,12 @@ def run():
                         raise ValueError('statement contents differ')
                     if trial:
                         timings[name].append(elapsed * 1000)
-            print(json.dumps(dict(jobs=10000, matched=len(expected),
+            print(json.dumps(dict(jobs=10000, settled=settled, matched=len(expected),
                                   median_ms={k: round(median(v), 2) for k, v in timings.items()})))
 
 
 if __name__ == '__main__':
-    run()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--settled', action='store_true', help='include and validate a receipt for every job')
+    run(parser.parse_args().settled)
