@@ -189,7 +189,7 @@ def maintain(root, source, *, only_pending=False):
         return True
 
 
-def maintain_pending(root, limit):
+def maintain_pending(root, limit, *, preview=False):
     if limit < 1:
         raise ValueError('limit must be positive')
     with closing(connect(root, 'private')) as db, db:
@@ -198,6 +198,11 @@ def maintain_pending(root, limit):
         rows = db.execute("""SELECT source FROM records WHERE summary IS NULL
             ORDER BY source <= coalesce((SELECT source FROM maintenance_cursor WHERE id=1), ''), source
             LIMIT ?""", (limit,)).fetchall()
+        if preview:
+            modes = dict(sealed=0, local=0, api=0)
+            for source, in rows:
+                modes[effective_policy(db, source)['mode']] += 1
+            return dict(selected=len(rows), modes=modes)
         if rows:
             db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0
@@ -262,6 +267,7 @@ def main():
     commands.add_parser('private-status', help='count private records with current or pending summaries')
     batch = commands.add_parser('maintain-pending', help='maintain a bounded batch of pending private records')
     batch.add_argument('--limit', required=True, type=int)
+    batch.add_argument('--preview', action='store_true', help='count records by maintenance mode without advancing the batch')
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -296,9 +302,9 @@ def main():
         elif args.action=='maintain-private':
             maintain(root,args.source)
         elif args.action=='maintain-pending':
-            result = maintain_pending(root, args.limit)
+            result = maintain_pending(root, args.limit, preview=args.preview)
             print(json.dumps(result))
-            if result['failed']:
+            if result.get('failed'):
                 raise SystemExit(2)
     except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
         # Remote messages and malformed input can contain private content.

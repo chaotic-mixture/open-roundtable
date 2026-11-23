@@ -11,6 +11,20 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_batch_preview_counts_routes_without_advancing(self):
+        data.ingest(self.root, 'private', [dict(source='second', body='local only')])
+        data.configure(self.root, 'api', 'remote', 'https://example.org/chat')
+        data.limit_record(self.root, 'second', 'sealed')
+        with patch.object(data, 'exchange', side_effect=ConnectionError) as api:
+            for _ in range(2):
+                self.assertEqual(data.maintain_pending(self.root, 1, preview=True),
+                                 dict(selected=1, modes=dict(api=1, sealed=0, local=0)))
+            api.assert_not_called()
+            self.assertEqual(data.maintain_pending(self.root, 1)['failed'], 1)
+            api.assert_called_once()
+            self.assertEqual(data.maintain_pending(self.root, 1, preview=True),
+                             dict(selected=1, modes=dict(api=0, sealed=1, local=0)))
+
     def test_one_record_batches_progress_past_an_unavailable_provider(self):
         data.ingest(self.root, 'private', [dict(source='second', body='local only')])
         data.configure(self.root, 'api', 'remote', 'https://example.org/chat')
