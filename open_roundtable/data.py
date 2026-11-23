@@ -167,10 +167,16 @@ def maintain(root, source):
             payload=dict(model=model,messages=messages,stream=False)
             if mode=='local':
                 answer=json.loads(exchange(endpoint,payload))
+                if (not isinstance(answer, dict) or answer.get('done', True) is not True
+                        or answer.get('done_reason', 'stop') != 'stop'):
+                    raise ValueError('incomplete maintenance response')
                 summary=answer['message']['content']
             else:
                 answer=json.loads(exchange(endpoint,payload,os.getenv('ROUNDTABLE_API_KEY')))
-                summary=answer['choices'][0]['message']['content']
+                choice=answer['choices'][0]
+                if not isinstance(choice, dict) or choice.get('finish_reason', 'stop') != 'stop':
+                    raise ValueError('incomplete maintenance response')
+                summary=choice['message']['content']
         else:
             raise ValueError('invalid stored policy')
         if not isinstance(summary,str) or not summary.strip():

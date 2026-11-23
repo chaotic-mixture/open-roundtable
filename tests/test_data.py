@@ -25,6 +25,20 @@ class DataTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT summary FROM records').fetchone(),('private content',))
         self.assertEqual(data.catalog(self.root),[])
 
+    def test_incomplete_provider_responses_preserve_previous_private_summary(self):
+        data.maintain(self.root, 'profile')
+        for mode, response in [
+                ('local', '{"done":false,"message":{"content":"partial"}}'),
+                ('local', '{"done":true,"done_reason":"length","message":{"content":"partial"}}'),
+                ('api', '{"choices":[{"finish_reason":"length","message":{"content":"partial"}}]}')]:
+            with self.subTest(mode=mode, response=response):
+                endpoint = 'https://example.org/chat' if mode == 'api' else None
+                data.configure(self.root, mode, 'model', endpoint)
+                with patch.object(data, 'exchange', return_value=response), self.assertRaisesRegex(ValueError, 'incomplete'):
+                    data.maintain(self.root, 'profile')
+                with closing(data.connect(self.root, 'private')) as db:
+                    self.assertEqual(db.execute('SELECT summary FROM records').fetchone(), ('private content',))
+
     def test_separate_permission_for_public_distribution(self):
         entry={'source':'https://example.org/document','body':'public'}
         data.ingest(self.root,'public',[entry])
