@@ -9,12 +9,12 @@ import os
 from pathlib import Path
 import shutil
 import ssl
-import subprocess
 import tempfile
 import unittest
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
+from examples.demo_certificates import issue_certificates
 from examples.peer_node import digest, ledger, packed, transfer
 from examples.two_node_demo import audit, cli, run, start
 from open_roundtable.data import initialize, share_public
@@ -28,28 +28,19 @@ class PeerTLSTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
             base = Path(tmp)
 
-            def issue(*args):
-                subprocess.run([openssl,*args],cwd=base,check=True,capture_output=True)
-
-            issue('req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=Test CA',
-                  '-addext','basicConstraints=critical,CA:TRUE','-keyout','ca.key','-out','ca.pem')
-            for name in ('A','B','directory'):
+            credentials = base/'certificates'
+            credentials.mkdir()
+            issue_certificates(credentials, openssl)
+            for name in ('A','B'):
                 root = base/name
                 initialize(root)
-                (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls',listen_address='127.0.0.1')))
-                shutil.copyfile(base/'ca.pem',root/'ca.pem')
-                issue('req','-new','-newkey','rsa:2048','-nodes','-subj','/CN='+name,
-                      '-keyout',str(root/'node.key'),'-out','node.csr')
-                (base/'extensions').write_text('subjectAltName=IP:127.0.0.1,DNS:localhost,URI:urn:roundtable:peer:'+name+
-                    '\nextendedKeyUsage=serverAuth,clientAuth\nbasicConstraints=CA:FALSE\n')
-                issue('x509','-req','-in','node.csr','-CA','ca.pem','-CAkey','ca.key','-CAcreateserial',
-                      '-days','1','-extfile','extensions','-out',str(root/'node.pem'))
+                (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls',credentials=str(credentials/name))))
             _, port = start(stack,base/'B',0)
             url = f'https://localhost:{port}'
             with closing(ledger(base/'A')) as db:
                 with self.assertRaisesRegex(ValueError,'remote origin'):
                     transfer(db,url+'/catalog',peer_name='B')
-                (base/'A'/'node.json').write_text(json.dumps(dict(name='A',transport='mtls',allowed_origins=[url])))
+                (base/'A'/'node.json').write_text(json.dumps(dict(name='A',transport='mtls',credentials=str(credentials/'A'),allowed_origins=[url])))
                 self.assertEqual(transfer(db,url+'/catalog',peer_name='B'), [])
                 with self.assertRaises(URLError) as wrong_peer:
                     transfer(db,url+'/consult',dict(sender='A'),peer_name='C')
@@ -62,7 +53,7 @@ class PeerTLSTests(unittest.TestCase):
                 self.assertEqual(failure.exception.code,403)
                 with self.assertRaises(ValueError):
                     transfer(db,url.replace('https:', 'http:')+'/catalog')
-            client = ssl.create_default_context(cafile=str(base/'ca.pem'))
+            client = ssl.create_default_context(cafile=str(credentials/'A'/'ca.pem'))
             with self.assertRaises((OSError,HTTPException)):
                 build_opener(ProxyHandler({}),HTTPSHandler(context=client)).open(url+'/catalog',timeout=3)
 
@@ -82,7 +73,7 @@ class PeerTLSTests(unittest.TestCase):
             stack.callback(model.shutdown)
             folder = base/'exercise'
             with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
-                result = run(folder, 'fixture', 'before-receipt', credentials=base, bind_offer=True)
+                result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual((result['deliveries'], result['credits'], calls), (2, 2, ['/api/chat']))
             for name in ('A','B'):

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sqlite3
 import ssl
+import tempfile
 import subprocess
 import sys
 import threading
@@ -191,7 +192,19 @@ if __name__=='__main__':
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
-    parser.add_argument('--credentials', type=Path, help='TLS credentials directory containing A, B and directory')
+    tls = parser.add_mutually_exclusive_group()
+    tls.add_argument('--temporary-tls', metavar='OPENSSL', help='issue disposable loopback credentials using this OpenSSL executable')
+    tls.add_argument('--credentials', type=Path, help='TLS credentials directory containing A, B and directory')
     parser.add_argument('--bind-offer',action='store_true',help='select a published offer and withdraw it before replay')
     args=parser.parse_args()
-    print(json.dumps(run(args.directory,args.model,args.fault,credentials=args.credentials,bind_offer=args.bind_offer) if args.action=='run' else audit(args.directory)))
+    if args.action=='verify':
+        result = audit(args.directory)
+    else:
+        with ExitStack() as stack:
+            credentials = args.credentials
+            if args.temporary_tls:
+                from examples.demo_certificates import issue_certificates
+                credentials = Path(stack.enter_context(tempfile.TemporaryDirectory()))
+                issue_certificates(credentials,args.temporary_tls)
+            result = run(args.directory,args.model,args.fault,credentials=credentials,bind_offer=args.bind_offer)
+    print(json.dumps(result))
