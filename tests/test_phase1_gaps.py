@@ -39,6 +39,12 @@ class GapTests(unittest.TestCase):
             self.assertEqual(summary['nested']['parent_state'], 'RESOLVED')
             self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
             with closing(sqlite3.connect(direct)) as flat:
+                with flat:
+                    flat.execute("UPDATE votes SET agree=0 WHERE member='expert'")
+                with self.assertRaisesRegex(ValueError, 'ballots or consultation state'):
+                    compare(direct, nested)
+                with flat:
+                    flat.execute("UPDATE votes SET agree=1 WHERE member='expert'")
                 original = flat.execute('SELECT body FROM proposals').fetchone()[0]
                 with flat:
                     flat.execute("UPDATE proposals SET body=json_set(body,'$.fallback','invalid reply')")

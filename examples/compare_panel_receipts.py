@@ -93,6 +93,14 @@ def read_receipt(path, nested, expected_input=None):
             result.update(position=position, consultation_seconds=duration)
         changes = [sum(shift['start'] != before['start'] for shift, before in zip(candidate, original, strict=True))
                    for candidate in candidates]
+        expert_agrees = not rules or (flags, changes[selected]) == (scores[0], changes[0])
+        expected_votes = {'expert': int(expert_agrees)}
+        if not fallback:
+            expected_votes['model'] = 1
+        votes = dict(db.execute('SELECT member,agree FROM votes WHERE topic=?', (topic,)))
+        if votes != expected_votes or state != ('RESOLVED' if sum(expected_votes.values()) == 2 else 'PAUSED'):
+            raise ValueError('ballots or consultation state differ from selected proposal')
+        result['votes'] = votes
         result['changed_shifts'] = changes[selected]
         result['min_changes_at_selected_score'] = min(n for n, score in zip(changes, scores) if score == flags)
         result['min_changes_at_best_score'] = min(n for n, score in zip(changes, scores)
