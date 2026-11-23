@@ -56,6 +56,14 @@ def feasibility(rows, accepts, budget):
     """Exact finite-domain search; a node limit yields unknown, never infeasible."""
     if type(budget)!=int or budget<1:
         raise ValueError('search_nodes must be a positive integer')
+    # A room or worker can occupy at most 168 distinct hours in one week.
+    for field in (1, 2):
+        hours = {}
+        for key, _, duration in rows:
+            resource = key[field]
+            hours[resource] = hours.get(resource, 0) + duration
+            if hours[resource] > 168:
+                return dict(status='infeasible', nodes=0, plan=None)
     original=[r[1] for r in rows]
     domains=[sorted(range(169-r[2]),key=lambda h:abs(h-r[1])) for r in rows]
     starts=[]
