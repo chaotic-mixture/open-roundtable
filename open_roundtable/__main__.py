@@ -17,6 +17,7 @@ def main():
     consult.add_argument('input',type=Path)
     consult.add_argument('--db',required=True,type=Path)
     consult.add_argument('--model',default='qwen3.5:9b')
+    consult.add_argument('--nested', action='store_true', help='delegate repair to a funded expert-and-model panel')
     verify = commands.add_parser('verify-batch',help='reconcile preference results offline')
     verify.add_argument('directory',type=Path)
     create = commands.add_parser('create', help='create a draft in a new or existing database')
@@ -72,7 +73,7 @@ def main():
     try:
         if args.command=='consult':
             from examples.user_consult import consult
-            result=consult(args.input,args.db,args.model)
+            result=consult(args.input,args.db,args.model,nested=args.nested)
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)

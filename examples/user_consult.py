@@ -53,7 +53,7 @@ def validate_roster(spec):
     return rows, rules
 
 
-def consult(source, database, model):
+def consult(source, database, model, *, nested=False):
     spec=json.loads(source.read_text(encoding='utf-8-sig'))
     rows, rules = validate_roster(spec)
     if exceeds_weekly_capacity(rows):
@@ -81,7 +81,11 @@ def consult(source, database, model):
     database.touch(exist_ok=False)
     with closing(Kernel(database)) as k:
         initialize(k.db)
-        topic=k.create(spec['title'],credits=2)
+        parent = k.create(spec['title'],credits=2)
+        topic = parent
+        if nested:
+            topic = k.delegate(parent, 'schedule panel', spec['title'], 2)
+            k.start(parent)
         k.join(topic,'expert',kind='expert')
         k.join(topic,'model',kind='model',source=model)
         k.start(topic)
@@ -109,4 +113,12 @@ def consult(source, database, model):
         if not error:
             k.vote(topic,'model',True,version=version)
         k.feedback(topic,'expert',encoded(dict(hard_pass=True)),source='independent hourly verification')
-        return dict(topic=topic,proposal=version,state=k.get(topic)['state'],**json.loads(body))
+        result = dict(topic=topic,proposal=version,state=k.get(topic)['state'],**json.loads(body))
+        if nested:
+            spent = None
+            if result['state'] == 'RESOLVED':
+                spent = k.settle(topic)
+                parent_version = k.propose(parent, body, previous_version=0)
+                k.vote(parent, 'schedule panel', True, version=parent_version)
+            result.update(parent=parent, parent_state=k.get(parent)['state'], settled_credits=spent)
+        return result
