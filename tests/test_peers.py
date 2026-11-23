@@ -10,7 +10,8 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.two_node_demo import audit, run
+from examples.peer_node import resume
+from examples.two_node_demo import SOURCE, audit, run
 
 
 class PeerRecoveryTests(unittest.TestCase):
@@ -56,3 +57,18 @@ class PeerRecoveryTests(unittest.TestCase):
                 network.execute("INSERT INTO traffic(direction,route,body) VALUES('send','/check',?)", (body,))
             with self.assertRaisesRegex(ValueError, 'private marker'):
                 audit(folder)
+
+            sender = folder / 'A'
+            with closing(sqlite3.connect(sender / 'network.sqlite3')) as network, network:
+                network.execute('UPDATE jobs SET result=NULL')
+                key = result['request_id']
+                with closing(sqlite3.connect(sender / 'public.sqlite3')) as public, public:
+                    public.execute('UPDATE records SET body=? WHERE source=?', ('{}', SOURCE))
+                    public.commit()
+                    with patch('examples.peer_node.transfer') as transfer:
+                        self.assertEqual(resume(sender, network), {key: 'published topic changed'})
+                        public.execute('UPDATE records SET shared=0 WHERE source=?', (SOURCE,))
+                        public.commit()
+                        self.assertEqual(resume(sender, network), {key: 'topic must be explicitly shared'})
+                        transfer.assert_not_called()
+                self.assertEqual(network.execute('SELECT result FROM jobs').fetchone(), (None,))

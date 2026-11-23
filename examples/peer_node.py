@@ -108,8 +108,10 @@ def deliver(root,db,request):
     return result,True
 
 
-def send(root,db,recipient,source):
+def send(root,db,recipient,source,*,original=None):
     request=envelope(root,recipient,source)
+    if original is not None and original != request:
+        raise ValueError('published topic changed')
     peer=db.execute('SELECT url FROM peers WHERE name=?',(recipient,)).fetchone()
     if not peer:
         raise ValueError('discover recipient first')
@@ -122,6 +124,24 @@ def send(root,db,recipient,source):
         db.execute('UPDATE jobs SET result=?,credits=? WHERE id=?',
                    (packed(result).decode(),result['credits'],result['id']))
     return result
+
+
+def resume(root, db):
+    """Retry pending outbound jobs whose original topic is still shared."""
+    name = json.loads((root / 'node.json').read_text())['name']
+    rows = db.execute('SELECT id,request FROM jobs WHERE result IS NULL ORDER BY rowid').fetchall()
+    outcomes = {}
+    for key, raw in rows:
+        request = json.loads(raw)
+        if request['sender'] != name:
+            continue
+        try:
+            send(root, db, request['recipient'], request['source'], original=request)
+        except (ValueError, OSError) as error:
+            outcomes[key] = str(error)
+        else:
+            outcomes[key] = 'received'
+    return outcomes
 
 
 def serve(root,port,interrupt):
@@ -173,6 +193,7 @@ if __name__=='__main__':
     server.add_argument('port',type=int)
     server.add_argument('--interrupt-after-commit',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
+    commands.add_parser('resume')
     submit=commands.add_parser('send')
     submit.add_argument('recipient')
     submit.add_argument('source')
@@ -181,6 +202,9 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit)
     else:
         with closing(ledger(args.directory)) as db:
-            result=(discover(db,args.bootstrap) if args.action=='discover' else
+            result=(resume(args.directory,db) if args.action=='resume' else
+                    discover(db,args.bootstrap) if args.action=='discover' else
                     send(args.directory,db,args.recipient,args.source))
         print(packed(result).decode())
+        if args.action == 'resume' and any(v != 'received' for v in result.values()):
+            raise SystemExit(1)

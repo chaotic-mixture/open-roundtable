@@ -145,7 +145,9 @@ def run(folder,model):
         restarted,_=start(stack,b,port)
         (folder/'interruption.json').write_bytes(packed(dict(exit=75,before_pid=proc.pid,
                 after_pid=restarted.pid,sender_receipt=receipt,receiver_credits=credits)))
-        cli(a,'send','B',SOURCE)
+        cli(a,'resume')
+        if json.loads(cli(a,'resume').stdout) != {}:
+            raise RuntimeError('completed job still pending')
     result=audit(folder)
     (folder/'audit.json').write_bytes(packed(result))
     return result
