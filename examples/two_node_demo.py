@@ -143,6 +143,8 @@ def audit(folder):
     if 'kernel_receipt_sha256' in fault:
         require(fault['kernel_receipt_sha256'] == digest(res), 'recovered receipt differs from pre-restart checkpoint')
     return dict(discovered=['A','B'],deliveries=2,model_calls=1,expert_calls=1,credits=cost,
+                fault_window={75:'after-commit', 76:'before-receipt'}[fault['exit']],
+                receiver_credits_at_disconnect=fault['receiver_credits'],
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
                 state=state,private_markers_found=0,private_stores_checked=[root.name for root in marker_roots],
                 request_id=key)
