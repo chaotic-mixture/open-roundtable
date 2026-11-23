@@ -160,3 +160,5 @@ Original code and original project documentation: MIT. Third-party materials, mo
 python -m examples.peer_node reports/release-peer-run/A mark JOB_ID weekend
 python -m examples.peer_node reports/release-peer-run/A revisit weekend
 ~~~
+
+接收方须在本机运行 `python -m examples.peer_node NODE_DIR permission PEER allow`，才能受理该节点的会诊。授权绑定已发现的名称和地址，节点地址变化后需要重新授权。用 `revoke` 代替 `allow` 可撤销后续受理和回执重发；已经受理的任务可以继续。旧节点库首次使用此版本时也需要授权。示例自动在 B 授权 A。此控制适用于可信回环环境，发送方名称和地址尚无密码学身份证明。

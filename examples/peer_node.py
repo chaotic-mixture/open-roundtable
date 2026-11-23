@@ -27,6 +27,7 @@ def ledger(root):
     db.execute('CREATE TABLE IF NOT EXISTS peers (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('''CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, request TEXT NOT NULL,
         result TEXT, credits INTEGER NOT NULL DEFAULT 0)''')
+    db.execute('CREATE TABLE IF NOT EXISTS consult_grants (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS traffic (direction TEXT, route TEXT, body TEXT)')
     db.commit()
     return db
@@ -66,6 +67,18 @@ def discover(db,bootstrap):
     return descriptors
 
 
+def set_permission(db, peer, allow):
+    with db:
+        if allow:
+            row = db.execute('SELECT url FROM peers WHERE name=?', (peer,)).fetchone()
+            if row is None:
+                raise ValueError('discover peer before granting consultations')
+            db.execute('INSERT OR REPLACE INTO consult_grants VALUES (?,?)', (peer, row[0]))
+        else:
+            db.execute('DELETE FROM consult_grants WHERE name=?', (peer,))
+    return dict(peer=peer, allowed=allow)
+
+
 def envelope(root,recipient,source):
     config=json.loads((root/'node.json').read_text())
     record=next((r for r in catalog(root) if r['source']==source),None)
@@ -83,9 +96,10 @@ def deliver(root,db,request):
     config=json.loads((root/'node.json').read_text())
     if request['recipient']!=config['name']:
         raise ValueError('wrong recipient')
-    row=db.execute('SELECT url FROM peers WHERE name=?',(request['sender'],)).fetchone()
+    row = db.execute('''SELECT peers.url FROM peers JOIN consult_grants USING(name,url)
+                        WHERE name=?''', (request['sender'],)).fetchone()
     if not row:
-        raise ValueError('unknown sender')
+        raise ValueError('sender has no consultation grant')
     published=transfer(db,row[0]+'/catalog')
     if not any(r['source']==request['source'] and json.loads(r['body'])==request['spec'] for r in published):
         raise ValueError('topic differs from shared source')
@@ -215,6 +229,9 @@ if __name__=='__main__':
     server.add_argument('--interrupt-after-commit',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
+    access = commands.add_parser('permission')
+    access.add_argument('peer')
+    access.add_argument('mode', choices=['allow', 'revoke'])
     mark = commands.add_parser('mark')
     mark.add_argument('job')
     mark.add_argument('label')
@@ -227,7 +244,9 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit)
     else:
         with closing(ledger(args.directory)) as db:
-            if args.action in ('mark', 'revisit'):
+            if args.action == 'permission':
+                result = set_permission(db, args.peer, args.mode == 'allow')
+            elif args.action in ('mark', 'revisit'):
                 result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
             else:
                 result=(resume(args.directory,db) if args.action=='resume' else

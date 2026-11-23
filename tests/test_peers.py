@@ -10,11 +10,31 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from examples.peer_node import resume
+from examples.peer_node import deliver, digest, ledger, resume, set_permission
 from examples.two_node_demo import SOURCE, audit, cli, run
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_receiver_permission(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'node.json').write_text('{"name":"B"}')
+            body = dict(sender='A', recipient='B', source='public', spec={})
+            request = dict(body, id=digest(body))
+            with closing(ledger(root)) as db, patch('examples.peer_node.transfer') as transfer:
+                db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+                for state in ('default', 'moved', 'revoked'):
+                    if state == 'moved':
+                        set_permission(db, 'A', True)
+                        db.execute("UPDATE peers SET url='http://127.0.0.1:8002'")
+                    if state == 'revoked':
+                        set_permission(db, 'A', True)
+                        set_permission(db, 'A', False)
+                    with self.subTest(state=state), self.assertRaisesRegex(ValueError, 'no consultation grant'):
+                        deliver(root, db, request)
+                transfer.assert_not_called()
+                self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+
     def test_replay_and_privacy(self):
         requests = []
 

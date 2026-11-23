@@ -130,6 +130,7 @@ def run(folder,model):
         bootstrap=f'http://127.0.0.1:{directory.server_port}'
         for root in (a,b):
             cli(root,'discover',bootstrap)
+        cli(b,'permission','A','allow')
         spec=json.loads(Path(__file__).with_name('consult_input.json').read_text(encoding='utf8'))
         spec.pop('criteria',None)
         ingest(a,'public',[dict(source=SOURCE,body=packed(spec).decode())])
