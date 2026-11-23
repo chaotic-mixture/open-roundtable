@@ -151,3 +151,12 @@ python -m examples.phase1_consult consult.sqlite3 score
 ## License
 
 Original code and original project documentation: MIT. Third-party materials, model/service rights and private conversation exports are not relicensed; see [NOTICE.md](NOTICE.md).
+
+### 按本地标记重访会诊
+
+运行双节点示例后，用输出中的 request_id 替换 JOB_ID。下列命令为 A 端已经收到回执的会诊添加标记，再按标记查阅完整回执。B 端可独立标记同一议题。标记存放在各自的私有库中，由本机操作者管理。查询使用本地账本，可离线执行，重复标记同一会诊只保留一条。
+
+~~~
+python -m examples.peer_node reports/release-peer-run/A mark JOB_ID weekend
+python -m examples.peer_node reports/release-peer-run/A revisit weekend
+~~~

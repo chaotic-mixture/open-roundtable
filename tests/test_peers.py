@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from examples.peer_node import resume
-from examples.two_node_demo import SOURCE, audit, run
+from examples.two_node_demo import SOURCE, audit, cli, run
 
 
 class PeerRecoveryTests(unittest.TestCase):
@@ -42,6 +42,15 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(result['discovered'], ['A', 'B'])
             self.assertEqual((result['deliveries'], result['credits']), (2, 2))
             self.assertEqual([path for path, _ in requests], ['/api/chat'])
+            self.assertEqual(result, audit(folder))
+            key = result['request_id']
+            label = 'personal-revisit-label'
+            for _ in range(2):
+                cli(folder / 'A', 'mark', key, label)
+            receipts = json.loads(cli(folder / 'A', 'revisit', label).stdout)
+            self.assertEqual([receipt['id'] for receipt in receipts], [key])
+            self.assertEqual(json.loads(cli(folder / 'B', 'revisit', label).stdout), [])
+            self.assertNotEqual(cli(folder / 'A', 'mark', 'missing', label, ok=False).returncode, 0)
             self.assertEqual(result, audit(folder))
             for node in ('A', 'B'):
                 with closing(sqlite3.connect(folder / node / 'private.sqlite3')) as private:

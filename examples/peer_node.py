@@ -10,7 +10,7 @@ import sqlite3
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
-from open_roundtable.data import catalog, NoRedirect
+from open_roundtable.data import catalog, connect, NoRedirect
 from examples.user_consult import consult
 
 
@@ -144,6 +144,27 @@ def resume(root, db):
     return outcomes
 
 
+def local_history(root, network, label, job=None):
+    label = label.strip()
+    if not label:
+        raise ValueError('provide a nonempty label')
+    with closing(connect(root, 'private')) as history, history:
+        history.execute("""CREATE TABLE IF NOT EXISTS job_labels (
+            label TEXT NOT NULL, job TEXT NOT NULL, PRIMARY KEY(label,job))""")
+        if job is not None:
+            row = network.execute('SELECT result FROM jobs WHERE id=?', (job,)).fetchone()
+            if not row or row[0] is None:
+                raise ValueError('a completed local consultation is required')
+            history.execute('INSERT OR IGNORE INTO job_labels VALUES (?,?)', (label, job))
+            return dict(job=job, label=label)
+        matches = []
+        for key, in history.execute('SELECT job FROM job_labels WHERE label=? ORDER BY job', (label,)):
+            row = network.execute('SELECT result FROM jobs WHERE id=?', (key,)).fetchone()
+            if row and row[0]:
+                matches.append(json.loads(row[0]))
+        return matches
+
+
 def serve(root,port,interrupt):
     class Handler(BaseHTTPRequestHandler):
         def reply(self,code,value):
@@ -194,6 +215,10 @@ if __name__=='__main__':
     server.add_argument('--interrupt-after-commit',action='store_true')
     commands.add_parser('discover').add_argument('bootstrap')
     commands.add_parser('resume')
+    mark = commands.add_parser('mark')
+    mark.add_argument('job')
+    mark.add_argument('label')
+    commands.add_parser('revisit').add_argument('label')
     submit=commands.add_parser('send')
     submit.add_argument('recipient')
     submit.add_argument('source')
@@ -202,7 +227,10 @@ if __name__=='__main__':
         serve(args.directory,args.port,args.interrupt_after_commit)
     else:
         with closing(ledger(args.directory)) as db:
-            result=(resume(args.directory,db) if args.action=='resume' else
+            if args.action in ('mark', 'revisit'):
+                result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
+            else:
+                result=(resume(args.directory,db) if args.action=='resume' else
                     discover(db,args.bootstrap) if args.action=='discover' else
                     send(args.directory,db,args.recipient,args.source))
         print(packed(result).decode())
