@@ -32,9 +32,10 @@ def revise(source, destination):
             def rank(candidate):
                 flags = candidate_score(candidate, original, rows, rules)
                 changed = sum(a != b for a,b in zip(candidate,original,strict=True))
-                return flags, -changed
+                revised = sum(a['start'] != b['start'] for a,b in zip(candidate,previous_schedule,strict=True))
+                return flags, -changed, -revised
             selected = max(range(len(menu)), key=lambda i: rank(menu[i]))
-            flags, negative_changes = rank(menu[selected])
+            flags, negative_changes, _ = rank(menu[selected])
             body = dict(selected=selected, schedule=menu[selected], criteria_met=flags,
                         changed_shifts=-negative_changes, proposed_by='expert')
             version = kernel.propose(topic,json.dumps(body),previous_version=1)
