@@ -192,8 +192,11 @@ def find_capability(root, db, tag=None):
     return dict(matches=matches, unavailable=unavailable)
 
 
-def match_offers(need, offers, model):
+def match_offers(need, offers, model, *, allowed_tags=None):
     from examples.auto_consult import api
+    if allowed_tags is not None:
+        allowed = set(allowed_tags)
+        offers = [offer for offer in offers if offer['tag'] in allowed]
     if not offers:
         return dict(matches=[], calls=0, input_tokens=0, output_tokens=0)
     menu = [dict(id=i, tag=o['tag'], description=o['description']) for i,o in enumerate(offers)]
@@ -565,6 +568,7 @@ if __name__=='__main__':
     commands.add_parser('find-capability').add_argument('tag')
     match = commands.add_parser('match-capability')
     match.add_argument('need')
+    match.add_argument('--allow-tag',action='append',help='only consider this declared operation tag; repeat for alternatives')
     match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
     commands.add_parser('account')
@@ -600,7 +604,7 @@ if __name__=='__main__':
                 result = find_capability(args.directory,db,args.tag)
             elif args.action == 'match-capability':
                 catalog_result = find_capability(args.directory,db)
-                result = match_offers(args.need,catalog_result['matches'],args.model)
+                result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)
                 result['unavailable'] = catalog_result['unavailable']
             elif args.action == 'feedback':
                 result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',
