@@ -18,6 +18,22 @@ In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated con
 
 Each approach used 36 credits, 59,058 input tokens and 126 output tokens. Total consultation time was 14.25 seconds for direct execution and 12.61 seconds for delegation. Recorded model time was almost identical (7.65 and 7.62 seconds). These runs show no scheduling benefit from delegation on this workload. The timing difference across two runs is insufficient to establish a speed advantage.
 
+Every roster already had a verified candidate satisfying both preferences. Only seed 503 received such a plan. The table compares the selected plan against the fewest shifts that had to move among the available plans meeting both preferences. The first preference preserves shift A's start. The second puts shift B's start before noon.
+
+| Seed | Preferences met by selected plan | Shifts moved | Fewest moves meeting both |
+| --- | --- | ---: | ---: |
+| 501 | Second only | 5 | 3 |
+| 502 | First only | 4 | 4 |
+| 503 | Both | 6 | 5 |
+| 504 | Second only | 9 | 7 |
+| 505 | Second only | 8 | 9 |
+| 506 | Neither | 8 | 9 |
+| 507 | Second only | 19 | 19 |
+| 508 | First only | 19 | 20 |
+| 509 | First only | 19 | 20 |
+
+Ranking the saved candidates by the two declared preferences, then by fewest moves, would satisfy both on all nine rosters. On seeds 505, 506, 508 and 509 that choice costs one extra changed shift per roster. On 501 and 504 it also saves two moves per roster. This is an offline comparison within the recorded candidate menus.
+
 To reproduce with local Ollama, use two fresh directories. The first two commands each make 18 model calls. The final command reads the saved ledgers offline and checks the paired requests and execution order.
 
 ```sh
