@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from examples.overnight_score import expected as expected_findings
-from examples.peer_node import find_capability, ledger, offer, send, set_permission, validate_receipt
+from examples.peer_node import find_capability, ledger, offer, send, set_permission, validate_job_identity, validate_receipt
 from examples.two_node_demo import start
 from open_roundtable.data import initialize, ingest, share_public
 
@@ -50,8 +50,9 @@ def reconcile_dispatch(db, topic, verified_providers):
     credits = 0
     for job_id, raw_request, raw_result, booked in bookings:
         request = json.loads(raw_request)
-        if job_id != request['id'] or raw_result is None:
-            raise ValueError('missing or mismatched dispatch receipt')
+        validate_job_identity(job_id, request)
+        if raw_result is None:
+            raise ValueError('missing dispatch receipt')
         receipt = json.loads(raw_result)
         validate_receipt(request, receipt)
         if receipt['outcome']['findings'] != score_request(request['spec']):

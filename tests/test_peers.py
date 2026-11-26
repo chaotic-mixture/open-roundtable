@@ -35,6 +35,12 @@ class PeerRecoveryTests(unittest.TestCase):
                 db.execute('UPDATE jobs SET result=? WHERE id=?', (json.dumps(receipt), job_id))
                 with self.assertRaisesRegex(ValueError, 'stored audit findings'):
                     reconcile_dispatch(db, 'roster', ['B'])
+            outcome['findings']['P'] = ['AB']
+            body['spec']['shifts'] = ['Aaa:0-3', 'Bab:2-4']
+            db.execute('UPDATE jobs SET request=?,result=? WHERE id=?',
+                       (json.dumps(dict(body, id=job_id)), json.dumps(receipt), job_id))
+            with self.assertRaisesRegex(ValueError, 'job identity mismatch'):
+                reconcile_dispatch(db, 'roster', ['B'])
 
     def test_dispatch_reconciliation_rejects_swapped_receipts_from_same_provider(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:

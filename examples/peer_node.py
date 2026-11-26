@@ -584,6 +584,11 @@ def settle_job(db, stored, result):
                 raise ValueError('conflicting receipt or changed job record')
 
 
+def validate_job_identity(key, request):
+    if key != request['id'] or key != digest({k: v for k, v in request.items() if k != 'id'}):
+        raise ValueError('job identity mismatch')
+
+
 def service_account(root, db):
     """Summarize each durable service receipt once from this node's perspective."""
     node = json.loads((root / 'node.json').read_text())['name']
@@ -591,8 +596,7 @@ def service_account(root, db):
     for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
         request = json.loads(raw)
         sender, provider = request['sender'], request['recipient']
-        if key != request['id'] or key != digest({k:v for k,v in request.items() if k!='id'}):
-            raise ValueError('job identity mismatch')
+        validate_job_identity(key, request)
         if node not in (sender, provider) or sender == provider:
             raise ValueError('service account requires two distinct participants')
         if saved is None:
