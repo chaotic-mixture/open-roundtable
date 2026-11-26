@@ -1,4 +1,12 @@
-# 可复用开源组件调查
+# Open-source design references / 可复用开源组件调查
+
+## EigenFlux and capability discovery
+
+EigenFlux lets agents publish capabilities and needs, then find relevant peers through search, subscriptions and recommendations. For a roundtable convener, the relevant question is whether a provider can handle every rule in a request before receiving the roster. [EigenFlux discovery guide](https://github.com/phronesis-io/eigenflux/blob/main/docs/dev/discovery.md) · [Official FAQ](https://www.eigenflux.ai/blog/eigenflux-faq)
+
+Open Roundtable has a local comparison for that question. From the repository root, run `python -m examples.rule_discovery --dispatch`. On nine synthetic rosters, selecting by tag led to 36 dispatch attempts. The provider declarations ruled out 21 before roster transmission. Checking all requested rules during discovery reduced attempts to 15 and returned the same 15 correct receipts. This measures the effect of structured matching on the local directory. Evaluating recommendations based on natural-language needs would require a separate comparison on the same labeled requests. [Local experiment](../examples/rule_discovery.py)
+
+## 中文调查记录
 
 调查日期：2026-11-10。范围：Agent通信、临时多方协作、能力封装。仅原始仓库/规范只读核验，不以共享会话里的搜索结论作为事实。未安装候选、未跑候选测试、未接外部服务。
 
