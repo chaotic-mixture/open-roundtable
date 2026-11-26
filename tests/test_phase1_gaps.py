@@ -102,12 +102,19 @@ class GapTests(unittest.TestCase):
             consult(source, direct, 'fixture')
             panel = consult(source, nested, 'fixture', nested=True)
             summary = compare(direct, nested)
+            self.assertEqual(summary['requested_model'], 'fixture')
             self.assertTrue(summary['same_schedule'])
             self.assertEqual(summary['direct']['selected'], 0)
             self.assertFalse(summary['direct']['used_fallback'])
             self.assertEqual(summary['nested']['parent_state'], 'RESOLVED')
             self.assertEqual((summary['direct']['credits'], summary['nested']['settled_credits']), (2, 2))
             with closing(sqlite3.connect(direct)) as flat:
+                with flat:
+                    flat.execute("UPDATE attempts SET request=json_set(request,'$.model','other-model')")
+                with self.assertRaisesRegex(ValueError, 'model requests differ'):
+                    compare(direct, nested)
+                with flat:
+                    flat.execute("UPDATE attempts SET request=json_set(request,'$.model','fixture')")
                 with flat:
                     flat.execute("UPDATE votes SET agree=0 WHERE member='expert'")
                 with self.assertRaisesRegex(ValueError, 'ballots or consultation state'):

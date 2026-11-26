@@ -131,7 +131,8 @@ def compare(direct, nested, *, expected_input=None):
         if {flat.get('position'), panel.get('position')} != {1, 2}:
             raise ValueError('inconsistent consultation order')
     request_hash = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
-    return dict(request_sha256=request_hash, same_schedule=schedule == other_schedule, direct=flat, nested=panel)
+    return dict(requested_model=request['model'], request_sha256=request_hash,
+                same_schedule=schedule == other_schedule, direct=flat, nested=panel)
 
 
 if __name__ == '__main__':
