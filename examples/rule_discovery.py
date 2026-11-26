@@ -21,7 +21,8 @@ def dispatch_candidates(root, db, topic, shifts, rules, matches):
     share_public(root, topic, True)
     truth = expected_findings(shifts)
     expected = {key: sorted(truth[key]) for key in rules}
-    rejected = completed = 0
+    rejected_providers = []
+    verified_providers = []
     for candidate in matches:
         try:
             receipt = send(root, db, candidate['node'], topic,
@@ -29,12 +30,13 @@ def dispatch_candidates(root, db, topic, shifts, rules, matches):
         except ValueError as error:
             if str(error) != 'selected offer does not cover the requested audit rules':
                 raise
-            rejected += 1
+            rejected_providers.append(candidate['node'])
             continue
         if receipt['outcome']['findings'] != expected:
             raise ValueError('audit differs from independent scorer')
-        completed += 1
-    return dict(attempts=len(matches), rejected=rejected, verified_receipts=completed)
+        verified_providers.append(candidate['node'])
+    return dict(attempts=len(matches), rejected=len(rejected_providers), verified_receipts=len(verified_providers),
+                rejected_providers=sorted(rejected_providers), verified_providers=sorted(verified_providers))
 
 
 def run(dispatch=False):
