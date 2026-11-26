@@ -20,6 +20,22 @@ from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_dispatch_reconciliation_rescores_stored_findings(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            body = dict(sender='A', recipient='B', source='roster', offer=['audit', 'reference'],
+                        spec=dict(operation='schedule-audit-v1', rules=['P'], shifts=['Aaa:1-3', 'Bab:2-4']))
+            job_id = digest(body)
+            outcome = dict(state='AUDITED', findings={'P': ['AB']})
+            receipt = dict(id=job_id, sender='B', recipient='A', credits=0, outcome=outcome)
+            db.execute('INSERT INTO jobs(id,request,result) VALUES (?,?,?)',
+                       (job_id, json.dumps(dict(body, id=job_id)), json.dumps(receipt)))
+            self.assertEqual(reconcile_dispatch(db, 'roster', ['B']), 0)
+            for findings in ([], ['AB', 'AC']):
+                outcome['findings']['P'] = findings
+                db.execute('UPDATE jobs SET result=? WHERE id=?', (json.dumps(receipt), job_id))
+                with self.assertRaisesRegex(ValueError, 'stored audit findings'):
+                    reconcile_dispatch(db, 'roster', ['B'])
+
     def test_dispatch_reconciliation_rejects_swapped_receipts_from_same_provider(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             receipts = []

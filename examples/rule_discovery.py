@@ -15,12 +15,16 @@ from open_roundtable.data import initialize, ingest, share_public
 SCOPES = [('PV', {'overlap', 'full'}), ('RL', {'fatigue', 'full'}), ('PVRL', {'full'})]
 
 
+def score_request(spec):
+    truth = expected_findings(spec['shifts'])
+    return {key: sorted(truth[key]) for key in spec['rules']}
+
+
 def dispatch_candidates(root, db, topic, shifts, rules, matches):
     spec = dict(operation='schedule-audit-v1', rules=list(rules), shifts=shifts)
     ingest(root, 'public', [dict(source=topic, body=json.dumps(spec))])
     share_public(root, topic, True)
-    truth = expected_findings(shifts)
-    expected = {key: sorted(truth[key]) for key in rules}
+    expected = score_request(spec)
     rejected_providers = []
     verified_providers = []
     for candidate in matches:
@@ -50,6 +54,8 @@ def reconcile_dispatch(db, topic, verified_providers):
             raise ValueError('missing or mismatched dispatch receipt')
         receipt = json.loads(raw_result)
         validate_receipt(request, receipt)
+        if receipt['outcome']['findings'] != score_request(request['spec']):
+            raise ValueError('stored audit findings differ from independent scorer')
         if booked != receipt['credits']:
             raise ValueError('receipt credits differ from requester ledger')
         providers.append(request['recipient'])
