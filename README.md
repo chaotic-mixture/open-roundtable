@@ -59,6 +59,21 @@ python -m open_roundtable.data runtime/store-demo public-feed
 
 Replace `HASH` with the SHA-256 from the review output after checking the notice text. The feed should now contain only the office-hours notice. To withdraw it, run `python -m open_roundtable.data runtime/store-demo share-public https://example.org/hours --off`. [Store and permission guide in Chinese](#公开资料和个人资料)
 
+### Compare ways to find a scheduling expert
+
+Run `python -m examples.rule_discovery --dispatch` from the repository root. A requester sends nine synthetic rosters to rule-based experts over loopback HTTP. All four providers advertise the same audit tag, but their offers differ in which checks they declare. Each roster produces two JSON lines. Compare `tag` (select by audit tag) with `rules` (also require every requested check). The rule codes are P for worker overlap, V for room overlap, R for minimum rest and L for maximum continuous work.
+
+| Across nine rosters | Tag only | Tag and required rules |
+| --- | ---: | ---: |
+| Extra providers selected | 21 | 0 |
+| Qualified providers missed | 0 | 0 |
+| Directory requests | 36 | 36 |
+| Requester network requests after discovery | 51 | 30 |
+| Receipts matching the independent roster check | 15 | 15 |
+| Credits charged | 0 | 0 |
+
+Here `extra` and `missed` count providers relative to the declared requirements. An extra selection triggers an offer check before the requester sends any shifts. Filtering earlier saved 21 such requests in this run. Both modes completed the same audits without calling a model. [Experiment and provider definitions](examples/rule_discovery.py)
+
 ## 中文指南
 
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
