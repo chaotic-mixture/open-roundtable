@@ -2,6 +2,26 @@
 
 **An experimental, composable roundtable runtime for heterogeneous participants.**
 
+[English quick start](#english-quick-start) · [中文指南](#中文指南)
+
+## English quick start
+
+Open Roundtable lets models and rule-based experts work on the same proposal. A SQLite ledger records each participant’s messages, votes and credit use so you can inspect how a decision was reached.
+
+With Python 3.11 or later, run the offline demo from the repository root. It uses the Python standard library and synthetic inputs.
+
+```sh
+python -m open_roundtable demo --db roundtable-demo.sqlite3
+```
+
+The demo prints a JSON report. Look for `RESOLVED` in the topic state and a remaining balance of 2 credits. Choose a fresh database filename for each run so earlier results stay available for inspection.
+
+To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine and reports which nodes the consumer can see before publication, after publication and after withdrawal. The expected sequence is an empty list, node B, then an empty list. [Registration example](examples/registration_demo.py)
+
+For a consultation with a real model, the two-node recovery walkthrough uses Ollama and `qwen3.5:9b`. It covers sending a shared scheduling request, recovering a lost receipt and reconciling credits on one machine. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Runnable example in English](examples/two_node_demo.py)
+
+## 中文指南
+
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
 
 **v0.0.6 发布同机双节点会诊与断线恢复。** [验收摘要与复现步骤](docs/V0.0.6.md)
