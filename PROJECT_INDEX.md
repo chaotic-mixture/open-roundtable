@@ -2,6 +2,8 @@
 
 [English quick start](README.md#english-quick-start) · [中文任务索引](#按任务定位)
 
+See the [roadmap](docs/ROADMAP.md) for evidence and open questions across all six phases.
+
 For the two-node discovery and recovery test, see the [v0.0.6 acceptance results, reproduction commands and verification limits](docs/V0.0.6.md).
 
 ## Scheduling experiment results

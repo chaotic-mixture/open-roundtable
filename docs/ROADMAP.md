@@ -1,4 +1,17 @@
-# 路线图
+# Roadmap / 路线图
+
+The phases below track separate research questions. The linked experiments give the scope of each result. The [Chinese roadmap and dated evidence](#路线图) also record follow-up trials.
+
+| Phase | What the project has demonstrated | What remains open |
+| --- | --- | --- |
+| 0 · Persistent decisions | A synthetic topic survives a restart. An independent reader checks the SQLite balance, participants, messages, ballots and feedback. [Kernel verifier](../tests/verify_core.py) | Accounting uses local integer test credits. |
+| 1 · Expert and model consultation | A local model and a scheduling expert check conflicts and propose repairs. Nine-roster comparisons measure preference satisfaction and costs. [Experiment results](../PROJECT_INDEX.md#scheduling-experiment-results) | How well the results transfer to operational rosters and new preferences. |
+| 2 · Independent nodes | Two processes on one host discover each other and recover a committed result after a lost receipt without a second charge. [Release evidence](V0.0.6.md) | Cross-host operation and independently reconciling an interrupted model call before its receipt is saved. |
+| 3 · Roundtables as members | A parent delegates a budget and receives a child decision after settlement. All 18 paired scheduling trials produced the same proposed repair in direct and delegated mode. All proposals paused pending agreement. [Paired results](../PROJECT_INDEX.md#does-delegating-the-repair-change-the-decision) | Whether a child panel with different expertise improves outcomes on more complex tasks. |
+| 4 · Resource exchange | Nodes reconcile consumption and contribution, limit admissions and record private feedback against a receipt. [Node commands](../examples/peer_node.py) | Verifying entitlements across providers and preventing one participant from claiming rewards under multiple identities. |
+| 5 · Testing proposed improvements | An experiment registered its acceptance criteria before comparing ranking policies on nine fresh rosters. Preference points rose from 32/63 to 44/63. Both policies passed the hard constraints. [Experiment](../examples/meta_consult.py) | Authenticating multiple operators and applying approved changes across nodes. |
+
+## 路线图
 
 路线可根据新证据调整，不把原型局限固化成愿景限制。
 
