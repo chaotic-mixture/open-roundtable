@@ -2,6 +2,8 @@
 
 [English quick start](README.md#english-quick-start) · [中文任务索引](#按任务定位)
 
+For the two-node discovery and recovery test, see the [v0.0.6 acceptance results, reproduction commands and verification limits](docs/V0.0.6.md).
+
 ## Scheduling experiment results
 
 These three studies use nine synthetic rosters, with three rosters each at 7, 11 and 22 shifts. Each report includes per-roster metrics and commands for reproduction. The observed gains depend on the rules, candidate plans and local model used in these runs.
