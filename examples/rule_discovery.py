@@ -39,6 +39,17 @@ def dispatch_candidates(root, db, topic, shifts, rules, matches):
                 rejected_providers=sorted(rejected_providers), verified_providers=sorted(verified_providers))
 
 
+def reconcile_dispatch(db, topic, verified_providers):
+    bookings = db.execute("""SELECT json_extract(request,'$.recipient'),json_extract(result,'$.sender'),
+                             credits,json_extract(result,'$.credits') FROM jobs
+                             WHERE json_extract(request,'$.source')=?""", (topic,)).fetchall()
+    if sorted(row[0] for row in bookings) != sorted(verified_providers):
+        raise ValueError('booked providers differ from verified dispatches')
+    if any(provider != sender or booked != reported for provider, sender, booked, reported in bookings):
+        raise ValueError('receipt sender or credits differ from requester ledger')
+    return sum(row[2] for row in bookings)
+
+
 def run(dispatch=False):
     lines = Path(__file__).with_name('overnight_inputs.txt').read_text().splitlines()
     tables = [line.split() for line in lines if line[:1].isdigit()]
@@ -80,10 +91,7 @@ def run(dispatch=False):
                     metrics = dispatch_candidates(root, db, topic, shifts, rules, result['matches'])
                     end, = db.execute('SELECT count(*) FROM traffic WHERE direction="send"').fetchone()
                     metrics['dispatch_requests'] = end - after
-                    booked, credits = db.execute("""SELECT count(result),coalesce(sum(credits),0) FROM jobs
-                        WHERE json_extract(request,'$.source')=?""", (topic,)).fetchone()
-                    if booked != metrics['verified_receipts']:
-                        raise ValueError('receipt count differs from requester ledger')
+                    credits = reconcile_dispatch(db, topic, metrics['verified_providers'])
                 yield dict(table=table, shifts=len(shifts), required=rules, mode=mode,
                            missed=len(expected-selected), extra=len(selected-expected),
                            expected_providers=sorted(expected), missed_providers=sorted(expected-selected),
