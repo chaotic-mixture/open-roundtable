@@ -28,6 +28,19 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_invalid_second_criterion_identifies_its_location(self):
+        spec = seeded_spec(501, 7)
+        first, second = spec['criteria']
+        for clause, expected in [
+            (None, 'criteria[1] must be an object'),
+            (dict(second, shift='missing'), 'criteria[1].shift'),
+            (dict(second, field='hours'), 'criteria[1].field'),
+            (dict(second, min=12, max=11), 'criteria[1] requires integer bounds'),
+        ]:
+            with self.subTest(clause=clause), self.assertRaises(ValueError) as error:
+                validate_roster(dict(spec, criteria=[first, clause]))
+            self.assertIn(expected, str(error.exception))
+
     def test_optional_criteria_require_an_array_when_present(self):
         spec = seeded_spec(501, 7)
         del spec['criteria']
