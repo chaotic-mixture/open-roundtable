@@ -53,6 +53,7 @@ def summarize_rounds(first, second):
     totals = {mode: dict(model_seconds=0.0, consultation_seconds=0.0, credits=0,
                          input_tokens=0, output_tokens=0, changed_shifts=0) for mode in ('direct', 'nested')}
     preferences = {mode: dict(met=0, evaluated=0, all_met_runs=0) for mode in totals}
+    ranked_candidates = dict(met=0, evaluated=0, all_met_runs=0, changed_shifts=0)
     pairs = same_schedule = 0
     changed_selections = {mode: [] for mode in totals}
     requested_model = None
@@ -63,6 +64,14 @@ def summarize_rounds(first, second):
             requested_model = left['requested_model']
         elif left['requested_model'] != requested_model:
             raise ValueError(f"requested model differs across rosters at seed {left['seed']}")
+        # Both consultation modes received the same menu. Count it once per round.
+        for paired_run in (left, right):
+            receipt = paired_run['direct']
+            best = receipt['best_criteria_met']
+            ranked_candidates['met'] += sum(best)
+            ranked_candidates['evaluated'] += len(best)
+            ranked_candidates['all_met_runs'] += all(best)
+            ranked_candidates['changed_shifts'] += receipt['min_changes_at_best_score']
         for mode, values in totals.items():
             if {left[mode].get('position'), right[mode].get('position')} != {1, 2}:
                 raise ValueError(f"expected opposite recorded positions at seed {left['seed']}")
@@ -79,7 +88,7 @@ def summarize_rounds(first, second):
         pairs += 2
         same_schedule += left['same_schedule'] + right['same_schedule']
     return dict(requested_model=requested_model, pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections,
-                preferences=preferences, totals=totals)
+                preferences=preferences, totals=totals, ranked_candidates=ranked_candidates)
 
 
 if __name__ == '__main__':

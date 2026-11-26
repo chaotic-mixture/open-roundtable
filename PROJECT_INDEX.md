@@ -42,6 +42,8 @@ python -m examples.paired_panel_benchmark reports/panel-reverse --model qwen3.5:
 python -m examples.paired_panel_benchmark reports/panel-forward --compare-round reports/panel-reverse
 ```
 
+In the summary, `ranked_candidates` scores the shared candidate menu once per roster per round. Across the 18 menus above, rule ranking would meet 36 of 36 preferences with 192 shift changes. Each observed consultation mode met 18 of 36 with 194 changes.
+
 ## 中文项目入口
 
 **v0.0.6 发布同机双节点会诊与断线恢复。** [验收摘要与复现步骤](docs/V0.0.6.md)

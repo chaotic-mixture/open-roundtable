@@ -20,13 +20,15 @@ class BenchmarkTests(unittest.TestCase):
         def result(position, selected):
             metrics = dict(model_seconds=1, consultation_seconds=2, credits=2,
                            input_tokens=10, output_tokens=3, selected=selected, changed_shifts=2+selected,
-                           criteria_met=[True, bool(selected)])
+                           criteria_met=[True, bool(selected)], best_criteria_met=[True, True],
+                           min_changes_at_best_score=3)
             return dict(seed=501, requested_model='fixture', request_sha256='same', same_schedule=True,
                         direct=dict(metrics, position=position), nested=dict(metrics, position=3-position))
 
         with patch('examples.paired_panel_benchmark.run', side_effect=[[result(1, 0)], [result(2, 1)]]):
             report = summarize_rounds('first', 'second')
         self.assertEqual(report['same_schedule_pairs'], 2)
+        self.assertEqual(report['ranked_candidates'], dict(met=4, evaluated=4, all_met_runs=2, changed_shifts=6))
         self.assertEqual(report['requested_model'], 'fixture')
         mixed_rounds = [
             [result(position, 0), dict(result(position, 0), seed=502, requested_model='other', request_sha256='second')]
