@@ -1,0 +1,12 @@
+{
+  "title": "Weekend shift coordination",
+  "preference": "First, have the early shift finish by 6 p.m. for school pickup. Among equally suitable plans, keep the late shift at its original start time.",
+  "shifts": [
+    {"id": "early", "worker": "Alex", "room": "East", "start": 8, "end": 14},
+    {"id": "late", "worker": "Alex", "room": "East", "start": 12, "end": 18}
+  ],
+  "criteria": [
+    {"shift": "early", "field": "end", "min": 0, "max": 18},
+    {"shift": "late", "field": "delta", "min": 0, "max": 0}
+  ]
+}

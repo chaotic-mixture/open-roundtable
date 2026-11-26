@@ -18,6 +18,18 @@ The demo prints a JSON report. Look for `RESOLVED` in the topic state and a rema
 
 To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine and reports which nodes the consumer can see before publication, after publication and after withdrawal. The expected sequence is an empty list, node B, then an empty list. [Registration example](examples/registration_demo.py)
 
+### Repair a schedule with your own preferences
+
+The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. In this example, `delta` of zero means keeping the original start time.
+
+With a local Ollama service running `qwen3.5:9b`, use a fresh database path for the consultation:
+
+```sh
+python -m open_roundtable consult examples/consult_input.en.json --db weekend.sqlite3 --model qwen3.5:9b
+```
+
+The rule expert generates feasible candidates and the model chooses among them. Inspect `criteria_met` to see which preferences the proposal satisfies. A disagreement can leave the consultation paused for revision. [Chinese scheduling request](examples/consult_input.json)
+
 ### Recover a consultation after a disconnect
 
 Start a local Ollama service with `qwen3.5:9b` installed. From the repository root, run the following command with a new output directory. The example uses OpenSSL to issue temporary certificates. If `openssl` is outside your PATH, supply its executable path after `--temporary-tls`.
