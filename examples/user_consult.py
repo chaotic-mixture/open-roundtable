@@ -36,8 +36,10 @@ def validate_roster(spec):
             if not isinstance(value,str) or not value.strip():
                 raise ValueError(f'{field} must be nonempty text')
         start,end=item.get('start'),item.get('end')
-        if item['id'] in seen or type(start)!=int or type(end)!=int or not 0<=start<end<=168:
-            raise ValueError('duplicate ID or invalid weekly interval')
+        if item['id'] in seen:
+            raise ValueError(f"duplicate shift ID: {item['id']}")
+        if type(start)!=int or type(end)!=int or not 0<=start<end<=168:
+            raise ValueError(f"{item['id']}: start and end must be integer hours with 0 <= start < end <= 168")
         if end-start>8:
             raise ValueError(f"{item['id']} cannot satisfy the 8-hour limit with its fixed duration")
         seen.add(item['id'])

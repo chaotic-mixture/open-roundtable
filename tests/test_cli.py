@@ -21,6 +21,20 @@ class CliTests(unittest.TestCase):
         return subprocess.run([sys.executable, '-m', 'open_roundtable', 'demo', '--db', str(self.path)],
                               cwd=ROOT, capture_output=True, text=True)
 
+    def test_invalid_roster_reports_shift_error_before_creating_ledger(self):
+        spec = json.loads((ROOT / 'examples/consult_input.en.json').read_text(encoding='utf8'))
+        source = self.path.with_suffix('.json')
+        for changes, message in [({'id': 'early'}, 'duplicate shift ID: early'),
+                                 ({'end': 169}, 'late: start and end must be integer hours')]:
+            with self.subTest(changes=changes):
+                shifts = [spec['shifts'][0], dict(spec['shifts'][1], **changes)]
+                source.write_text(json.dumps(dict(spec, shifts=shifts)), encoding='utf8')
+                result = subprocess.run([sys.executable, '-m', 'open_roundtable', 'consult', str(source),
+                                         '--db', str(self.path)], cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(message, result.stderr)
+                self.assertFalse(self.path.exists())
+
     def test_delegate_from_new_database(self):
         def cli(command, *args):
             output = subprocess.check_output([sys.executable, '-m', 'open_roundtable', command,
