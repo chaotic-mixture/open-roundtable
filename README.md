@@ -18,7 +18,23 @@ The demo prints a JSON report. Look for `RESOLVED` in the topic state and a rema
 
 To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine and reports which nodes the consumer can see before publication, after publication and after withdrawal. The expected sequence is an empty list, node B, then an empty list. [Registration example](examples/registration_demo.py)
 
-For a consultation with a real model, the two-node recovery walkthrough uses Ollama and `qwen3.5:9b`. It covers sending a shared scheduling request, recovering a lost receipt and reconciling credits on one machine. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Runnable example in English](examples/two_node_demo.py)
+### Recover a consultation after a disconnect
+
+Start a local Ollama service with `qwen3.5:9b` installed. From the repository root, run the following command with a new output directory. The example uses OpenSSL to issue temporary certificates. If `openssl` is outside your PATH, supply its executable path after `--temporary-tls`.
+
+```sh
+python -m examples.two_node_demo run reports/recovery-first --temporary-tls openssl --bind-offer --fault after-commit
+```
+
+Nodes A and B discover each other through a directory on the same machine. A sends a synthetic scheduling request. B runs the rule expert and model, records the charge, then stops before A receives its receipt. The demo withdraws B’s service offer, restarts B, and retries the original request.
+
+To check the result later, run the verifier against the same directory. It reads the saved evidence and works with Ollama stopped.
+
+```sh
+python -m examples.two_node_demo verify reports/recovery-first
+```
+
+A successful recovery reports two deliveries, one expert call, one model call and 2 credits in total. Both nodes record the same charge. For this fault window, `receiver_credits_at_disconnect` is already 2. Check `private_stores_checked` for A, B and the directory, and `private_markers_found` for the number of synthetic private markers found in the inspected records. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Demo and verifier](examples/two_node_demo.py)
 
 ## 中文指南
 
