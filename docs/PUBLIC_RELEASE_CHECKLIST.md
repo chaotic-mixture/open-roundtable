@@ -1,4 +1,33 @@
-# 公开发布边界
+# Public release checklist
+
+[中文清单与历史验收记录](#公开发布边界)
+
+Version 0.0.6 ships as a Git source snapshot. The build backend disables wheel and source distribution builds.
+
+## Review the candidate files
+
+Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
+
+| Release | Additional candidate evidence |
+| --- | --- |
+| 0.0.3 | `examples/paired_benchmark.md` and `examples/paired_501_metrics.csv` |
+| 0.0.4 | `examples/repair_results.md`, `examples/repair_501_metrics.csv` and `examples/select_501_metrics.csv` |
+| 0.0.5 | `examples/preference_results.md` and `examples/preference_501_metrics.csv` |
+| 0.0.6 | `docs/V0.0.6.md` and the synthetic input `examples/consult_input.json` |
+
+Keep private references, local reports, runtime directories, databases, `.hermes.md`, environment files, keys, model files, user inputs, original sharing links, conversation IDs, machine-specific paths and files from other projects out of the snapshot. The published source must run independently of private research materials.
+
+## Verify and publish
+
+1. List the exact files approved for this release. Compare that list with the proposed Git tree before archiving it.
+2. Review licenses and the origin of third-party material. Preserve the original licensing terms.
+3. Inspect the candidate files for private paths, account details, credentials, session identifiers and identifying details from other projects.
+4. Run the tests and synthetic demo from an isolated copy of the approved source. The snapshot verifier checks archive membership against the commit and runs the checks in the extracted tree. See the [contributor commands](../CONTRIBUTING.md#check-a-commit-for-publication).
+5. Verify the packaging boundary independently of Git ignore rules. For this source-only release, check that wheel and sdist builds are disabled.
+6. Retain the source archive SHA-256 and the verification report. Record a pass only for checks that succeeded.
+7. Confirm the owner's authorization before creating a remote repository or uploading a release. Keep publication separate from the private research workspace. The project initiator authorized the first public release.
+
+## 公开发布边界
 
 v0.0.6 以 Git 源码快照发行。wheel 和 sdist 构建由后端禁用。
 

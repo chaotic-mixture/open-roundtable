@@ -22,7 +22,7 @@ Read `reports/core_verification.md` for failures and skipped tests. The peer int
 
 ## Check a commit for publication
 
-Review the proposed file list, licenses and data provenance against the [public release checklist (Chinese)](docs/PUBLIC_RELEASE_CHECKLIST.md). Keep local evidence under `reports/`. Once the intended changes are committed, verify the exact revision in a fresh directory.
+Review the proposed file list, licenses and data provenance against the [public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md). Keep local evidence under `reports/`. Once the intended changes are committed, verify the exact revision in a fresh directory.
 
 ```sh
 python tests/verify_snapshot.py reports/snapshot-review --revision HEAD --openssl openssl
