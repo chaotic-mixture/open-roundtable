@@ -13,12 +13,31 @@ from unittest.mock import patch
 
 from examples.peer_node import confirms_public_record, deliver, discover, digest, ledger, resume, send, set_permission, validate_receipt
 from examples.two_node_demo import SOURCE, audit, cli, run, start
+from examples.rule_discovery import reconcile_dispatch
 from examples.user_consult import NoFeasibleCandidate
 from examples.peer_node import import_registration, partner_statement, reconcile, reconcile_online, service_account
 from open_roundtable.data import connect, ingest, initialize, share_public
 
 
 class PeerRecoveryTests(unittest.TestCase):
+    def test_dispatch_reconciliation_rejects_swapped_receipts_from_same_provider(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            receipts = []
+            for source in ('first', 'second'):
+                body = dict(sender='A', recipient='B', source=source, offer=['audit', 'reference'],
+                            spec=dict(operation='schedule-audit-v1', rules=['P'], shifts=['Aaa:1-2']))
+                job_id = digest(body)
+                receipt = json.dumps(dict(id=job_id, sender='B', recipient='A', credits=0,
+                                          outcome=dict(state='AUDITED', findings={'P': []})))
+                receipts.append(receipt)
+                db.execute('INSERT INTO jobs(id,request,result) VALUES (?,?,?)',
+                           (job_id, json.dumps(dict(body, id=job_id)), receipt))
+                self.assertEqual(reconcile_dispatch(db, source, ['B']), 0)
+            for source, swapped in zip(('first', 'second'), reversed(receipts)):
+                db.execute("UPDATE jobs SET result=? WHERE json_extract(request,'$.source')=?", (swapped, source))
+                with self.assertRaisesRegex(ValueError, 'receipt identity mismatch'):
+                    reconcile_dispatch(db, source, ['B'])
+
     def test_rejected_import_preserves_reviewed_registration(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/'A'
