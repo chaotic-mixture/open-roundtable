@@ -20,6 +20,8 @@ These three studies use nine synthetic rosters, with three rosters each at 7, 11
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
 
+The 18 matching pairs count proposed repairs. In each mode all 18 consultations paused after the expert and model disagreed, and zero reached resolution. The summary reports these ballot outcomes under `topic_states`.
+
 Each approach used 36 credits, 59,058 input tokens and 126 output tokens. Total consultation time was 14.25 seconds for direct execution and 12.61 seconds for delegation. Recorded model time was almost identical (7.65 and 7.62 seconds). These runs show no scheduling benefit from delegation on this workload. The timing difference across two runs is insufficient to establish a speed advantage.
 
 Every roster already had a verified candidate satisfying both preferences. Only seed 503 received such a plan. The table compares the selected plan against the fewest shifts that had to move among the available plans meeting both preferences. The first preference preserves shift A's start. The second puts shift B's start before noon.
