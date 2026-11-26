@@ -24,6 +24,17 @@ To try node discovery, run `python -m examples.registration_demo`. It starts tem
 
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
 
+The model receives your request, including the original preference text, alongside the verified candidate schedules. The expert scores the conditions you explicitly put in `criteria`. For each condition, name a shift ID, choose a field below and give inclusive integer bounds `min` and `max`.
+
+| Field | What the expert checks | Example |
+| --- | --- | --- |
+| `start` or `end` | Absolute hour from the start of the week | An `end` from 0 to 18 meets the example's Saturday deadline. |
+| `hour` | Start hour within a day (0–23) | A range of 0 to 11 accepts starts before noon on any day. |
+| `day` | Day of the shift's start, counting from 0 | In the Saturday-based example, a shift starting Sunday has day 1. |
+| `delta` | Candidate start minus original start, in hours | A range of -2 to 0 allows a shift to start up to two hours earlier. |
+
+List your most important condition first. When ranking verified candidates, the expert compares the conditions in order. At the first difference it prefers the plan meeting that condition. If all flags match, it prefers fewer shifted start times.
+
 With a local Ollama service running `qwen3.5:9b`, use a fresh database path for the consultation:
 
 ```sh
