@@ -30,6 +30,14 @@ python -m open_roundtable consult examples/consult_input.en.json --db weekend.sq
 
 The rule expert generates feasible candidates and the model chooses among them. Inspect `criteria_met` to see which preferences the proposal satisfies. A disagreement can leave the consultation paused for revision. [Chinese scheduling request](examples/consult_input.json)
 
+If the consultation is `PAUSED` and the expert voted against the first proposal, revise it in a fresh ledger:
+
+```sh
+python -m examples.revise_panel_proposal weekend.sqlite3 weekend-revised.sqlite3
+```
+
+The revision reuses the verified candidates and ranks them by the declared priorities. In one run of the English example, `previous.criteria_met` was `[false, true]`: the model kept the late shift’s start but missed the early shift’s deadline. Version 2 scored `[true, false]`, meeting the higher priority. Each proposal moved one shift relative to the original roster, but switching between proposals changed both shifts’ start times. The expert approved version 2; the ledger stayed `PAUSED` pending a new vote. This step runs offline and preserves the original ledger.
+
 ### Recover a consultation after a disconnect
 
 Start a local Ollama service with `qwen3.5:9b` installed. From the repository root, run the following command with a new output directory. The example uses OpenSSL to issue temporary certificates. If `openssl` is outside your PATH, supply its executable path after `--temporary-tls`.
