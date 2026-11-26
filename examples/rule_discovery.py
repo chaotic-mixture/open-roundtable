@@ -1,4 +1,4 @@
-"""Compare public audit discovery on nine rosters, without dispatching consultations."""
+"""Compare provider discovery on nine public rosters, optionally dispatching each match."""
 import argparse
 from contextlib import ExitStack, closing
 import json
@@ -84,11 +84,13 @@ def run(dispatch=False):
                         raise ValueError('receipt count differs from requester ledger')
                 yield dict(table=table, shifts=len(shifts), required=rules, mode=mode,
                            missed=len(expected-selected), extra=len(selected-expected),
+                           expected_providers=sorted(expected), missed_providers=sorted(expected-selected),
+                           extra_providers=sorted(selected-expected),
                            candidates=sorted(selected), directory_requests=after-before, credits=credits, **metrics)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dispatch', action='store_true', help='send each candidate a public synthetic audit')
     for row in run(parser.parse_args().dispatch):
         print(json.dumps(row))
