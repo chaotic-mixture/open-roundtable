@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from examples.overnight_score import expected as expected_findings
-from examples.peer_node import find_capability, ledger, offer, send, set_permission
+from examples.peer_node import find_capability, ledger, offer, send, set_permission, validate_receipt
 from examples.two_node_demo import start
 from open_roundtable.data import initialize, ingest, share_public
 
@@ -40,14 +40,23 @@ def dispatch_candidates(root, db, topic, shifts, rules, matches):
 
 
 def reconcile_dispatch(db, topic, verified_providers):
-    bookings = db.execute("""SELECT json_extract(request,'$.recipient'),json_extract(result,'$.sender'),
-                             credits,json_extract(result,'$.credits') FROM jobs
-                             WHERE json_extract(request,'$.source')=?""", (topic,)).fetchall()
-    if sorted(row[0] for row in bookings) != sorted(verified_providers):
+    bookings = db.execute("""SELECT id,request,result,credits FROM jobs
+                             WHERE json_extract(request,'$.source')=?""", (topic,))
+    providers = []
+    credits = 0
+    for job_id, raw_request, raw_result, booked in bookings:
+        request = json.loads(raw_request)
+        if job_id != request['id'] or raw_result is None:
+            raise ValueError('missing or mismatched dispatch receipt')
+        receipt = json.loads(raw_result)
+        validate_receipt(request, receipt)
+        if booked != receipt['credits']:
+            raise ValueError('receipt credits differ from requester ledger')
+        providers.append(request['recipient'])
+        credits += booked
+    if sorted(providers) != sorted(verified_providers):
         raise ValueError('booked providers differ from verified dispatches')
-    if any(provider != sender or booked != reported for provider, sender, booked, reported in bookings):
-        raise ValueError('receipt sender or credits differ from requester ledger')
-    return sum(row[2] for row in bookings)
+    return credits
 
 
 def run(dispatch=False):
