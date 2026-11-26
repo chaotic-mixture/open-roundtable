@@ -36,6 +36,29 @@ python -m examples.two_node_demo verify reports/recovery-first
 
 A successful recovery reports two deliveries, one expert call, one model call and 2 credits in total. Both nodes record the same charge. For this fault window, `receiver_credits_at_disconnect` is already 2. Check `private_stores_checked` for A, B and the directory, and `private_markers_found` for the number of synthetic private markers found in the inspected records. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Demo and verifier](examples/two_node_demo.py)
 
+### Keep a private preference and publish a service notice
+
+From the repository root, create two UTF-8 JSON files. In `preference.json`, save `[{"source":"profile","body":"I prefer morning meetings."}]`. In `notice.json`, save `[{"source":"https://example.org/hours","body":"Office hours start at 9."}]`. The HTTPS address identifies the notice. Importing the file reads its contents from disk.
+
+```sh
+python -m open_roundtable.data runtime/store-demo init
+python -m open_roundtable.data runtime/store-demo import private preference.json
+python -m open_roundtable.data runtime/store-demo maintain-private profile
+python -m open_roundtable.data runtime/store-demo summary-origin profile
+python -m open_roundtable.data runtime/store-demo import public notice.json
+python -m open_roundtable.data runtime/store-demo public-feed
+```
+
+Use a fresh directory for `init`. The summary should report `ready: true`, mode `sealed`, and model `null`. Sealed maintenance normalizes whitespace locally. The public feed should still be `[]` at this point.
+
+```sh
+python -m open_roundtable.data runtime/store-demo review-public https://example.org/hours
+python -m open_roundtable.data runtime/store-demo share-public https://example.org/hours --if-sha256 HASH
+python -m open_roundtable.data runtime/store-demo public-feed
+```
+
+Replace `HASH` with the SHA-256 from the review output after checking the notice text. The feed should now contain only the office-hours notice. To withdraw it, run `python -m open_roundtable.data runtime/store-demo share-public https://example.org/hours --off`. [Store and permission guide in Chinese](#公开资料和个人资料)
+
 ## 中文指南
 
 开放圆桌探索一个由模型、专家系统、人类和其他圆桌共同参与的协作环境：遇到难题时临时组织会诊，在有限资源下讨论与实践反馈，并逐步支持跨节点供给、历史重访和圆桌递归组合。
