@@ -12,6 +12,20 @@ These three studies use nine synthetic rosters, with three rosters each at 7, 11
 | Can a model choose a better repair from verified plans? | On seeds 505–507, model selection satisfied seven additional preferences over the default in total, with one additional shift change. Ranking the same candidates by the three encoded preferences matched the model on all nine rosters. | [Repair and selection report](examples/repair_results.md) |
 | What changes when preferences have priorities and exceptions? | All three strategies passed the hard constraints on all nine rosters. Rule ranking scored 42/63 preference points at 9 credits, model selection scored 34/63 at 18 credits, and the tool default scored 31/63 at 9 credits. The comparison excludes the effort to encode the rules. | [Priority and exception report](examples/preference_results.md) |
 
+### Does delegating the repair change the decision?
+
+In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
+
+Each approach used 36 credits, 59,058 input tokens and 126 output tokens. Total consultation time was 14.25 seconds for direct execution and 12.61 seconds for delegation. Recorded model time was almost identical (7.65 and 7.62 seconds). These runs show no scheduling benefit from delegation on this workload. The timing difference across two runs is insufficient to establish a speed advantage.
+
+To reproduce with local Ollama, use two fresh directories. The first two commands each make 18 model calls. The final command reads the saved ledgers offline and checks the paired requests and execution order.
+
+```sh
+python -m examples.paired_panel_benchmark reports/panel-forward --model qwen3.5:9b
+python -m examples.paired_panel_benchmark reports/panel-reverse --model qwen3.5:9b --reverse-order
+python -m examples.paired_panel_benchmark reports/panel-forward --compare-round reports/panel-reverse
+```
+
 ## 中文项目入口
 
 **v0.0.6 发布同机双节点会诊与断线恢复。** [验收摘要与复现步骤](docs/V0.0.6.md)
