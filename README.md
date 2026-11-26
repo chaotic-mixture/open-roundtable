@@ -40,6 +40,17 @@ python -m examples.revise_panel_proposal weekend.sqlite3 weekend-revised.sqlite3
 
 The revision reuses the verified candidates and ranks them by the declared priorities. In one run of the English example, `previous.criteria_met` was `[false, true]`: the model kept the late shift’s start but missed the early shift’s deadline. Version 2 scored `[true, false]`, meeting the higher priority. Each proposal moved one shift relative to the original roster, but switching between proposals changed both shifts’ start times. The expert approved version 2; the ledger stayed `PAUSED` pending a new vote. This step runs offline and preserves the original ledger.
 
+### Compare direct and delegated scheduling decisions
+
+Use the original `weekend.sqlite3` from the consultation above. Run the same request with the same model in a fresh ledger, this time delegating the decision to a child roundtable. Then compare the two saved decisions offline:
+
+```sh
+python -m open_roundtable consult examples/consult_input.en.json --db weekend-panel.sqlite3 --model qwen3.5:9b --nested
+python -m examples.compare_panel_receipts weekend.sqlite3 weekend-panel.sqlite3
+```
+
+Each ledger must contain one returned model call. Compare `criteria_met` in priority order, then `changed_shifts` to see how much of the roster moved. The report also gives input and output tokens and model-call time for each run. In the delegated run, `credits` measures work already performed by the expert and model. A null `settled_credits` means the parent has yet to settle that work.
+
 ### Recover a consultation after a disconnect
 
 Start a local Ollama service with `qwen3.5:9b` installed. From the repository root, run the following command with a new output directory. The example uses OpenSSL to issue temporary certificates. If `openssl` is outside your PATH, supply its executable path after `--temporary-tls`.
