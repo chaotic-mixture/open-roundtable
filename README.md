@@ -4,6 +4,8 @@
 
 [English quick start](#english-quick-start) · [中文指南](#中文指南)
 
+For measured results on when a second participant helps, see the [scheduling experiment index](PROJECT_INDEX.md#scheduling-experiment-results).
+
 ## English quick start
 
 Open Roundtable lets models and rule-based experts work on the same proposal. A SQLite ledger records each participant’s messages, votes and credit use so you can inspect how a decision was reached.

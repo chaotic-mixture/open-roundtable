@@ -1,4 +1,18 @@
-# Open Roundtable — 项目入口
+# Open Roundtable — Project index / 项目入口
+
+[English quick start](README.md#english-quick-start) · [中文任务索引](#按任务定位)
+
+## Scheduling experiment results
+
+These three studies use nine synthetic rosters, with three rosters each at 7, 11 and 22 shifts. Each report includes per-roster metrics and commands for reproduction. The observed gains depend on the rules, candidate plans and local model used in these runs.
+
+| Question | Result on these rosters | Evidence |
+| --- | --- | --- |
+| Does a second participant improve conflict detection? | The rule tool alone had zero misses and false positives. Expert input improved the model’s answer on all nine rosters, while model review introduced errors on three rosters relative to the tool alone. | [Conflict detection report](examples/paired_benchmark.md) |
+| Can a model choose a better repair from verified plans? | On seeds 505–507, model selection satisfied seven additional preferences over the default in total, with one additional shift change. Ranking the same candidates by the three encoded preferences matched the model on all nine rosters. | [Repair and selection report](examples/repair_results.md) |
+| What changes when preferences have priorities and exceptions? | All three strategies passed the hard constraints on all nine rosters. Rule ranking scored 42/63 preference points at 9 credits, model selection scored 34/63 at 18 credits, and the tool default scored 31/63 at 9 credits. The comparison excludes the effort to encode the rules. | [Priority and exception report](examples/preference_results.md) |
+
+## 中文项目入口
 
 **v0.0.6 发布同机双节点会诊与断线恢复。** [验收摘要与复现步骤](docs/V0.0.6.md)
 
