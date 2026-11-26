@@ -21,12 +21,20 @@ class BenchmarkTests(unittest.TestCase):
             metrics = dict(model_seconds=1, consultation_seconds=2, credits=2,
                            input_tokens=10, output_tokens=3, selected=selected, changed_shifts=2+selected,
                            criteria_met=[True, bool(selected)])
-            return dict(seed=501, request_sha256='same', same_schedule=True,
+            return dict(seed=501, requested_model='fixture', request_sha256='same', same_schedule=True,
                         direct=dict(metrics, position=position), nested=dict(metrics, position=3-position))
 
         with patch('examples.paired_panel_benchmark.run', side_effect=[[result(1, 0)], [result(2, 1)]]):
             report = summarize_rounds('first', 'second')
         self.assertEqual(report['same_schedule_pairs'], 2)
+        self.assertEqual(report['requested_model'], 'fixture')
+        mixed_rounds = [
+            [result(position, 0), dict(result(position, 0), seed=502, requested_model='other', request_sha256='second')]
+            for position in (1, 2)
+        ]
+        with patch('examples.paired_panel_benchmark.run', side_effect=mixed_rounds):
+            with self.assertRaisesRegex(ValueError, 'requested model differs across rosters at seed 502'):
+                summarize_rounds('first', 'second')
         for mode in ('direct', 'nested'):
             self.assertEqual(report['changed_selections'][mode], [dict(seed=501, first=0, second=1)])
             self.assertEqual(report['preferences'][mode], dict(met=3, evaluated=4, all_met_runs=1))

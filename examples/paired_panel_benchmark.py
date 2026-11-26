@@ -55,9 +55,14 @@ def summarize_rounds(first, second):
     preferences = {mode: dict(met=0, evaluated=0, all_met_runs=0) for mode in totals}
     pairs = same_schedule = 0
     changed_selections = {mode: [] for mode in totals}
+    requested_model = None
     for left, right in zip(run(first, None, verify_only=True), run(second, None, verify_only=True), strict=True):
         if left['request_sha256'] != right['request_sha256']:
             raise ValueError(f"model request differs across rounds at seed {left['seed']}")
+        if requested_model is None:
+            requested_model = left['requested_model']
+        elif left['requested_model'] != requested_model:
+            raise ValueError(f"requested model differs across rosters at seed {left['seed']}")
         for mode, values in totals.items():
             if {left[mode].get('position'), right[mode].get('position')} != {1, 2}:
                 raise ValueError(f"expected opposite recorded positions at seed {left['seed']}")
@@ -73,7 +78,7 @@ def summarize_rounds(first, second):
                 preferences[mode]['all_met_runs'] += all(flags)
         pairs += 2
         same_schedule += left['same_schedule'] + right['same_schedule']
-    return dict(pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections,
+    return dict(requested_model=requested_model, pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections,
                 preferences=preferences, totals=totals)
 
 
