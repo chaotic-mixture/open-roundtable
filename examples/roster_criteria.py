@@ -2,6 +2,8 @@
 
 
 def compile_criteria(spec, ids):
+    if not isinstance(spec, list):
+        raise ValueError('criteria must be an array')
     rules = []
     for clause in spec:
         if not isinstance(clause,dict) or clause.get('shift') not in ids:

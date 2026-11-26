@@ -28,6 +28,15 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_optional_criteria_require_an_array_when_present(self):
+        spec = seeded_spec(501, 7)
+        del spec['criteria']
+        self.assertEqual(validate_roster(spec)[1], [])
+        self.assertEqual(validate_roster(dict(spec, criteria=[]))[1], [])
+        for invalid in ({}, '', None, False, 0):
+            with self.subTest(criteria=invalid), self.assertRaisesRegex(ValueError, 'criteria must be an array'):
+                validate_roster(dict(spec, criteria=invalid))
+
     def test_bilingual_examples_encode_the_same_shifts_and_ordered_preferences(self):
         examples = Path(__file__).resolve().parents[1] / 'examples'
         def load(name):
