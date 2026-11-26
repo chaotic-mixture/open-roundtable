@@ -15,6 +15,8 @@ Review each path for the proposed revision. Candidates include the license, noti
 | 0.0.5 | `examples/preference_results.md` and `examples/preference_501_metrics.csv` |
 | 0.0.6 | `docs/V0.0.6.md` and the synthetic input `examples/consult_input.json` |
 
+On the main branch, the English companion fixture `examples/consult_input.en.json` is also a candidate for review. Both fixtures encode the same shifts and ordered preference ranges.
+
 Keep private references, local reports, runtime directories, databases, `.hermes.md`, environment files, keys, model files, user inputs, original sharing links, conversation IDs, machine-specific paths and files from other projects out of the snapshot. The published source must run independently of private research materials.
 
 ## Verify and publish

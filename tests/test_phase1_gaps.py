@@ -11,7 +11,7 @@ from urllib.error import URLError
 from examples import preference_benchmark as batch
 from examples.compare_panel_receipts import compare
 from examples.paired_panel_benchmark import seeded_spec
-from examples.user_consult import consult
+from examples.user_consult import consult, validate_roster
 from examples.refine_schedule import feasibility
 from examples.revise_panel_proposal import revise
 from examples.verify_preferences import verify
@@ -28,6 +28,17 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_bilingual_examples_encode_the_same_shifts_and_ordered_preferences(self):
+        examples = Path(__file__).resolve().parents[1] / 'examples'
+        def load(name):
+            return validate_roster(json.loads((examples / name).read_text(encoding='utf-8')))
+
+        english = load('consult_input.en.json')
+        self.assertEqual(english, load('consult_input.json'))
+        rows, rules = english
+        self.assertEqual([(start, duration) for _, start, duration in rows], [(8, 6), (12, 6)])
+        self.assertEqual(rules, [(0, 'end', 0, 18), (1, 'delta', 0, 0)])
+
     def test_revision_minimizes_changes_from_first_proposal_on_tie(self):
         def choose_third_index(path, payload=None):
             reply = provider(path, payload)
