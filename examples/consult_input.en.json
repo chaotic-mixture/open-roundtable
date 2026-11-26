@@ -1,6 +1,6 @@
 {
   "title": "Weekend shift coordination",
-  "preference": "First, have the early shift finish by 6 p.m. for school pickup. Among equally suitable plans, keep the late shift at its original start time.",
+  "preference": "Give Alex time to pick up their child by scheduling the early shift to end by 6 p.m. on Saturday. Among equally suitable plans, keep the late shift at its original start time.",
   "shifts": [
     {"id": "early", "worker": "Alex", "room": "East", "start": 8, "end": 14},
     {"id": "late", "worker": "Alex", "room": "East", "start": 12, "end": 18}

@@ -22,7 +22,7 @@ To try node discovery, run `python -m examples.registration_demo`. It starts tem
 
 ### Repair a schedule with your own preferences
 
-The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. In this example, `delta` of zero means keeping the original start time.
+The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
 
 With a local Ollama service running `qwen3.5:9b`, use a fresh database path for the consultation:
 
