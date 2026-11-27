@@ -1,14 +1,29 @@
 """Smoke comparison on fixed public offers, including a need with no provider."""
+import argparse
+
 from examples.peer_node import match_offers
 
 
-def run(model):
+def run(model, held_out=False):
     offers = [dict(tag='repair',description='Change shift times to resolve conflicts.'),
               dict(tag='reschedule',description='Reassign weekly shift times to produce a conflict-free roster.'),
               dict(tag='audit',description='Report shift overlaps without changing the roster.')]
     cases = [('repair','Fix overlapping shifts and return an adjusted roster.',{0,1}),
              ('audit','Identify overlapping shifts; keep every shift unchanged.',{2}),
              ('payroll','Calculate monthly payroll taxes.',set())]
+    if held_out:
+        offers = [
+            dict(tag='audit', description='List gaps below the minimum rest between shifts. Leave all shifts intact.'),
+            dict(tag='audit', description='Inspect room double bookings and return a report. No edits.'),
+            dict(tag='repair', description='Move shifts to fix room double bookings.'),
+            dict(tag='reschedule', description='Reassign rooms to fix room double bookings. Keep all start times.'),
+        ]
+        cases = [
+            ('audit', 'Flag insufficient recovery time between duties. Preserve the timetable.', {0}),
+            ('audit', 'List rooms assigned to simultaneous shifts. Leave bookings alone.', {1}),
+            ('repair', 'Resolve room clashes while keeping every start time fixed.', {3}),
+            ('audit', 'Check both room clashes and overnight rest in a single report.', set()),
+        ]
     for tag,need,expected in cases:
         result = match_offers(need,offers,model)
         selected = {offers.index(o) for o in result['matches']}
@@ -28,4 +43,6 @@ def run(model):
 
 
 if __name__ == '__main__':
-    run('qwen3.5:9b')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--held-out', action='store_true', help='compare offers with overlapping tags and different constraints')
+    run('qwen3.5:9b', parser.parse_args().held_out)

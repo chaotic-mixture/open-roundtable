@@ -21,6 +21,19 @@ The unrestricted model found the synonymous repair service missed by exact match
 
 The table records the original prompt at commit `cec7400`. A follow-up prompt made the read-only constraint explicit. It found the auditor but missed one repair provider. The current prompt also asks the model to evaluate every offer independently, including equivalent services with different tags. On one rerun with the same three requests it returned both repair providers, only the auditor for the read-only request, and no payroll provider. Unrestricted selection used 3 calls and 534 input / 23 output tokens. Restricting tags first used 2 calls and 280 input / 17 output tokens. The tag rules alone still returned the same correct sets. These requests were used to tune the prompt, so this result measures fit to the examples.
 
+### When two providers share a tag
+
+Run `python -m examples.capability_comparison --held-out` for four additional English requests scored against labels set before inference. The prompt from commit `e767f97` was held fixed. Two auditors cover different rules, and two repair providers resolve room clashes by different means. Each selected provider must meet the entire request independently.
+
+| Method | Missed offers | Incorrect offers | Calls | Input / output tokens |
+| --- | ---: | ---: | ---: | ---: |
+| Exact tag | 1 | 5 | 0 | 0 / 0 |
+| Allowed tags | 0 | 5 | 0 | 0 / 0 |
+| Model over all offers | 0 | 1 | 4 | 876 / 28 |
+| Model over allowed tags | 0 | 2 | 4 | 645 / 31 |
+
+In one local run with `qwen3.5:9b`, both model methods selected exactly the right provider for the rest audit, room audit and fixed-start repair. When asked for one report covering both audit rules, no individual offer qualified. The unrestricted model recommended one partial match and the filtered model recommended both. Reading descriptions helped disambiguate shared tags in these cases. A compound request still needs a check that each selected offer covers every required rule. This run measured recommendations only.
+
 ## 中文调查记录
 
 调查日期：2026-11-10。范围：Agent通信、临时多方协作、能力封装。仅原始仓库/规范只读核验，不以共享会话里的搜索结论作为事实。未安装候选、未跑候选测试、未接外部服务。
