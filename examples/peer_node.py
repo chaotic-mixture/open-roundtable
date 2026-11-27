@@ -80,6 +80,13 @@ def tls_context(root, *, server=False):
     return context
 
 
+def listen_address(config, context):
+    address = IPv4Address(config.get('listen_address', '127.0.0.1'))
+    if address.is_unspecified or address.is_multicast or (not context and str(address) != '127.0.0.1'):
+        raise ValueError('an explicit interface and mutual TLS are required for remote service')
+    return str(address)
+
+
 def certificate_matches(certificate, peer):
     names = [value for kind,value in certificate.get('subjectAltName', ())
              if kind == 'URI' and value.startswith('urn:roundtable:peer:')]
@@ -928,10 +935,7 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                 self.reply(409,{'error':'request could not be completed'})
 
     config = json.loads((root/'node.json').read_text())
-    address = IPv4Address(config.get('listen_address', '127.0.0.1'))
-    if address.is_unspecified or address.is_multicast or (not context and str(address) != '127.0.0.1'):
-        raise ValueError('an explicit interface and mutual TLS are required for remote service')
-    with ThreadingHTTPServer((str(address),port),Handler) as server:
+    with ThreadingHTTPServer((listen_address(config, context),port),Handler) as server:
         if context:
             server.socket = context.wrap_socket(server.socket, server_side=True)
         (root/'ready').write_text(str(server.server_port))
@@ -942,6 +946,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     commands=parser.add_subparsers(dest='action',required=True)
+    commands.add_parser('check-listener', help='check local listener settings and load server credentials offline')
     server=commands.add_parser('serve')
     server.add_argument('port',type=int)
     server.add_argument('--interrupt-after-commit',action='store_true')
@@ -1009,7 +1014,15 @@ if __name__=='__main__':
     submit.add_argument('source')
     submit.add_argument('--offer',nargs=2,metavar=('SOURCE','SHA256'))
     args=parser.parse_args()
-    if args.action == 'dispatch-status':
+    if args.action == 'check-listener':
+        try:
+            config = json.loads((args.directory/'node.json').read_text())
+            context = tls_context(args.directory, server=True)
+            print(json.dumps(dict(listen_address=listen_address(config, context),
+                                  transport=config.get('transport', 'http'))))
+        except (ValueError, OSError) as error:
+            parser.error(str(error))
+    elif args.action == 'dispatch-status':
         if not re.fullmatch(r'[0-9a-f]{64}', args.job):
             parser.error('expected a 64-character lowercase hexadecimal job ID')
         path = args.directory / (args.job + '.sqlite3')

@@ -234,6 +234,8 @@ The recovery demo runs on loopback. For a trial across machines, set `transport`
 
 The `credentials` directory holds `ca.pem`, `node.pem` and `node.key`. The node certificate must cover the hostname or IP used by clients and identify the configured node name with a URI such as `urn:roundtable:peer:B`. The demo issues certificates for localhost and the loopback address. A cross-host acceptance run still needs to demonstrate connectivity, identity checks and lost-receipt recovery on separate machines.
 
+Before starting each service, run `python -m examples.peer_node runtime/provider check-listener` with that node's directory. This offline check loads the configured server credentials for mutual TLS and applies the listener's address policy. Its JSON output shows the address and transport. Binding the interface, verifying peer identities and testing connectivity require the live trial.
+
 For a directory whose configured node name is `directory`, start its service on the directory host. The following examples assume initialized stores and configured certificates on both machines:
 
 ```sh
