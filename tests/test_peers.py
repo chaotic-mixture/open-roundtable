@@ -272,6 +272,13 @@ class PeerRecoveryTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
                 model.assert_not_called()
             provider = partner_statement(root, db, 'A')
+            set_permission(db, 'A', False)
+            with patch('examples.peer_node.transfer') as fetch, patch('examples.user_consult.api') as model:
+                with self.assertRaisesRegex(ValueError, 'no consultation grant'):
+                    deliver(root, db, request)
+                fetch.assert_not_called()
+                model.assert_not_called()
+            self.assertEqual(partner_statement(root, db, 'A'), provider)
             sender = root/'A'
             sender.mkdir()
             (sender/'node.json').write_text('{"name":"A"}')

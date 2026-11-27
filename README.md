@@ -24,6 +24,8 @@ Discovery refreshes the current directory snapshot. If B is withdrawn and republ
 
 Run `python -m examples.peer_node runtime/consumer permission-status B` on A to inspect its local decision. A discovered node can have no grant. With a grant still in place, `remaining: 0` and `can_submit: false` mean the peer has exhausted its quota for new requests. Retrying an identical, already completed request can still retrieve its saved receipt. For an active grant, a null remaining count means unlimited uses.
 
+Explicitly revoking the grant also closes the receipt-retry path for that peer. The receiving node keeps its existing ledger entry for reconciliation.
+
 ### Repair a schedule with your own preferences
 
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
