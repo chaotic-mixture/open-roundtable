@@ -185,6 +185,8 @@ def maintain(root, source, *, only_pending=False):
                 'Summarize this record concisely for its owner in the original language. '
                 'Preserve qualifications that affect meaning, including fictional or hypothetical status, '
                 'negation, exceptions, uncertainty, and whose preference is described. '
+                'When someone relays another person\'s preference, identify both people and their roles. '
+                'Copy the original clause describing what the messenger disclosed, including its verb. '
                 'When a record describes both a current arrangement and a possible future change, '
                 'state what applies now in its own sentence. Keep the condition and uncertainty with the future change. '
                 'Retain any explicit decision status, including pending approval. Use the names or pronouns '
