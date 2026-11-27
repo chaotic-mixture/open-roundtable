@@ -8,7 +8,7 @@ from contextlib import closing
 from examples.generate_overnight import generate
 from examples.overnight_score import expected
 from examples.preference_rubric import assess
-from examples.preference_benchmark import BRIEFS_BY_LANGUAGE
+from examples.preference_benchmark import BRIEFS_BY_LANGUAGE, facts
 from examples.repair_benchmark import schedule
 from examples.select_repair import choice
 
@@ -54,6 +54,19 @@ def verify(folder):
             if any(len(p)!=len(old) or any(type(h)!=int or not 0<=h<=168-d for h,d in zip(p,durations))
                    or any(expected(schedule(shifts,p)).values()) for p in plans):
                 raise ValueError('invalid candidate menu')
+            if arm == 'model':
+                request = data['request']
+                marker = 'Candidates: ' if design.get('language') == 'en' else '候选数据：'
+                prompt = request['messages'][0]['content']
+                _, separator, menu = prompt.partition(marker)
+                expected_menu = [
+                    dict(id=i, shifts=facts(plan, shifts), changed=sum(h != o for h, o in zip(plan, old)))
+                    for i, plan in enumerate(plans)
+                ]
+                if not separator or json.loads(menu) != expected_menu:
+                    raise ValueError(f'model request candidate facts differ for seed {seed}')
+                if request['format']['properties']['plan']['enum'] != list(range(len(plans))):
+                    raise ValueError(f'model request candidate IDs differ for seed {seed}')
             idx=expert['tool_choice']
             if arm=='rules':
                 def rank(j):

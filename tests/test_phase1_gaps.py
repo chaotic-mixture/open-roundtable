@@ -40,6 +40,22 @@ class GapTests(unittest.TestCase):
                 self.assertTrue(prompt.startswith(batch.ENGLISH_BRIEFS[(seed-501) % 3]))
             with self.assertRaisesRegex(ValueError, 'incompatible run directory'):
                 batch.run(folder, 'fixture', language='zh')
+            path = folder / '501-model.json'
+            record = json.loads(path.read_text(encoding='utf8'))
+            ids = record['request']['format']['properties']['plan']['enum']
+            last_id = ids.pop()
+            path.write_text(json.dumps(record), encoding='utf8')
+            with self.assertRaisesRegex(ValueError, 'model request candidate IDs differ'):
+                verify(folder)
+            ids.append(last_id)
+            message = record['request']['messages'][0]
+            prefix, menu = message['content'].split('Candidates: ')
+            candidates = json.loads(menu)
+            candidates[0]['changed'] += 1
+            message['content'] = prefix + 'Candidates: ' + json.dumps(candidates)
+            path.write_text(json.dumps(record), encoding='utf8')
+            with self.assertRaisesRegex(ValueError, 'model request candidate facts differ'):
+                verify(folder)
 
     def test_batch_rejects_unpaired_candidate_menus(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(batch, 'api', side_effect=provider):
