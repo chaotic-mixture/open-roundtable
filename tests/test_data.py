@@ -222,6 +222,8 @@ class DataTests(unittest.TestCase):
         for mode, response in [
                 ('local', '{"done":false,"message":{"content":"partial"}}'),
                 ('local', '{"done":true,"done_reason":"length","message":{"content":"partial"}}'),
+                ('local', '{"done":true,"message":{"content":"Checking","tool_calls":[{}]}}'),
+                ('api', '{"choices":[{"finish_reason":"stop","message":{"content":"Unavailable","refusal":"declined"}}]}'),
                 ('api', '{"choices":[{"finish_reason":"length","message":{"content":"partial"}}]}')]:
             with self.subTest(mode=mode, response=response):
                 endpoint = 'https://example.org/chat' if mode == 'api' else None

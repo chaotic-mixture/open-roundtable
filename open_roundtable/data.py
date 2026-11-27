@@ -187,13 +187,16 @@ def maintain(root, source, *, only_pending=False):
                 if (not isinstance(answer, dict) or answer.get('done', True) is not True
                         or answer.get('done_reason', 'stop') != 'stop'):
                     raise ValueError('incomplete maintenance response')
-                summary=answer['message']['content']
+                message = answer['message']
             else:
                 answer=json.loads(exchange(endpoint,payload,os.getenv('ROUNDTABLE_API_KEY')))
                 choice=answer['choices'][0]
                 if not isinstance(choice, dict) or choice.get('finish_reason', 'stop') != 'stop':
                     raise ValueError('incomplete maintenance response')
-                summary=choice['message']['content']
+                message = choice['message']
+            if not isinstance(message, dict) or message.get('refusal') or message.get('tool_calls'):
+                raise ValueError('incomplete maintenance response')
+            summary = message.get('content')
         else:
             raise ValueError('invalid stored policy')
         if not isinstance(summary,str) or not summary.strip():
