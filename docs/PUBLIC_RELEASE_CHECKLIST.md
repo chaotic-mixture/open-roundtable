@@ -12,6 +12,12 @@ To reproduce, run `python tests/verify_snapshot.py reports/check-5bf2700 --revis
 
 The follow-up snapshot at `33fbd32ad0b8944838e3f5de3703d919fb9eaefd` matched the earlier snapshot's 88 paths. All 116 tests passed in the extracted tree, including private maintenance recovery. Independent SQLite readback and loopback registration, discovery and withdrawal over mutual TLS also passed. ZIP SHA-256: `9d0cae2ee183e7a8803b40168a9cc48a3c76e75d8d474a8d8f187028f720445f`. Supplied path list SHA-256: `e1c12fa261a0c3ae3fa3e7be684793d640898843e21200fa08a00a9edfbb1bc7`.
 
+### Regression baseline for Phase 2
+
+At commit `4c2e1b1`, all 124 tests passed from an extracted 88-file snapshot with OpenSSL enabled. The suite exercised duplicate deliveries, receipt reconciliation and private marker checks. Independent SQLite readback confirmed a resolved topic with 2 credits remaining. In the same-machine registration demo, B appeared after publication, disappeared after withdrawal and reappeared after republication. Rediscovery left its old grant revoked.
+
+Reproduce with `python tests/verify_snapshot.py reports/check-4c2e1b1 --revision 4c2e1b1 --openssl openssl` and a fresh output directory. The ZIP SHA-256 was `3797dfd09cf5f87fc38b5e2cb2f184769880f169b223dd6bb9c68a7ddf17dd62`. The inventory check compared the archive with Git. Independent file approval and cross-host deployment are separate checks.
+
 ## Review the candidate files
 
 Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
