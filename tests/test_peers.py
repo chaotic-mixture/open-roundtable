@@ -279,6 +279,12 @@ class PeerRecoveryTests(unittest.TestCase):
                 fetch.assert_not_called()
                 model.assert_not_called()
             self.assertEqual(partner_statement(root, db, 'A'), provider)
+            set_permission(db, 'A', True, 1)
+            with patch('examples.peer_node.transfer', return_value=[dict(source='public', body=json.dumps(spec))]), patch('examples.user_consult.api') as model:
+                self.assertEqual(deliver(root, db, request), (receipt, False))
+                model.assert_not_called()
+            self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (1,))
+            self.assertEqual(partner_statement(root, db, 'A'), provider)
             sender = root/'A'
             sender.mkdir()
             (sender/'node.json').write_text('{"name":"A"}')

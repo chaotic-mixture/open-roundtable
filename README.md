@@ -24,7 +24,7 @@ Discovery refreshes the current directory snapshot. If B is withdrawn and republ
 
 Run `python -m examples.peer_node runtime/consumer permission-status B` on A to inspect its local decision. A discovered node can have no grant. With a grant still in place, `remaining: 0` and `can_submit: false` mean the peer has exhausted its quota for new requests. Retrying an identical, already completed request can still retrieve its saved receipt. For an active grant, a null remaining count means unlimited uses.
 
-Explicitly revoking the grant also closes the receipt-retry path for that peer. The receiving node keeps its existing ledger entry for reconciliation.
+Explicitly revoking the grant also closes the receipt-retry path for that peer. The receiving node keeps its existing ledger entry for reconciliation. If the operator grants access again and the original topic is still shared, replaying an identical completed request returns its saved receipt and preserves the new quota for fresh work.
 
 ### Repair a schedule with your own preferences
 
