@@ -70,6 +70,8 @@ python -m open_roundtable consult examples/consult_input.en.json --db weekend.sq
 
 The rule expert generates feasible candidates and the model chooses among them. Inspect `criteria_met` to see which preferences the proposal satisfies. A disagreement can leave the consultation paused for revision. [Chinese scheduling request](examples/consult_input.json)
 
+In a local run with this input, the model moved `early` from hours 8–14 to 26–32 and kept `late` at 12–18. Replacing the input's `shifts` with the returned `schedule` and rerunning the offline audit produced empty findings for all four hard rules. The pickup deadline was missed, so the expert voted against the proposal and the topic paused. The ledger recorded 1 credit each for the expert and model. The model reported 346 input tokens, 7 output tokens and 5.88 seconds for its call.
+
 If the consultation is `PAUSED` and the expert voted against the first proposal, revise it in a fresh ledger:
 
 ```sh
