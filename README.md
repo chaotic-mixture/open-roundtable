@@ -88,6 +88,8 @@ A successful recovery reports two deliveries, one expert call, one model call an
 
 ### Reconcile two nodes' receipts offline
 
+Add `--with-criteria` to a fresh recovery run to send the fixture's ordered preferences with the roster. The verifier recomputes the selected schedule's preference score and checks the expert vote against the candidate list. In an English run, the selected schedule preserved the late shift's start but missed the higher-priority pickup deadline. A received B's `PAUSED` decision after reconnecting. Both ledgers recorded two credits for one expert call and one model call.
+
 To exercise a disconnect after the consultation result is saved but before B posts the network charge, use a fresh directory:
 
 ```sh

@@ -69,10 +69,25 @@ def audit(folder):
     require([(r[0],r[2]) for r in charges]==[('expert',1),('model',1)] and cost==res['credits']==2,'charge mismatch')
     require(json.loads(charges[1][1])==model,'model receipt')
     topic,state,balance=read(b,key+'.sqlite3','SELECT id,state,credits FROM topics')[0]
-    require((topic,state,balance)==(res['outcome']['topic'],'RESOLVED',0),'consultation incomplete')
     body=json.loads(read(b,key+'.sqlite3','SELECT body FROM proposals ORDER BY version DESC LIMIT 1')[0][0])
     require(all(res['outcome'][k]==v for k,v in body.items()),'proposal mismatch')
-    require(dict(read(b,key+'.sqlite3','SELECT member,agree FROM votes'))=={'expert':1,'model':1},'ballots')
+    expert_agrees = True
+    if req['spec'].get('criteria'):
+        from examples.user_consult import validate_roster
+        from examples.roster_criteria import evaluate
+        rows, rules = validate_roster(req['spec'])
+        def rank(schedule):
+            starts = [shift['start'] for shift in schedule]
+            return evaluate(rules, rows, starts), -sum(h != row[1] for h,row in zip(starts,rows))
+        candidates = json.loads(charges[0][1])['candidates']
+        require(body['schedule'] == candidates[body['selected']], 'selected schedule mismatch')
+        score = rank(body['schedule'])
+        require(list(score[0]) == body['criteria_met'], 'preference score mismatch')
+        expert_agrees = score == max(map(rank, candidates))
+    expected_state = 'RESOLVED' if expert_agrees else 'PAUSED'
+    require((topic,state,balance)==(res['outcome']['topic'],expected_state,0)
+            and res['outcome']['state']==state,'consultation state mismatch')
+    require(dict(read(b,key+'.sqlite3','SELECT member,agree FROM votes'))=={'expert':int(expert_agrees),'model':1},'ballots')
     shared=catalog(a)
     require(any(r['source']==req['source'] and json.loads(r['body'])==req['spec'] for r in shared),
             'unpublished request')
@@ -163,7 +178,7 @@ def audit(folder):
                 request_id=key, **allowance)
 
 
-def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False, language='zh'):
+def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False, language='zh', with_criteria=False):
     fixture = {'en': 'consult_input.en.json', 'zh': 'consult_input.json'}[language]
     if fault not in ('before-receipt','after-commit'):
         raise ValueError('unknown fault window')
@@ -201,7 +216,8 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
             cli(root, *discovery)
         cli(b,'permission','A','allow','--remaining','1')
         spec=json.loads(Path(__file__).with_name(fixture).read_text(encoding='utf8'))
-        spec.pop('criteria',None)
+        if not with_criteria:
+            spec.pop('criteria',None)
         ingest(a,'public',[dict(source=SOURCE,body=packed(spec).decode())])
         share_public(a,SOURCE,True,digest(spec))
         offer_args = []
@@ -245,6 +261,7 @@ if __name__=='__main__':
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--language', choices=['en', 'zh'], default='zh', help='language of the synthetic scheduling request')
+    parser.add_argument('--with-criteria', action='store_true', help='include the fixture’s ordered preference criteria')
     parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
     tls = parser.add_mutually_exclusive_group()
     tls.add_argument('--temporary-tls', metavar='OPENSSL', help='issue disposable loopback credentials using this OpenSSL executable')
@@ -261,5 +278,5 @@ if __name__=='__main__':
                 credentials = Path(stack.enter_context(tempfile.TemporaryDirectory()))
                 issue_certificates(credentials,args.temporary_tls)
             result = run(args.directory,args.model,args.fault,credentials=credentials,bind_offer=args.bind_offer,
-                         language=args.language)
+                         language=args.language,with_criteria=args.with_criteria)
     print(json.dumps(result))
