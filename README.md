@@ -86,6 +86,20 @@ The recovery demo runs on loopback. For a trial across machines, set `transport`
 
 The `credentials` directory holds `ca.pem`, `node.pem` and `node.key`. The node certificate must cover the hostname or IP used by clients and identify the configured node name with a URI such as `urn:roundtable:peer:B`. The demo issues certificates for localhost and the loopback address. A cross-host acceptance run still needs to demonstrate connectivity, identity checks and lost-receipt recovery on separate machines.
 
+For a directory whose configured node name is `directory`, start its service on the directory host. The following examples assume initialized stores and configured certificates on both machines:
+
+```sh
+python -m examples.peer_node runtime/directory serve 8443
+```
+
+On the consumer host, replace the example hostname with the directory's certificate-covered hostname. Add that exact origin to the consumer's `allowed_origins`, then fetch the published registrations:
+
+```sh
+python -m examples.peer_node runtime/consumer discover https://directory.example:8443 --directory-name directory
+```
+
+The directory name is the identity in the certificate URI. A successful empty list means the directory returned no eligible peers. To exercise publication and withdrawal on one machine first, run `python -m examples.registration_demo --openssl openssl`.
+
 ### Keep a private preference and publish a service notice
 
 From the repository root, create two UTF-8 JSON files. In `preference.json`, save `[{"source":"profile","body":"I prefer morning meetings."}]`. In `notice.json`, save `[{"source":"https://example.org/hours","body":"Office hours start at 9."}]`. The HTTPS address identifies the notice. Importing the file reads its contents from disk.
