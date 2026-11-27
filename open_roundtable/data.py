@@ -177,6 +177,8 @@ def maintain(root, source, *, only_pending=False):
                 'Summarize this record concisely for its owner in the original language. '
                 'Preserve qualifications that affect meaning, including fictional or hypothetical status, '
                 'negation, exceptions, uncertainty, and whose preference is described. '
+                'When a record describes both a current arrangement and a possible future change, '
+                'state what applies now in its own sentence. Keep the condition and uncertainty with the future change. '
                 'If the record is already a concise sentence, repeat it verbatim.')},
                       {'role':'user','content':body}]
             payload=dict(model=model,messages=messages,stream=False)
