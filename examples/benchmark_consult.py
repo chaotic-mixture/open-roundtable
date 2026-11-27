@@ -106,6 +106,8 @@ def evaluate(k, folder, seed, size, shifts, arm, model, *, continue_on_model_err
                seconds=sum(c['seconds'] for c in calls))
     for r in RULES:
         row.update({r+'_missed':len(scores[r]['missing']), r+'_extra':len(scores[r]['extra'])})
+    votes = {vote['member']: vote['agree'] for vote in state['votes']}
+    row.update(topic_state=state['state'], model_vote=votes.get('model'), expert_vote=votes.get('expert'))
     return row
 
 

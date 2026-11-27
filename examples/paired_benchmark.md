@@ -44,6 +44,8 @@ python -m examples.summarize_detection reports/paired-reproduction/results.csv -
 
 ### Follow-up on three fresh rosters
 
+The error counts score the submitted answer even when the panel pauses. On seed 602, the model endorsed its revision and the expert voted against it. The ledger recorded `PAUSED`. Both members endorsed the answers on seeds 601 and 603, which reached `RESOLVED`. In the CSV, vote columns use 1 for agreement and 0 for disagreement. Single-participant arms stay `ACTIVE` with blank votes because the benchmark only requests a ballot from the panel.
+
 On Ollama 0.40.18 with `qwen3.5:9b`, all nine arms returned scored results. The expert alone had zero misses and zero false positives across the three rosters. The model alone missed 95 violations and introduced 35 false positives. The roundtable missed one excessive continuous-work block on the 11-shift roster and had zero false positives. Model review added one call and one credit per roster relative to the expert. SQLite recorded 12 posted calls and 12 credits across the run. Each difficulty had one roster. [Per-arm scores, token counts and timings](paired_601_metrics.csv)
 
 ```sh
