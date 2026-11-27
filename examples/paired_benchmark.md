@@ -34,6 +34,8 @@ For an interrupted run, pass its saved design to include planned rosters with ze
 
 If the model service raises an error during a request, inspect the run directory's `SEED-ARM.json`. The `calls` list contains completed responses. The separate `failed_attempt` records the request, elapsed time and error type. Its token counts are unknown. The `credits_spent` field records the charges already posted for this roster and arm. The failed arm has no scored CSV row.
 
+If the model returns an incomplete generation or an invalid verdict, the same file preserves the response, its reported token counts, posted credits and a `scoring_error`. An unscored reply can therefore still consume credits.
+
 ```sh
 python -m examples.summarize_detection reports/paired-reproduction/results.csv --design reports/paired-reproduction/design.json
 ```

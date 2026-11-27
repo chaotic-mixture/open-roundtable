@@ -71,12 +71,23 @@ def evaluate(k, folder, seed, size, shifts, arm, model):
             body = response['message']['content']
         assert_post(k, topic, member, body)
         calls.append(dict(event, member=member, seconds=elapsed))
-        save(folder, f'{seed}-{arm}.json', dict(topic=topic, shifts=shifts, calls=calls))
+        evidence = dict(topic=topic, shifts=shifts, calls=calls,
+                        credits_spent=sum(message['cost'] for message in k.get(topic)['messages']))
+        save(folder, f'{seed}-{arm}.json', evidence)
         if member == 'model':
-            if not response['done'] or response['done_reason'] != 'stop':
-                raise ValueError(f'incomplete generation at {topic}')
-            final = json.loads(body)
-    scores = grade(shifts, final)
+            try:
+                if not response['done'] or response['done_reason'] != 'stop':
+                    raise ValueError('incomplete generation')
+                final = json.loads(body)
+                if not isinstance(final, dict) or type(final.get('approve_final')) is not bool:
+                    raise ValueError('expected a boolean approve_final verdict')
+                scores = grade(shifts, final)
+            except (ValueError, KeyError, TypeError) as error:
+                evidence['scoring_error'] = str(error)
+                save(folder, f'{seed}-{arm}.json', evidence)
+                raise
+    if arm == 'tool':
+        scores = grade(shifts, final)
     if arm == 'table':
         k.vote(topic, 'model', final['approve_final'])
         k.vote(topic, 'expert', all(set(final[r]) == set(proposal[r]) for r in RULES))
