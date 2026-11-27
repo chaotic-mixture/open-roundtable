@@ -33,6 +33,8 @@ Run `python -m examples.feasibility_benchmark` to reproduce the current solver's
 
 The benchmark also scores the first feasible plan against the two preferences after search. Seeds 501–509 kept A's start on all nine rosters, placed B before noon on three, and moved 93 shifts. Seeds 510–518 kept A's start on all nine, placed B before noon on four, and moved 94 shifts. Overall, 7 of 18 plans met both preferences. The search uses input order and tries starts near the original time, so preserving the first shift in these fixtures does not demonstrate that the solver optimized preferences. When there is no plan, both quality fields are null.
 
+Add `--require-preferences` to either benchmark command to restrict each shift's possible start hours to those satisfying its encoded criteria. At the same 10,000-node limit per roster, this search met both preferences on 18/18 rosters and moved 197 shifts across the two batches, versus 7/18 and 187 moves for the first hard-rule solution. Total visited nodes were 8,539 and 8,459 respectively. Node counts exclude the work of filtering start hours. Each search stopped at its first qualifying plan, so the ten additional moves measure these returned plans, not the minimum cost of meeting the preferences.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.

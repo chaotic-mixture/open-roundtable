@@ -88,7 +88,7 @@ def worker_blocks_fit(rows, starts, indices, fillable_gaps):
     return True
 
 
-def feasibility(rows, accepts, budget):
+def feasibility(rows, accepts, budget, *, allowed_start=None):
     """Exact finite-domain search; a node limit yields unknown, never infeasible."""
     if type(budget)!=int or budget<1:
         raise ValueError('search_nodes must be a positive integer')
@@ -96,6 +96,10 @@ def feasibility(rows, accepts, budget):
         return dict(status='infeasible', nodes=0, plan=None)
     original=[r[1] for r in rows]
     domains=[sorted(range(169-r[2]),key=lambda h:abs(h-r[1])) for r in rows]
+    if allowed_start is not None:
+        domains = [[hour for hour in hours if allowed_start(i, hour)] for i, hours in enumerate(domains)]
+        if any(not hours for hours in domains):
+            return dict(status='infeasible', nodes=0, plan=None)
     starts=[]
     visits=0
     worker_indices = {}
