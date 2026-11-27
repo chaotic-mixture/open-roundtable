@@ -13,6 +13,17 @@ from open_roundtable.data import initialize, ingest, share_public
 
 
 class CapabilityLimitsTests(unittest.TestCase):
+    def test_admission_filters_require_tls_before_catalog_access(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A"}')
+            db.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8002')")
+            with patch('examples.peer_node.fetch_public_subset') as fetch:
+                for options in ({'accepting_only': True}, {'search_nodes': 10000}):
+                    with self.subTest(options=options), self.assertRaisesRegex(ValueError, 'mutual TLS'):
+                        find_capability(root, db, **options)
+                fetch.assert_not_called()
+
     def test_dispatch_verifies_selected_revision_in_mixed_catalog(self):
         body = json.dumps(dict(kind='capability', node='B', tag='audit', description='Check shifts'))
         records = [None, {}, dict(source='audit', body=None), dict(source='audit', body=body)]

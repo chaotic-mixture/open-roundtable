@@ -308,7 +308,11 @@ def find_capability(root, db, tag=None, *other_tags, accepting_only=False, requi
         raise ValueError('search_nodes must be a positive integer')
     tags = {tag, *other_tags} if tag is not None else None
     required = set(required_rules)
-    node = json.loads((root/'node.json').read_text())['name']
+    config = json.loads((root/'node.json').read_text())
+    check_admission = accepting_only or search_nodes is not None
+    if check_admission and config.get('transport') != 'mtls':
+        raise ValueError('admission filtering requires mutual TLS')
+    node = config['name']
     matches, unavailable = [], []
     for peer,url in db.execute('SELECT name,url FROM peers WHERE name<>? ORDER BY name',(node,)).fetchall():
         try:
@@ -335,9 +339,7 @@ def find_capability(root, db, tag=None, *other_tags, accepting_only=False, requi
                 if 'rules' in item:
                     match['rules'] = item['rules']
                 matches.append(match)
-    if accepting_only or search_nodes is not None:
-        if json.loads((root/'node.json').read_text()).get('transport') != 'mtls':
-            raise ValueError('admission filtering requires mutual TLS')
+    if check_admission:
         accepting = set()
         declined = []
         for peer in sorted({match['node'] for match in matches}):
