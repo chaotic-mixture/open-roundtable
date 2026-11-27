@@ -17,6 +17,7 @@ from urllib.request import build_opener, HTTPSHandler, ProxyHandler
 
 from examples.demo_certificates import issue_certificates
 from examples.peer_node import digest, discover, ledger, packed, transfer
+from examples.revise_panel_proposal import revise
 from examples.two_node_demo import audit, cli, run, start
 from open_roundtable.data import initialize, ingest, share_public
 
@@ -119,13 +120,20 @@ class PeerTLSTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit(folder)
             checkpoint.write_bytes(original)
+            destination = base/'revised.sqlite3'
             with closing(ledger(folder/'B')) as db:
                 with db:
                     db.execute("UPDATE grant_limits SET remaining=1 WHERE name='A'")
                 with self.assertRaisesRegex(ValueError, 'receiver allowance mismatch'):
-                    audit(folder)
+                    revise(folder, destination)
+                self.assertFalse(destination.exists())
                 with db:
                     db.execute("UPDATE grant_limits SET remaining=0 WHERE name='A'")
+            revision = revise(folder, destination)
+            self.assertTrue(destination.is_file())
+            self.assertEqual((revision['version'], revision['state']), (2, 'PAUSED'))
+            self.assertEqual(list(revision['criteria_met']), result['best_candidate_criteria_met'])
+            self.assertEqual(revision['changed_shifts'], result['best_candidate_changed_shifts'])
             with closing(ledger(folder/'A')) as db:
                 db.execute("UPDATE traffic SET route=replace(route,'/offers','/other') WHERE direction='receive' AND route LIKE '%/offers'")
                 db.commit()
