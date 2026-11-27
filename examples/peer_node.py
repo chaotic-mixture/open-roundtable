@@ -987,12 +987,21 @@ if __name__=='__main__':
         try:
             with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as journal:
                 journal.execute('BEGIN')
-                rows = journal.execute('SELECT status,response IS NOT NULL FROM attempts ORDER BY id').fetchall()
+                tables = {name for name, in journal.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('attempts','peer_receipt')")}
+                saved = journal.execute('SELECT result FROM peer_receipt WHERE id=? AND result IS NOT NULL',
+                                        (args.job,)).fetchone() if 'peer_receipt' in tables else None
+                if 'attempts' in tables:
+                    rows = journal.execute('SELECT status,response IS NOT NULL FROM attempts ORDER BY id').fetchall()
+                elif saved and journal.execute("""SELECT json_extract(result,'$.id')=? AND
+                        json_extract(result,'$.outcome.state')='NO_PLAN' AND json_extract(result,'$.credits')=0
+                        FROM peer_receipt WHERE id=?""", (args.job, args.job)).fetchone() == (1,):
+                    rows = []
+                else:
+                    parser.error('missing model dispatch journal')
                 report = dict(job=args.job, attempts=[dict(status=s, has_response=bool(r)) for s,r in rows])
                 if args.checkpoint:
-                    table = journal.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='peer_receipt'").fetchone()
-                    report['has_consultation_receipt'] = bool(table and journal.execute(
-                        'SELECT 1 FROM peer_receipt WHERE id=? AND result IS NOT NULL', (args.job,)).fetchone())
+                    report['has_consultation_receipt'] = bool(saved)
         except sqlite3.Error:
             parser.error('unable to read a model dispatch journal for this job')
         print(json.dumps(report))
