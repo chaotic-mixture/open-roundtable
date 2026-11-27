@@ -36,6 +36,13 @@ class CliTests(unittest.TestCase):
                 else:
                     self.assertEqual(json.loads(result.stdout)['findings'], {'R': ['x@26-29'] if end == 26 else []})
 
+    def test_audit_consultation_uses_original_labels(self):
+        source = ROOT / 'examples/consult_input.en.json'
+        output = subprocess.check_output([sys.executable, '-m', 'open_roundtable', 'audit',
+                                          str(source), '--consult-input'], cwd=ROOT)
+        self.assertEqual(json.loads(output)['findings'], dict(P=[['early', 'late']], V=[['early', 'late']],
+                                                            R=[], L=['Alex@8-18']))
+
     def test_audit_reads_piped_requests(self):
         cmd = [sys.executable, '-m', 'open_roundtable', 'audit', '-', '--fail-on-findings']
         request = dict(operation='schedule-audit-v1', rules=['V'], shifts=['Axv:1-4', 'Byv:3-5'])

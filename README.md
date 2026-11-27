@@ -47,6 +47,8 @@ For a scripted check, run `python -m open_roundtable audit audit.json --fail-on-
 
 When another program produces the request, pipe its JSON output into `python -m open_roundtable audit - --fail-on-findings`. The command reads one request from standard input and emits the same report and exit status as file input.
 
+To inspect the starting schedule of a repair consultation, run `python -m open_roundtable audit examples/consult_input.en.json --consult-input` from the source checkout. This checks the consultation input format and all four scheduling rules locally. The report names the original shifts and workers. In this example, `early` and `late` overlap for both worker and room, and Alex's continuous work spans hours 8 through 18. You can pass the same input file to `consult` for repair.
+
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
 
 The model receives your request, including the original preference text, alongside the verified candidate schedules. The expert scores the conditions you explicitly put in `criteria`. For each condition, name a shift ID, choose a field below and give inclusive integer bounds `min` and `max`.

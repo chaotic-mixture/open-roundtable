@@ -16,6 +16,7 @@ def main():
     demo.add_argument('--db', required=True, help='path for a new SQLite database')
     audit = commands.add_parser('audit', help='check a schedule-audit-v1 request offline')
     audit.add_argument('input', help='audit request JSON file, or - to read from standard input')
+    audit.add_argument('--consult-input', action='store_true', help='check all four rules on a scheduling consultation input')
     audit.add_argument('--fail-on-findings', action='store_true', help='exit with status 1 if any requested rule has findings')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
@@ -81,10 +82,21 @@ def main():
             from .schedule_expert import audit_rules, check
             payload = sys.stdin.buffer.read() if args.input == '-' else Path(args.input).read_bytes()
             spec = json.loads(payload)
-            rules = audit_rules(spec)
-            if rules is None:
-                raise ValueError('expected a schedule-audit-v1 request')
-            findings = check(spec['shifts'], rules=rules)
+            if args.consult_input:
+                from examples.user_consult import validate_roster
+                rows, _ = validate_roster(spec)
+                findings = check([f'{key}:{start}-{start + duration}' for key, start, duration in rows])
+                shifts = {key[0]: shift['id'] for (key, _, _), shift in zip(rows, spec['shifts'])}
+                workers = {key[1]: shift['worker'] for (key, _, _), shift in zip(rows, spec['shifts'])}
+                for rule in ('P', 'V'):
+                    findings[rule] = [[shifts[a], shifts[b]] for a, b in sorted(findings[rule])]
+                for rule in ('R', 'L'):
+                    findings[rule] = [workers[item[0]] + item[1:] for item in findings[rule]]
+            else:
+                rules = audit_rules(spec)
+                if rules is None:
+                    raise ValueError('expected a schedule-audit-v1 request')
+                findings = check(spec['shifts'], rules=rules)
             result = dict(state='AUDITED', findings={key: sorted(values) for key, values in findings.items()})
         elif args.command=='consult':
             from examples.user_consult import consult
