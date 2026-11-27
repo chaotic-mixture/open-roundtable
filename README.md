@@ -103,6 +103,20 @@ python -m open_roundtable.data runtime/store-demo public-feed
 
 Replace `HASH` with the SHA-256 from the review output after checking the notice text. The feed should now contain only the office-hours notice. To withdraw it, run `python -m open_roundtable.data runtime/store-demo share-public https://example.org/hours --off`. [Store and permission guide in Chinese](#公开资料和个人资料)
 
+### Choose where a private record can be processed
+
+The private store starts in `sealed` mode. Its policy controls how a record's summary is produced. In `sealed` mode the process normalizes whitespace on the same machine. In `local` mode it sends the record body to the configured local Ollama service. In `api` mode it sends the body to the configured HTTPS endpoint when maintenance runs.
+
+For example, to allow local-model maintenance by default while keeping the example's `profile` record sealed, set its individual limit first:
+
+```sh
+python -m open_roundtable.data runtime/store-demo record-limit profile sealed
+python -m open_roundtable.data runtime/store-demo policy local --model qwen3.5:9b
+python -m open_roundtable.data runtime/store-demo preview-private profile
+```
+
+The preview should show `store` as `local` and the effective `mode` as `sealed`, with a null destination. Preview reads the policy without sending the record body. Use `record-limit profile inherit` to let the record follow the store policy again. A sealed store keeps every record sealed, including records with an individual local-model limit.
+
 ### Compare ways to find a scheduling expert
 
 Run `python -m examples.rule_discovery --dispatch` from the repository root. A requester sends nine synthetic rosters to rule-based experts over loopback HTTP. All four providers advertise the same audit tag, but their offers differ in which checks they declare. Each roster produces two JSON lines. Compare `tag` (select by audit tag) with `rules` (also require every requested check). The rule codes are P for worker overlap, V for room overlap, R for minimum rest and L for maximum continuous work.
