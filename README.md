@@ -219,6 +219,16 @@ python -m open_roundtable.data runtime/store-demo preview-private profile
 
 The preview should show `store` as `local` and the effective `mode` as `sealed`, with a null destination. Preview reads the policy without sending the record body. Use `record-limit profile inherit` to let the record follow the store policy again. A sealed store keeps every record sealed, including records with an individual local-model limit.
 
+To preview API maintenance, keep the individual limit on `profile`. Replace the example model and HTTPS endpoint with your provider's values before running maintenance. The following commands only configure the store and inspect its routing decision:
+
+```sh
+python -m open_roundtable.data runtime/store-demo policy api --model example-model --endpoint https://api.example.org/v1/chat/completions
+python -m open_roundtable.data runtime/store-demo preview-private profile
+python -m open_roundtable.data runtime/store-demo policy sealed
+```
+
+For `profile`, the preview reports `store: api`, `mode: sealed` and a null destination. If you preview another private record that inherits the store policy before the final command, its destination shows the API origin. The final command restores sealed maintenance for the whole store. When you choose to perform API maintenance, provide the service credential through `ROUNDTABLE_API_KEY` if required.
+
 To inspect the quality of local-model maintenance, run `python -m examples.private_summary_cases --language en` with Ollama serving `qwen3.5:9b`. The example creates a temporary private store and prints each synthetic source alongside its saved summary. Check whose preference is known, whether both conditions on a late shift survive, and whether a pending pilot remains tentative. Use `--language zh` for the original Chinese cases.
 
 Each output row includes the requested `model`, the service's `reported_model` when available, and the maintenance `mode` read back from SQLite. In a local English run on 2026-11-27, all three rows recorded `qwen3.5:9b` for both model fields. The summaries preserved Jo's ownership of the preference and both conditions on Chen's late shifts. The pilot summary retained pending approval and the tentative change, but its “otherwise” phrasing made the current roster's present status less explicit. These observations cover one generation per record in that run.
