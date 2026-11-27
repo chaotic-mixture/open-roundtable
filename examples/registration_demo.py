@@ -47,6 +47,14 @@ def run(openssl=None):
                                     JOIN grant_limits USING(name) WHERE name='B' ''').fetchall()
         if granted != [(endpoint, 1)]:
             raise ValueError('consumer did not persist the bounded grant')
+        # Skip discovery during one withdrawal, as an offline consumer would.
+        share_public(directory, source, False)
+        share_public(directory, source, True, imported['sha256'])
+        if json.loads(cli(consumer, *discovery).stdout) != published:
+            raise ValueError('unexpected snapshot after a missed withdrawal')
+        with closing(ledger(consumer)) as db:
+            quota = db.execute('''SELECT remaining FROM peers JOIN consult_grants USING(name,url)
+                                 JOIN grant_limits USING(name) WHERE name=?''', ('B',)).fetchone()
         share_public(directory, source, False)
         withdrawn = json.loads(cli(consumer, *discovery).stdout)
         if before or published != [dict(name='B', url=endpoint)] or withdrawn:
@@ -66,7 +74,7 @@ def run(openssl=None):
                 if db.execute(f'SELECT 1 FROM {table} WHERE name=?', ('B',)).fetchone():
                     raise ValueError(f'republication restored a stale entry in {table}')
         return dict(before_publication=before, published=published, after_withdrawal=withdrawn,
-                    after_republication=republished)
+                    after_republication=republished, remaining_after_missed_withdrawal=quota[0] if quota else None)
 
 
 if __name__ == '__main__':

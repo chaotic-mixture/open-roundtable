@@ -20,6 +20,8 @@ The demo prints a JSON report. Look for `RESOLVED` in the topic state and a rema
 
 To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine. The consumer finds no nodes at first, sees B after publication, loses B after withdrawal and sees B again after republication. The demo checks the consumer's ledger to confirm that rediscovery leaves the earlier consultation permission and quota revoked. [Registration example](examples/registration_demo.py)
 
+Discovery refreshes the current directory snapshot. If B is withdrawn and republished at the same address between two refreshes, A can miss the withdrawal. The demo reports A's remaining grant in `remaining_after_missed_withdrawal`. To revoke A's permission for B directly, run `python -m examples.peer_node runtime/consumer permission B revoke` on A.
+
 ### Repair a schedule with your own preferences
 
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
