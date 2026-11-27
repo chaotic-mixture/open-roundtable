@@ -33,13 +33,14 @@ def run(language='zh', model='qwen3.5:9b'):
         if result['completed'] != len(cases):
             raise RuntimeError(f'Incomplete synthetic batch: {result}')
         with closing(data.connect(root, 'private')) as db:
-            rows = db.execute("""SELECT source, body, summary, mode, model FROM records
-                                 LEFT JOIN summary_origin USING(source) ORDER BY source""")
-            for source, body, summary, mode, recorded_model in rows:
+            rows = db.execute("""SELECT source, body, summary, mode, o.model, p.model FROM records
+                                 LEFT JOIN summary_origin o USING(source)
+                                 LEFT JOIN summary_reported_model p USING(source) ORDER BY source""")
+            for source, body, summary, mode, recorded_model, reported_model in rows:
                 if (mode, recorded_model) != ('local', model):
                     raise ValueError('stored summary origin differs from the requested local model')
                 print(json.dumps(dict(case=source, language=language, mode=mode, model=recorded_model,
-                                      original=body, summary=summary), ensure_ascii=False))
+                                      reported_model=reported_model, original=body, summary=summary), ensure_ascii=False))
 
 
 if __name__ == '__main__':

@@ -43,6 +43,10 @@ class DataTests(unittest.TestCase):
             data.maintain(self.root, 'profile')
         data.configure(self.root, 'sealed')
         self.assertEqual(origin(), dict(ready=True, mode='local', model='model-a'))
+        data.configure(self.root, 'local', 'alias')
+        with patch.object(data, 'exchange', return_value='{"model":"alias:latest","message":{"content":"summary"}}'):
+            data.maintain(self.root, 'profile')
+        self.assertEqual(origin(), dict(ready=True, mode='local', model='alias', reported_model='alias:latest'))
         data.ingest(self.root, 'private', [dict(source='profile', body='changed')])
         self.assertEqual(origin(), dict(ready=False, mode=None, model=None))
 

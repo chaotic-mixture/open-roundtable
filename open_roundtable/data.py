@@ -51,6 +51,8 @@ def connect(root, scope):
         if scope == 'private':
             db.execute("""CREATE TABLE IF NOT EXISTS summary_origin (
                 source TEXT PRIMARY KEY, mode TEXT NOT NULL, model TEXT)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS summary_reported_model (
+                source TEXT PRIMARY KEY, model TEXT NOT NULL)""")
             db.execute("""CREATE TABLE IF NOT EXISTS record_limits (
                 source TEXT PRIMARY KEY REFERENCES records(source),
                 mode TEXT NOT NULL CHECK(mode IN ('sealed','local')), model TEXT)""")
@@ -110,6 +112,7 @@ def ingest(root, scope, records):
                 WHERE records.body<>excluded.body''',(source,body)).rowcount
             if scope == 'private' and changed:
                 db.execute('DELETE FROM summary_origin WHERE source=?', (source,))
+                db.execute('DELETE FROM summary_reported_model WHERE source=?', (source,))
 
 
 def exchange(url, payload=None, token=None):
@@ -195,6 +198,11 @@ def maintain(root, source, *, only_pending=False):
             raise ValueError('empty maintenance result')
         db.execute('UPDATE records SET summary=? WHERE source=?',(summary,source))
         db.execute('INSERT OR REPLACE INTO summary_origin VALUES (?,?,?)', (source, mode, model))
+        reported = answer.get('model') if mode != 'sealed' else None
+        if isinstance(reported, str) and reported.strip():
+            db.execute('INSERT OR REPLACE INTO summary_reported_model VALUES (?,?)', (source, reported))
+        else:
+            db.execute('DELETE FROM summary_reported_model WHERE source=?', (source,))
         return True
 
 
@@ -307,12 +315,16 @@ def main():
             print(json.dumps(preview_private(root,args.source),ensure_ascii=True))
         elif args.action=='summary-origin':
             with closing(connect(root, 'private')) as db:
-                row = db.execute("""SELECT r.summary IS NOT NULL, o.mode, o.model FROM records r
-                    LEFT JOIN summary_origin o USING(source) WHERE r.source=?""", (args.source,)).fetchone()
+                row = db.execute("""SELECT r.summary IS NOT NULL, o.mode, o.model, p.model FROM records r
+                    LEFT JOIN summary_origin o USING(source) LEFT JOIN summary_reported_model p USING(source)
+                    WHERE r.source=?""", (args.source,)).fetchone()
                 if row is None:
                     raise ValueError('unknown private record')
-                ready, mode, model = row
-                print(json.dumps(dict(ready=bool(ready), mode=mode, model=model)))
+                ready, mode, model, reported = row
+                origin = dict(ready=bool(ready), mode=mode, model=model)
+                if reported is not None:
+                    origin['reported_model'] = reported
+                print(json.dumps(origin))
         elif args.action=='private-status':
             with closing(connect(root, 'private')) as db:
                 total, ready = db.execute('SELECT count(*), count(summary) FROM records').fetchone()
