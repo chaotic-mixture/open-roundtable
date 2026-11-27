@@ -1,4 +1,31 @@
-# 排班修复与候选选择 · v0.0.4
+# Schedule repair and candidate selection (v0.0.4)
+
+[中文报告与逐表结果](#排班修复与候选选择--v004)
+
+On nine synthetic rosters, the expert's default repaired all nine. Letting the model edit shift times directly produced three valid repairs after expert review. Restricting the model to previously verified candidates restored the success rate to nine out of nine. Ranking those same candidates by the three stated preferences matched the model on both preferences met and shifts moved for every roster.
+
+| Method | Valid repairs | Preferences met in valid repairs (of 27) | Shifts moved in valid repairs | Calls / credits |
+| --- | ---: | ---: | ---: | ---: |
+| Model alone | 0/9 | 0 | — | 9 / 9 |
+| Expert default | 9/9 | 10 | 90 | 9 / 9 |
+| Model edits with expert review | 3/9 | 5 | 29 | 27 / 27 |
+| Model selects a verified candidate | 9/9 | 17 | 91 | 18 / 18 |
+
+**Where did the seven additional preferences come from?** On roster 505, one extra changed shift met all three preferences. On 506 and 507, the selector met two more preferences apiece with the same number of changes as the default. On the other six rosters the default already reached the best available preference count. All three preferences had equal weight and could be scored directly: preserve A's start, start B between 06:00 inclusive and noon exclusive, and start C between noon inclusive and 18:00 exclusive.
+
+The model selected a valid ID every time in this trial. A separate offline test covers invalid replies and outages, where the selector delivers candidate 0. The results apply to the generated candidates and the local model used here. [Per-roster free-edit results](repair_501_metrics.csv) · [Per-roster verified selections and usage](select_501_metrics.csv)
+
+### Reproduce the comparison
+
+From the repository root with Python 3.11 or later, run the offline check to recompute rule rankings and verify fallback accounting. To repeat inference, start Ollama with `qwen3.5:9b` installed and give each benchmark a fresh output directory. Both use seeds 501–509.
+
+```sh
+python -m unittest discover -s tests -p test_repair.py -v
+python -m examples.repair_benchmark reports/repair-repro --model qwen3.5:9b
+python -m examples.select_repair reports/select-repro --model qwen3.5:9b
+```
+
+## 排班修复与候选选择 · v0.0.4
 
 九张表中，505、506、507 的可行候选能比工具默认方案多满足偏好。模型选中了这些候选，共多满足 7 项偏好，只多改 1 个班次。其余六张表的默认方案已经达到候选内最高偏好数。**本轮三项偏好都能直接计分，九张表用规则排序即可取得相同的偏好数和改动数。** 自由表达且难以编码的偏好仍需另做实验。
 
