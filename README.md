@@ -18,7 +18,7 @@ python -m open_roundtable demo --db roundtable-demo.sqlite3
 
 The demo prints a JSON report. Look for `RESOLVED` in the topic state and a remaining balance of 2 credits. Choose a fresh database filename for each run so earlier results stay available for inspection.
 
-To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine and reports which nodes the consumer can see before publication, after publication and after withdrawal. The expected sequence is an empty list, node B, then an empty list. [Registration example](examples/registration_demo.py)
+To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine. The consumer finds no nodes at first, sees B after publication, loses B after withdrawal and sees B again after republication. The demo checks the consumer's ledger to confirm that rediscovery leaves the earlier consultation permission and quota revoked. [Registration example](examples/registration_demo.py)
 
 ### Repair a schedule with your own preferences
 

@@ -55,7 +55,18 @@ def run(openssl=None):
             for table in ('peers', 'consult_grants', 'grant_limits'):
                 if db.execute(f'SELECT 1 FROM {table} WHERE name=?', ('B',)).fetchone():
                     raise ValueError(f'withdrawn peer remains in {table}')
-        return dict(before_publication=before, published=published, after_withdrawal=withdrawn)
+        share_public(directory, source, True, imported['sha256'])
+        republished = json.loads(cli(consumer, *discovery).stdout)
+        if republished != published:
+            raise ValueError('consumer did not rediscover the republished node')
+        with closing(ledger(consumer)) as db:
+            if db.execute('SELECT url FROM peers WHERE name=?', ('B',)).fetchall() != [(endpoint,)]:
+                raise ValueError('rediscovered endpoint missing from consumer ledger')
+            for table in ('consult_grants', 'grant_limits'):
+                if db.execute(f'SELECT 1 FROM {table} WHERE name=?', ('B',)).fetchone():
+                    raise ValueError(f'republication restored a stale entry in {table}')
+        return dict(before_publication=before, published=published, after_withdrawal=withdrawn,
+                    after_republication=republished)
 
 
 if __name__ == '__main__':
