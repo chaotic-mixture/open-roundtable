@@ -80,6 +80,12 @@ python -m examples.two_node_demo verify reports/recovery-first
 
 A successful recovery reports two deliveries, one expert call, one model call and 2 credits in total. Both nodes record the same charge. For this fault window, `receiver_credits_at_disconnect` is already 2. Check `private_stores_checked` for A, B and the directory, and `private_markers_found` for the number of synthetic private markers found in the inspected records. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Demo and verifier](examples/two_node_demo.py)
 
+### Prepare a node for a cross-host trial
+
+The recovery demo runs on loopback. For a trial across machines, set `transport` to `mtls` in each node's `node.json` and set `listen_address` to a specific IPv4 address assigned to that machine. The default is `127.0.0.1`. List every remote HTTPS origin the node will contact in `allowed_origins`, including the directory when it is remote. Each entry includes the explicit port, for example `https://peer-b.example:8443`, with no path or trailing slash.
+
+The `credentials` directory holds `ca.pem`, `node.pem` and `node.key`. The node certificate must cover the hostname or IP used by clients and identify the configured node name with a URI such as `urn:roundtable:peer:B`. The demo issues certificates for localhost and the loopback address. A cross-host acceptance run still needs to demonstrate connectivity, identity checks and lost-receipt recovery on separate machines.
+
 ### Keep a private preference and publish a service notice
 
 From the repository root, create two UTF-8 JSON files. In `preference.json`, save `[{"source":"profile","body":"I prefer morning meetings."}]`. In `notice.json`, save `[{"source":"https://example.org/hours","body":"Office hours start at 9."}]`. The HTTPS address identifies the notice. Importing the file reads its contents from disk.
