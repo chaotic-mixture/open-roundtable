@@ -303,7 +303,7 @@ class PeerRecoveryTests(unittest.TestCase):
                         validate_receipt(request, receipt | dict(outcome=changed))
                 self.assertEqual(json.loads(cli(root, 'dispatch-status', request['id'], '--checkpoint').stdout),
                                  dict(job=request['id'], attempts=[], has_consultation_receipt=True,
-                                      no_plan=dict(feasibility=status, nodes=nodes)))
+                                      no_plan=dict(feasibility=status, nodes=nodes, posted_to_network_ledger=True)))
                 self.assertEqual(receipt['credits'], 0)
                 with db:
                     db.execute('UPDATE jobs SET credits=1 WHERE id=?', (request['id'],))
@@ -325,6 +325,8 @@ class PeerRecoveryTests(unittest.TestCase):
                 # Recreate the durable state between checkpointing and posting the network result.
                 with db:
                     db.execute('UPDATE jobs SET result=NULL WHERE id=?', (request['id'],))
+                pending = json.loads(cli(root, 'dispatch-status', request['id'], '--checkpoint').stdout)
+                self.assertIs(pending['no_plan']['posted_to_network_ledger'], False)
                 with patch('examples.peer_node.consult') as consult:
                     self.assertEqual(deliver(root, db, request), (receipt, False))
                     consult.assert_not_called()

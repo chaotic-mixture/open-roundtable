@@ -1028,7 +1028,8 @@ if __name__=='__main__':
                     validate_receipt(request, receipt)
                     if job[2] != receipt['credits'] or (job[1] is not None and json.loads(job[1]) != receipt):
                         parser.error('no-plan checkpoint differs from network ledger')
-                    no_plan = dict(feasibility=outcome['feasibility'], nodes=outcome['nodes'])
+                    no_plan = dict(feasibility=outcome['feasibility'], nodes=outcome['nodes'],
+                                   posted_to_network_ledger=job[1] is not None)
                     rows = []
                 else:
                     parser.error('missing model dispatch journal')

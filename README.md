@@ -178,6 +178,8 @@ On the provider, keep the job journal (`JOB_ID.sqlite3`) and its matching `netwo
 | `infeasible` | The provider ruled out a hard-rule repair. Review the shifts, workers or rooms before sharing a revised request. A capacity proof may use zero search nodes. |
 | `unknown` | The provider exhausted the requested search budget. To try a larger search, increase `search_nodes`, review the provider's admission limit and share the revised request. |
 
+Check `no_plan.posted_to_network_ledger` before recovery. A value of `false` means the task journal has a verified receipt and the provider's network job is still pending. Retrying the same eligible request can finish posting that receipt. A value of `true` confirms that the provider's two local records agree. Delivery to the requester is checked separately.
+
 Either outcome uses one admission quota slot on first acceptance and zero model calls or credits. Replaying the identical request while its source is still shared and its grant remains valid retrieves the saved receipt. A revised request gets a new ID and requires fresh admission.
 
 For a repair that ended before model selection, inspect `no_plan.feasibility`. An `infeasible` result means the expert ruled out a schedule under the submitted constraints. An `unknown` result leaves feasibility open; a new request with a larger search budget may find a plan. The `nodes` field counts search nodes visited. Replaying the same request returns its saved result.
