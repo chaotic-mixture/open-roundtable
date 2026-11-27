@@ -58,6 +58,8 @@ def connect(root, scope):
                 source TEXT PRIMARY KEY REFERENCES records(source),
                 mode TEXT NOT NULL CHECK(mode IN ('sealed','local')), model TEXT)""")
         else:
+            db.execute("""CREATE INDEX IF NOT EXISTS published_node_sources ON records(source)
+                WHERE shared=1 AND substr(source,-5)='/node'""")
             db.execute('CREATE TABLE IF NOT EXISTS node_withdrawals (source TEXT PRIMARY KEY, token TEXT NOT NULL)')
             db.execute("""CREATE TRIGGER IF NOT EXISTS track_node_withdrawal AFTER UPDATE OF shared ON records
                 WHEN OLD.shared=1 AND NEW.shared=0 AND substr(NEW.source,-5)='/node'
