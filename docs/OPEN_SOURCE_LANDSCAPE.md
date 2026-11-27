@@ -34,6 +34,14 @@ Run `python -m examples.capability_comparison --held-out` for four additional En
 
 In one local run with `qwen3.5:9b`, both model methods selected exactly the right provider for the rest audit, room audit and fixed-start repair. When asked for one report covering both audit rules, no individual offer qualified. The unrestricted model recommended one partial match and the filtered model recommended both. Reading descriptions helped disambiguate shared tags in these cases. A compound request still needs a check that each selected offer covers every required rule. This run measured recommendations only.
 
+With A's peer directory configured, operators can require both checks on each offer before invoking the matcher:
+
+```sh
+python -m examples.peer_node runtime/A match-capability "Check both room clashes and overnight rest in a single report." --allow-tag audit --require-rule V --require-rule R
+```
+
+The caller supplies the rule codes explicitly. Even when one peer publishes both a room audit and a separate rest audit, each offer must independently declare both codes. A discovery regression using a simulated catalog checks that split coverage yields an empty menu, zero model calls and zero tokens.
+
 ## 中文调查记录
 
 调查日期：2026-11-10。范围：Agent通信、临时多方协作、能力封装。仅原始仓库/规范只读核验，不以共享会话里的搜索结论作为事实。未安装候选、未跑候选测试、未接外部服务。

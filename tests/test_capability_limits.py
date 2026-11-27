@@ -38,13 +38,15 @@ class CapabilityLimitsTests(unittest.TestCase):
             (root/'node.json').write_text('{"name":"A"}')
             db.execute("INSERT INTO peers VALUES ('B','http://127.0.0.1:8002')")
             offers = []
-            for source, fields in [('legacy', {}), ('partial', {'rules': ['R']}),
+            for source, fields in [('legacy', {}), ('partial', {'rules': ['R']}), ('room', {'rules': ['V']}),
                                    ('both', {'rules': ['R', 'L']})]:
                 body = dict(kind='capability', node='B', tag='audit', description='Roster audit', **fields)
                 offers.append(dict(source=source, body=json.dumps(body)))
             with patch('examples.peer_node.fetch_public_subset', return_value=offers), patch('examples.auto_consult.api') as api:
-                missing = find_capability(root, db, required_rules=['V'])
-                self.assertEqual(match_offers('audit', missing['matches'], 'fixture')['calls'], 0)
+                missing = find_capability(root, db, 'audit', required_rules=['V', 'R'])
+                self.assertEqual(match_offers('Check both room clashes and overnight rest in a single report.',
+                                              missing['matches'], 'fixture'),
+                                 dict(matches=[], calls=0, input_tokens=0, output_tokens=0))
                 api.assert_not_called()
                 available = find_capability(root, db, required_rules=['R', 'L'])
                 api.return_value = dict(done=True, done_reason='stop', message=dict(content='{"ids":[0]}'),
