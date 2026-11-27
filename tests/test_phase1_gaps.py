@@ -298,6 +298,9 @@ class GapTests(unittest.TestCase):
         self.assertEqual(feasibility(rows, lambda p: True, 1), dict(status='infeasible', nodes=0, plan=None))
 
     def test_exhausted_domain_differs_from_exhausted_budget(self):
+        # Filling the gap may require more than one remaining shift.
+        bridge = [('Axu', 0, 2), ('Bxv', 5, 2), ('Cxw', 2, 1), ('Dxz', 3, 2)]
+        self.assertEqual(feasibility(bridge, lambda p: True, 4)['plan'], [0, 5, 2, 3])
         rows = [('Axu', 0, 2), ('Bxv', 4, 2), ('Cyw', 12, 2)]
         self.assertEqual(feasibility(rows, lambda p: True, 12)['plan'], [0, 2, 12])
         # A third shift for x can still fill the gap between the first two.

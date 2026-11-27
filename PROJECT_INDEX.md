@@ -27,6 +27,8 @@ For reproduction in each checkout, generate rows with `validate_roster(seeded_sp
 
 A subsequent search check groups assigned shifts separated by less than eight hours. Any positive gap within such a group must be filled to satisfy minimum rest. If filling it would create more than eight continuous work hours, the branch can be discarded immediately. With the same inputs and budgets, seeds 502–509 produced independently verified plans after 164, 64, 227, 218, 285, 1,325, 1,230 and 1,004 visits respectively. Seed 501 remained unknown after 10,000 visits. This raised coverage to eight of nine, including all six larger rosters. The measurement covers search nodes and feasibility only.
 
+Checking whether any subset of the worker's remaining fixed shift durations can exactly fill each short gap found a plan for seed 501 in 80 visits. Under the same 10,000-node budget per roster, all nine plans passed the independent hourly check. The other eight visit counts were unchanged. This check is a necessary condition for filling each gap individually. Final verification still evaluates the complete roster.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.

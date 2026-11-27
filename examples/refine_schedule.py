@@ -74,7 +74,7 @@ def exceeds_weekly_capacity(rows):
     return False
 
 
-def worker_blocks_fit(rows, starts, indices, *, complete):
+def worker_blocks_fit(rows, starts, indices, fillable_gaps):
     """Nonoverlapping intervals with a short gap must eventually form one block."""
     intervals = sorted((starts[j], starts[j] + rows[j][2]) for j in indices if j < len(starts))
     block_start, end = intervals[0]
@@ -82,7 +82,7 @@ def worker_blocks_fit(rows, starts, indices, *, complete):
         gap = start - end
         if gap >= 8:
             block_start = start
-        elif stop - block_start > 8 or (gap > 0 and complete):
+        elif stop - block_start > 8 or gap not in fillable_gaps:
             return False
         end = stop
     return True
@@ -101,6 +101,15 @@ def feasibility(rows, accepts, budget):
     worker_indices = {}
     for index, (key, _, _) in enumerate(rows):
         worker_indices.setdefault(key[1], []).append(index)
+    # At each depth, record the short gaps that a subset of this worker's
+    # unassigned shifts could exactly fill, using each shift at most once.
+    fillable_after = {}
+    for indices in worker_indices.values():
+        gaps = {0}
+        for j in reversed(indices):
+            fillable_after[j] = gaps
+            duration = rows[j][2]
+            gaps = gaps | {gap + duration for gap in gaps if gap + duration < 8}
 
     def search():
         nonlocal visits
@@ -120,7 +129,7 @@ def feasibility(rows, accepts, budget):
                 continue
             starts.append(h)
             indices = worker_indices[key[1]]
-            if worker_blocks_fit(rows, starts, indices, complete=i == indices[-1]):
+            if worker_blocks_fit(rows, starts, indices, fillable_after[i]):
                 result=search()
                 if result is not None:
                     return result
