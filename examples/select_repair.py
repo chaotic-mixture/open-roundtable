@@ -21,8 +21,13 @@ def choice(response, count):
     message = response['message']
     if not isinstance(message, dict) or message.get('refusal') or message.get('tool_calls'):
         raise ValueError('model did not finalize a selection')
-    answer = json.loads(message['content'])
-    if not isinstance(answer, dict) or set(answer) != {'plan'}:
+    def single_plan_field(pairs):
+        if len(pairs) != 1 or pairs[0][0] != 'plan':
+            raise ValueError('expected a plan ID only')
+        return dict(pairs)
+
+    answer = json.loads(message['content'], object_pairs_hook=single_plan_field)
+    if not isinstance(answer, dict):
         raise ValueError('expected a plan ID only')
     index = answer['plan']
     if type(index) != int or not 0 <= index < count:

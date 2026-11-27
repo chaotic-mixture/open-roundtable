@@ -46,7 +46,8 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(totals,[17,91])
 
     def test_selector_rejects_edits_and_invalid_ids(self):
-        for raw in ['{"plan":true}','{"plan":-1}','{"plan":2}','{"plan":0,"moves":{}}','']:
+        for raw in ['{"plan":true}','{"plan":-1}','{"plan":2}','{"plan":0,"moves":{}}',
+                    '{"plan":0,"plan":1}', '{"plan":{"plan":1}}', '']:
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 select.choice(response(raw),2)
         self.assertEqual(select.choice(response('{"plan":1}'),2),1)
