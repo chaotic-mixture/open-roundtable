@@ -22,22 +22,29 @@ ENGLISH_CASES = {
 }
 
 
-def run(language='zh'):
+def run(language='zh', model='qwen3.5:9b'):
     cases = {'en': ENGLISH_CASES, 'zh': CASES}[language]
     with TemporaryDirectory() as folder:
         root = Path(folder) / 'synthetic'
         data.initialize(root)
         data.ingest(root, 'private', [dict(source=k, body=v) for k, v in cases.items()])
-        data.configure(root, 'local', 'qwen3.5:9b')
+        data.configure(root, 'local', model)
         result = data.maintain_pending(root, len(cases))
         if result['completed'] != len(cases):
             raise RuntimeError(f'Incomplete synthetic batch: {result}')
         with closing(data.connect(root, 'private')) as db:
-            for source, body, summary in db.execute('SELECT source, body, summary FROM records ORDER BY source'):
-                print(json.dumps(dict(case=source, original=body, summary=summary), ensure_ascii=False))
+            rows = db.execute("""SELECT source, body, summary, mode, model FROM records
+                                 LEFT JOIN summary_origin USING(source) ORDER BY source""")
+            for source, body, summary, mode, recorded_model in rows:
+                if (mode, recorded_model) != ('local', model):
+                    raise ValueError('stored summary origin differs from the requested local model')
+                print(json.dumps(dict(case=source, language=language, mode=mode, model=recorded_model,
+                                      original=body, summary=summary), ensure_ascii=False))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--language', choices=('en', 'zh'), default='zh', help='language of the synthetic records')
-    run(parser.parse_args().language)
+    parser.add_argument('--model', default='qwen3.5:9b', help='installed local Ollama model')
+    args = parser.parse_args()
+    run(args.language, args.model)
