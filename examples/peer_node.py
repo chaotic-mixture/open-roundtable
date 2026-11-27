@@ -740,6 +740,11 @@ def reconcile(local, remote, *, list_matched=False):
             reason = 'settled locally, pending at partner'
         elif packed(expected[key]) != packed(reported[key]):
             reason = 'receipt or charge differs'
+            changes = {field: dict(local=expected[key][field], partner=reported[key][field])
+                       for field in ('provider', 'credits', 'receipt')
+                       if expected[key][field] != reported[key][field]}
+            differences.append(dict(job=key, reason=reason, changes=changes))
+            continue
         elif expected[key]['receipt'] is None:
             reason = 'pending at both nodes'
         else:

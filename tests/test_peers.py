@@ -239,6 +239,17 @@ class PeerRecoveryTests(unittest.TestCase):
             result = cli(base/'圆桌', 'reconcile', 'Council', str(statement), '--list-matched')
             self.assertEqual(json.loads(result.stdout), dict(matched=1, differences=[], matched_jobs=[key]))
 
+    def test_settled_statement_differences_name_changed_fields(self):
+        entry = dict(job='1'*64, provider='B', credits=1, receipt='a'*64)
+        local = dict(format=1, node='A', partner='B', entries=[entry])
+        for update in [dict(provider='A'), dict(receipt='b'*64), dict(credits=2, receipt='b'*64)]:
+            with self.subTest(update=update):
+                remote = dict(format=1, node='B', partner='A', entries=[dict(entry, **update)])
+                report = reconcile(local, remote)
+                self.assertEqual(report['matched'], 0)
+                self.assertEqual(report['differences'], [dict(job=entry['job'], reason='receipt or charge differs',
+                    changes={field: dict(local=entry[field], partner=value) for field, value in update.items()})])
+
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
