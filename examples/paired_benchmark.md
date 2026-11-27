@@ -42,6 +42,14 @@ If the model returns an incomplete generation or an invalid verdict, the same fi
 python -m examples.summarize_detection reports/paired-reproduction/results.csv --design reports/paired-reproduction/design.json
 ```
 
+### Follow-up on three fresh rosters
+
+On Ollama 0.40.18 with `qwen3.5:9b`, all nine arms returned scored results. The expert alone had zero misses and zero false positives across the three rosters. The model alone missed 95 violations and introduced 35 false positives. The roundtable missed one excessive continuous-work block on the 11-shift roster and had zero false positives. Model review added one call and one credit per roster relative to the expert. SQLite recorded 12 posted calls and 12 credits across the run. Each difficulty had one roster. [Per-arm scores, token counts and timings](paired_601_metrics.csv)
+
+```sh
+python -m examples.benchmark_consult reports/paired-601 --first-seed 601 --repetitions 1 --continue-on-model-error
+```
+
 ## v0.0.3 排班对照实验
 
 需要模型提交最终清单时，给它一次排班专家调用，在本轮九张表上逐张减少了错误。收益最大的是 22 班次档：三张表共多用 3 credits、4.48 秒，消除了 234 项漏报和 40 项误报。若目标只是判定这四条明确规则，单工具在九张表上已经全部正确。增加模型复核后，六张表持平，三张出现了新错误：种子 502、505 各漏掉一项、两项连续工作超时，503 多报了一对人员冲突。
