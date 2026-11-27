@@ -350,7 +350,7 @@ def main():
             print(json.dumps(result))
             if result.get('failed'):
                 raise SystemExit(2)
-    except (HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
+    except (HTTPException,HTTPError,URLError,sqlite3.Error,OSError,ValueError,KeyError,IndexError,TypeError) as exc:
         # Remote messages and malformed input can contain private content.
         parser.exit(2,f'{args.action} failed ({type(exc).__name__})\n')
 

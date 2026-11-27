@@ -1,5 +1,7 @@
 from contextlib import closing
 from contextlib import redirect_stdout
+from contextlib import redirect_stderr
+from http.client import BadStatusLine
 from io import StringIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -14,6 +16,18 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_single_record_cli_redacts_malformed_http_status(self):
+        data.configure(self.root, 'local', 'fixture')
+        errors = StringIO()
+        with patch('sys.argv', ['data', str(self.root), 'maintain-private', 'profile']), redirect_stderr(errors):
+            with patch.object(data, 'exchange', side_effect=BadStatusLine('private upstream detail')):
+                with self.assertRaises(SystemExit) as stopped:
+                    data.main()
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertEqual(errors.getvalue(), 'maintain-private failed (BadStatusLine)\n')
+        with closing(data.connect(self.root, 'private')) as db:
+            self.assertEqual(db.execute('SELECT summary FROM records').fetchall(), [(None,)])
+
     def test_batch_continues_after_a_record_constraint_and_retries_it(self):
         data.ingest(self.root, 'private', [dict(source='second', body='another record')])
         with closing(data.connect(self.root, 'private')) as db, db:
