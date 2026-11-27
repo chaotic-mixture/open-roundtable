@@ -15,6 +15,7 @@ def main():
     demo.add_argument('--db', required=True, help='path for a new SQLite database')
     audit = commands.add_parser('audit', help='check a schedule-audit-v1 request offline')
     audit.add_argument('input', type=Path, help='JSON file containing the audit request')
+    audit.add_argument('--fail-on-findings', action='store_true', help='exit with status 1 if any requested rule has findings')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
     consult.add_argument('--db',required=True,type=Path)
@@ -124,6 +125,8 @@ def main():
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, ensure_ascii=True, indent=2))
+    if args.command == 'audit' and args.fail_on_findings and any(result['findings'].values()):
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

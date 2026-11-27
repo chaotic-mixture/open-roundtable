@@ -21,6 +21,21 @@ class CliTests(unittest.TestCase):
         return subprocess.run([sys.executable, '-m', 'open_roundtable', 'demo', '--db', str(self.path)],
                               cwd=ROOT, capture_output=True, text=True)
 
+    def test_audit_exit_status_and_report(self):
+        source = self.path.with_suffix('.json')
+        for end, flags, status in [(26, [], 0), (26, ['--fail-on-findings'], 1),
+                                   (21, ['--fail-on-findings'], 0), (169, ['--fail-on-findings'], 2)]:
+            with self.subTest(end=end, flags=flags):
+                source.write_text(json.dumps(dict(operation='schedule-audit-v1', rules=['R'],
+                                                  shifts=[f'Axv:18-{end}', 'Bxu:29-33'])))
+                result = subprocess.run([sys.executable, '-m', 'open_roundtable', 'audit', str(source), *flags],
+                                        cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, status)
+                if status == 2:
+                    self.assertIn('shifts[0]', result.stderr)
+                else:
+                    self.assertEqual(json.loads(result.stdout)['findings'], {'R': ['x@26-29'] if end == 26 else []})
+
     def test_invalid_roster_reports_shift_error_before_creating_ledger(self):
         spec = json.loads((ROOT / 'examples/consult_input.en.json').read_text(encoding='utf8'))
         source = self.path.with_suffix('.json')
