@@ -29,7 +29,8 @@ def verify(output, revision, openssl, approved_files=None):
     inventory = subprocess.check_output(['git', 'ls-tree', '-rz', '--name-only', commit], cwd=repo)
     expected = {os.fsdecode(name) for name in inventory.split(b'\0') if name}
     if approved_files is not None:
-        approved = set(approved_files.read_text(encoding='utf-8-sig').splitlines())
+        manifest = approved_files.read_bytes()
+        approved = set(manifest.decode('utf-8-sig').splitlines())
         if expected != approved:
             raise ValueError(f'approval inventory mismatch: unapproved={sorted(expected - approved)!r}, '
                              f'missing={sorted(approved - expected)!r}')
@@ -49,6 +50,8 @@ def verify(output, revision, openssl, approved_files=None):
     subprocess.run([sys.executable, '-m', 'examples.registration_demo', '--openssl', env['ROUNDTABLE_TEST_OPENSSL']],
                    cwd=tree, env=env, check=True)
     result = dict(commit=commit, files=len(expected), sha256=hashlib.sha256(archive.read_bytes()).hexdigest())
+    if approved_files is not None:
+        result['approved_files_sha256'] = hashlib.sha256(manifest).hexdigest()
     (output/'verified.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
     return result
 

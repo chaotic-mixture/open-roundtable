@@ -32,7 +32,7 @@ Keep private references, local reports, runtime directories, databases, `.hermes
 3. Inspect the candidate files for private paths, account details, credentials, session identifiers and identifying details from other projects.
 4. Run the tests and synthetic demo from an isolated copy of the approved source. The snapshot verifier checks archive membership against the commit and runs the checks in the extracted tree. See the [contributor commands](../CONTRIBUTING.md#check-a-commit-for-publication).
 5. Verify the packaging boundary independently of Git ignore rules. For this source-only release, check that wheel and sdist builds are disabled.
-6. Retain the source archive SHA-256 and the verification report. Record a pass only for checks that succeeded.
+6. Retain the source archive SHA-256 and the verification report. When you supply a reviewed path list, keep its original file alongside the report. The `approved_files_sha256` field in `verified.json` identifies the exact bytes of that list, including its line endings. Record a pass only for checks that succeeded.
 7. Confirm the owner's authorization before creating a remote repository or uploading a release. Keep publication separate from the private research workspace. The project initiator authorized the first public release.
 
 ## 公开发布边界
