@@ -86,6 +86,22 @@ python -m examples.two_node_demo verify reports/recovery-first
 
 A successful recovery reports two deliveries, one expert call, one model call and 2 credits in total. Both nodes record the same charge. For this fault window, `receiver_credits_at_disconnect` is already 2. Check `private_stores_checked` for A, B and the directory, and `private_markers_found` for the number of synthetic private markers found in the inspected records. [Walkthrough in Chinese](#phase-2-双节点断线恢复实验) · [Demo and verifier](examples/two_node_demo.py)
 
+### Reconcile two nodes' receipts offline
+
+After a consultation, B can export its statement for A. Use B's node directory and a fresh output filename:
+
+```sh
+python -m examples.peer_node runtime/B statement A B-for-A.json
+```
+
+Deliver the file to A through a channel both operators trust. On A, compare it with the local ledger:
+
+```sh
+python -m examples.peer_node runtime/A reconcile B B-for-A.json
+```
+
+For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}`. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a difference and a nonzero exit status. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
+
 ### Prepare a node for a cross-host trial
 
 The recovery demo runs on loopback. For a trial across machines, set `transport` to `mtls` in each node's `node.json` and set `listen_address` to a specific IPv4 address assigned to that machine. The default is `127.0.0.1`. List every remote HTTPS origin the node will contact in `allowed_origins`, including the directory when it is remote. Each entry includes the explicit port, for example `https://peer-b.example:8443`, with no path or trailing slash.
