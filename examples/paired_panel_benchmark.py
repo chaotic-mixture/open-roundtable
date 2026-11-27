@@ -54,6 +54,7 @@ def summarize_rounds(first, second):
                          input_tokens=0, output_tokens=0, changed_shifts=0) for mode in ('direct', 'nested')}
     preferences = {mode: dict(met=0, evaluated=0, all_met_runs=0) for mode in totals}
     topic_states = {mode: {'PAUSED': 0, 'RESOLVED': 0} for mode in totals}
+    fallback_counts = dict.fromkeys(totals, 0)
     ranked_candidates = dict(met=0, evaluated=0, all_met_runs=0, changed_shifts=0)
     pairs = same_schedule = 0
     changed_selections = {mode: [] for mode in totals}
@@ -83,6 +84,7 @@ def summarize_rounds(first, second):
                 values[field] += left[mode][field] + right[mode][field]
             for result in (left[mode], right[mode]):
                 topic_states[mode][result['state']] += 1
+                fallback_counts[mode] += result['used_fallback']
                 flags = result['criteria_met']
                 preferences[mode]['met'] += sum(flags)
                 preferences[mode]['evaluated'] += len(flags)
@@ -90,7 +92,8 @@ def summarize_rounds(first, second):
         pairs += 2
         same_schedule += left['same_schedule'] + right['same_schedule']
     return dict(requested_model=requested_model, pairs=pairs, same_schedule_pairs=same_schedule, changed_selections=changed_selections,
-                topic_states=topic_states, preferences=preferences, totals=totals, ranked_candidates=ranked_candidates)
+                topic_states=topic_states, fallback_counts=fallback_counts, preferences=preferences,
+                totals=totals, ranked_candidates=ranked_candidates)
 
 
 if __name__ == '__main__':
