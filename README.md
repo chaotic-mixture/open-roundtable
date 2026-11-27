@@ -73,7 +73,7 @@ Each ledger must contain one returned model call. Compare `criteria_met` in prio
 Start a local Ollama service with `qwen3.5:9b` installed. From the repository root, run the following command with a new output directory. The example uses OpenSSL to issue temporary certificates. If `openssl` is outside your PATH, supply its executable path after `--temporary-tls`.
 
 ```sh
-python -m examples.two_node_demo run reports/recovery-first --temporary-tls openssl --bind-offer --fault after-commit
+python -m examples.two_node_demo run reports/recovery-first --language en --temporary-tls openssl --bind-offer --fault after-commit
 ```
 
 Nodes A and B discover each other through a directory on the same machine. A sends a synthetic scheduling request. B runs the rule expert and model, records the charge, then stops before A receives its receipt. The demo withdraws B’s service offer, restarts B, and retries the original request.

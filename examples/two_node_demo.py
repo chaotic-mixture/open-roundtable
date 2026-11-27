@@ -163,7 +163,8 @@ def audit(folder):
                 request_id=key, **allowance)
 
 
-def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False):
+def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False, language='zh'):
+    fixture = {'en': 'consult_input.en.json', 'zh': 'consult_input.json'}[language]
     if fault not in ('before-receipt','after-commit'):
         raise ValueError('unknown fault window')
     folder.mkdir(parents=True,exist_ok=False)
@@ -199,7 +200,7 @@ def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False
         for root in (a,b):
             cli(root, *discovery)
         cli(b,'permission','A','allow','--remaining','1')
-        spec=json.loads(Path(__file__).with_name('consult_input.json').read_text(encoding='utf8'))
+        spec=json.loads(Path(__file__).with_name(fixture).read_text(encoding='utf8'))
         spec.pop('criteria',None)
         ingest(a,'public',[dict(source=SOURCE,body=packed(spec).decode())])
         share_public(a,SOURCE,True,digest(spec))
@@ -243,6 +244,7 @@ if __name__=='__main__':
     parser.add_argument('action',choices=['run','verify'])
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
+    parser.add_argument('--language', choices=['en', 'zh'], default='zh', help='language of the synthetic scheduling request')
     parser.add_argument('--fault',choices=['after-commit','before-receipt'],default='after-commit')
     tls = parser.add_mutually_exclusive_group()
     tls.add_argument('--temporary-tls', metavar='OPENSSL', help='issue disposable loopback credentials using this OpenSSL executable')
@@ -258,5 +260,6 @@ if __name__=='__main__':
                 from examples.demo_certificates import issue_certificates
                 credentials = Path(stack.enter_context(tempfile.TemporaryDirectory()))
                 issue_certificates(credentials,args.temporary_tls)
-            result = run(args.directory,args.model,args.fault,credentials=credentials,bind_offer=args.bind_offer)
+            result = run(args.directory,args.model,args.fault,credentials=credentials,bind_offer=args.bind_offer,
+                         language=args.language)
     print(json.dumps(result))
