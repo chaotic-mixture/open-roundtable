@@ -1,6 +1,7 @@
 """Command line entry point for offline demonstrations and local consultations."""
 import argparse
 import json
+import sys
 from pathlib import Path
 from contextlib import closing
 from .core import Kernel
@@ -14,7 +15,7 @@ def main():
     demo = commands.add_parser('demo', help='run the synthetic SQLite state-machine demonstration')
     demo.add_argument('--db', required=True, help='path for a new SQLite database')
     audit = commands.add_parser('audit', help='check a schedule-audit-v1 request offline')
-    audit.add_argument('input', type=Path, help='JSON file containing the audit request')
+    audit.add_argument('input', help='audit request JSON file, or - to read from standard input')
     audit.add_argument('--fail-on-findings', action='store_true', help='exit with status 1 if any requested rule has findings')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
@@ -78,7 +79,8 @@ def main():
     try:
         if args.command == 'audit':
             from .schedule_expert import audit_rules, check
-            spec = json.loads(args.input.read_bytes())
+            payload = sys.stdin.buffer.read() if args.input == '-' else Path(args.input).read_bytes()
+            spec = json.loads(payload)
             rules = audit_rules(spec)
             if rules is None:
                 raise ValueError('expected a schedule-audit-v1 request')

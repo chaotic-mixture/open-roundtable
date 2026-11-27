@@ -36,6 +36,16 @@ class CliTests(unittest.TestCase):
                 else:
                     self.assertEqual(json.loads(result.stdout)['findings'], {'R': ['x@26-29'] if end == 26 else []})
 
+    def test_audit_reads_piped_requests(self):
+        cmd = [sys.executable, '-m', 'open_roundtable', 'audit', '-', '--fail-on-findings']
+        request = dict(operation='schedule-audit-v1', rules=['V'], shifts=['Axv:1-4', 'Byv:3-5'])
+        report = subprocess.run(cmd, cwd=ROOT, input=json.dumps(request), capture_output=True, text=True)
+        self.assertEqual(report.returncode, 1)
+        self.assertEqual(json.loads(report.stdout)['findings'], {'V': ['AB']})
+        invalid = subprocess.run(cmd, cwd=ROOT, input='{', capture_output=True, text=True)
+        self.assertEqual(invalid.returncode, 2)
+        self.assertEqual(invalid.stdout, '')
+
     def test_invalid_roster_reports_shift_error_before_creating_ledger(self):
         spec = json.loads((ROOT / 'examples/consult_input.en.json').read_text(encoding='utf8'))
         source = self.path.with_suffix('.json')

@@ -45,6 +45,8 @@ Each shift starts with its ID, worker and room, followed by start and end hours 
 
 For a scripted check, run `python -m open_roundtable audit audit.json --fail-on-findings`. Exit status 0 means all requested checks passed, 1 means the JSON report contains findings, and 2 indicates a request or input error. Without the flag, a completed audit returns 0 even when it reports conflicts.
 
+When another program produces the request, pipe its JSON output into `python -m open_roundtable audit - --fail-on-findings`. The command reads one request from standard input and emits the same report and exit status as file input.
+
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
 
 The model receives your request, including the original preference text, alongside the verified candidate schedules. The expert scores the conditions you explicitly put in `criteria`. For each condition, name a shift ID, choose a field below and give inclusive integer bounds `min` and `max`.
