@@ -305,6 +305,12 @@ class PeerRecoveryTests(unittest.TestCase):
                                  dict(job=request['id'], attempts=[], has_consultation_receipt=True,
                                       no_plan=dict(feasibility=status, nodes=nodes)))
                 self.assertEqual(receipt['credits'], 0)
+                with db:
+                    db.execute('UPDATE jobs SET credits=1 WHERE id=?', (request['id'],))
+                inspected = cli(root, 'dispatch-status', request['id'], '--checkpoint', ok=False)
+                self.assertIn(b'checkpoint differs from network ledger', inspected.stderr)
+                with db:
+                    db.execute('UPDATE jobs SET credits=0 WHERE id=?', (request['id'],))
                 checkpoint_path = root / (request['id'] + '.sqlite3')
                 with closing(sqlite3.connect(checkpoint_path)) as checkpoint:
                     bad = receipt | dict(outcome=receipt['outcome'] | dict(nodes=budget + 1))

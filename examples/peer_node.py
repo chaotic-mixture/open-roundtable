@@ -1020,12 +1020,14 @@ if __name__=='__main__':
                         parser.error('invalid no-plan checkpoint')
                     network = args.directory / 'network.sqlite3'
                     with closing(sqlite3.connect(network.resolve().as_uri() + '?mode=ro', uri=True)) as db:
-                        job = db.execute('SELECT request FROM jobs WHERE id=?', (args.job,)).fetchone()
+                        job = db.execute('SELECT request,result,credits FROM jobs WHERE id=?', (args.job,)).fetchone()
                     if not job:
                         parser.error('missing request for no-plan checkpoint')
                     request = json.loads(job[0])
                     validate_job_identity(args.job, request)
                     validate_receipt(request, receipt)
+                    if job[2] != receipt['credits'] or (job[1] is not None and json.loads(job[1]) != receipt):
+                        parser.error('no-plan checkpoint differs from network ledger')
                     no_plan = dict(feasibility=outcome['feasibility'], nodes=outcome['nodes'])
                     rows = []
                 else:
