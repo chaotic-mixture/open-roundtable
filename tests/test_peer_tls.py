@@ -90,7 +90,14 @@ class PeerTLSTests(unittest.TestCase):
             threading.Thread(target=model.serve_forever,daemon=True).start()
             stack.callback(model.shutdown)
             folder = base/'exercise'
-            with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)):
+            def publish(root, source, enabled, expected=None):
+                share_public(root, source, enabled, expected)
+                if root == folder/'directory' and source == 'https://b.example/node' and enabled:
+                    share_public(root, source, False)
+                    share_public(root, source, True, expected)
+
+            with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)), patch(
+                    'examples.two_node_demo.share_public', side_effect=publish):
                 result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual(result['private_stores_checked'], ['A', 'B', 'directory'])

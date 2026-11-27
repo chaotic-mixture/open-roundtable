@@ -125,12 +125,18 @@ def audit(folder):
             route = origin + '/record?' + urlencode({'source': record['source']})
             require(imports.get(route) == [record], 'directory registration import mismatch')
         served = [json.loads(body) for direction,route,body in directory_traffic if direction == 'serve' and route == '/nodes']
-        require(served == [directory_snapshot, directory_snapshot], 'directory discovery responses mismatch')
+        discovery_snapshot = [record.copy() for record in directory_snapshot]
+        if read(directory,'public.sqlite3',"SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_withdrawals'"):
+            tokens = dict(read(directory,'public.sqlite3','SELECT source,token FROM node_withdrawals'))
+            for record in discovery_snapshot:
+                if record['source'] in tokens:
+                    record['publication'] = tokens[record['source']]
+        require(served == [discovery_snapshot, discovery_snapshot], 'directory discovery responses mismatch')
         discovery_routes = set()
         for root in (a, b):
             receipts = read(root, 'network.sqlite3',
                             "SELECT route,body FROM traffic WHERE direction='receive' AND route LIKE '%/nodes'")
-            require(len(receipts) == 1 and json.loads(receipts[0][1]) == directory_snapshot,
+            require(len(receipts) == 1 and json.loads(receipts[0][1]) == discovery_snapshot,
                     f'{root.name} directory receipt mismatch')
             discovery_routes.add(receipts[0][0])
         require(len(discovery_routes) == 1, 'nodes used different discovery endpoints')
