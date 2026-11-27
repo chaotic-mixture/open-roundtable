@@ -229,15 +229,19 @@ def maintain_pending(root, limit, *, preview=False, diagnostics=False):
     if limit < 1:
         raise ValueError('limit must be positive')
     with closing(connect(root, 'private')) as db, db:
-        db.execute('BEGIN IMMEDIATE')
-        db.execute('CREATE TABLE IF NOT EXISTS maintenance_cursor (id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL)')
-        selection = """SELECT source FROM records WHERE summary IS NULL
-            ORDER BY source <= coalesce((SELECT source FROM maintenance_cursor WHERE id=1), ''), source
-            LIMIT ?"""
+        db.execute('BEGIN' if preview else 'BEGIN IMMEDIATE')
+        if not preview:
+            db.execute('CREATE TABLE IF NOT EXISTS maintenance_cursor (id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL)')
+        cursor = ''
+        if not preview or db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='maintenance_cursor'").fetchone():
+            row = db.execute('SELECT source FROM maintenance_cursor WHERE id=1').fetchone()
+            if row:
+                cursor = row[0]
+        selection = 'SELECT source FROM records WHERE summary IS NULL ORDER BY source <= ?, source LIMIT ?'
         if preview:
-            modes = pending_modes(db, selection, (limit,))
+            modes = pending_modes(db, selection, (cursor, limit))
             return dict(selected=sum(modes.values()), modes=modes)
-        rows = db.execute(selection, (limit,)).fetchall()
+        rows = db.execute(selection, (cursor, limit)).fetchall()
         if rows:
             db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0

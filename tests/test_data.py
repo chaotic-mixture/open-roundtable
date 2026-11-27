@@ -198,6 +198,16 @@ class DataTests(unittest.TestCase):
             data.configure(self.root, 'sealed')
             self.assertEqual(status('--by-mode')['pending_by_mode'], dict(sealed=2, local=0, api=0))
 
+    def test_preview_reads_committed_state_while_writer_holds_reservation(self):
+        with closing(data.connect(self.root, 'private')) as writer:
+            writer.execute('BEGIN IMMEDIATE')
+            writer.execute("UPDATE records SET summary='pending commit'")
+            self.assertEqual(data.maintain_pending(self.root, 1, preview=True),
+                             dict(selected=1, modes=dict(sealed=1, local=0, api=0)))
+            self.assertIsNone(writer.execute("SELECT 1 FROM sqlite_master WHERE name='maintenance_cursor'").fetchone())
+            writer.commit()
+            self.assertEqual(data.maintain_pending(self.root, 1, preview=True)['selected'], 0)
+
     def test_pending_mode_counts_exclude_ready_records_and_follow_policy_changes(self):
         data.ingest(self.root, 'private', [
             dict(source=source, body='synthetic') for source in ('local-a', 'local-b', 'remote', 'sealed')
