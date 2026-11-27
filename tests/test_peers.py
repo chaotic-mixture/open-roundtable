@@ -278,8 +278,10 @@ class PeerRecoveryTests(unittest.TestCase):
     def check_no_plan_receipt(self, count, status, nodes, separate_workers=False, duration=8):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
-            (root/'node.json').write_text('{"name":"B","model":"fixture"}')
-            spec = dict(title='crowded week', preference='keep starts', search_nodes=1,
+            budget = 10 if separate_workers else 1
+            config = dict(name='B', model='fixture', max_search_nodes=budget)
+            (root/'node.json').write_text(json.dumps(config))
+            spec = dict(title='crowded week', preference='keep starts', search_nodes=budget,
                         shifts=[dict(id=str(i), worker=str(i) if separate_workers else 'w',
                                      room='r', start=0, end=duration) for i in range(count)])
             body = dict(sender='A', recipient='B', source='public', spec=spec)
@@ -295,6 +297,8 @@ class PeerRecoveryTests(unittest.TestCase):
                                  dict(job=request['id'], attempts=[], has_consultation_receipt=True,
                                       no_plan=dict(feasibility=status, nodes=nodes)))
                 self.assertEqual(receipt['credits'], 0)
+                if budget > 1:
+                    (root/'node.json').write_text(json.dumps(config | {'max_search_nodes': budget - 1}))
                 self.assertEqual(deliver(root, db, request), (receipt, False))
                 self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
                 model.assert_not_called()
