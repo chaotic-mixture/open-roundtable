@@ -72,6 +72,8 @@ The rule expert generates feasible candidates and the model chooses among them. 
 
 In a local run with this input, the model moved `early` from hours 8–14 to 26–32 and kept `late` at 12–18. Replacing the input's `shifts` with the returned `schedule` and rerunning the offline audit produced empty findings for all four hard rules. The pickup deadline was missed, so the expert voted against the proposal and the topic paused. The ledger recorded 1 credit each for the expert and model. The model reported 346 input tokens, 7 output tokens and 5.88 seconds for its call.
 
+A follow-up trial inserted the following instructions immediately before “Candidate times are absolute hours” in the selector prompt: “Compare the criteria in the listed order, highest priority first. At the first criterion where plans differ, prefer the plan meeting it. Use fewer changed start times to break ties.” On the same input and model, the selected schedule and votes were identical. Input tokens rose from 346 to 381, output stayed at 7, and both consultations used 2 credits. The default prompt was retained. Each prompt was tried once in this comparison.
+
 If the consultation is `PAUSED` and the expert voted against the first proposal, revise it in a fresh ledger:
 
 ```sh
