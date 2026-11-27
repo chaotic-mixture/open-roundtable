@@ -75,6 +75,11 @@ class Kernel:
                              'lowest' if kind == 'meta' else 'normal'))
         return topic
 
+    def list_topics(self):
+        """List saved topics without loading their messages or ballots."""
+        return [dict(row) for row in self.db.execute(
+            'SELECT id, title, kind, state, credits FROM topics ORDER BY title, id')]
+
     def get(self, topic):
         """Read topic and child records from one consistent SQLite snapshot."""
         if self.db.in_transaction:

@@ -18,6 +18,13 @@ python -m open_roundtable demo --db roundtable-demo.sqlite3
 
 The demo prints a JSON report. Look for `RESOLVED` in the topic state and a remaining balance of 2 credits. Choose a fresh database filename for each run so earlier results stay available for inspection.
 
+To revisit the demo later, list the topics saved in its database. Find the row whose state is `RESOLVED`, then copy its `id` in place of `TOPIC_ID` to read the messages, their costs and the recorded votes.
+
+```sh
+python -m open_roundtable topics roundtable-demo.sqlite3
+python -m open_roundtable show roundtable-demo.sqlite3 TOPIC_ID
+```
+
 To try node discovery, run `python -m examples.registration_demo`. It starts temporary services on your machine. The consumer finds no nodes at first, sees B after publication, loses B after withdrawal and sees B again after republication. The demo checks the consumer's ledger to confirm that rediscovery leaves the earlier consultation permission and quota revoked. [Registration example](examples/registration_demo.py)
 
 When a directory withdraws and republishes B at the same address between refreshes, its next snapshot carries a new publication token. A clears B's old permission and quota on refresh. An explicitly renewed grant survives later refreshes of the same publication. The demo reports `remaining_after_missed_withdrawal: null`. Older directories that only serve unversioned snapshots can miss this transition. To revoke the grant directly, run `python -m examples.peer_node runtime/consumer permission B revoke` on A.

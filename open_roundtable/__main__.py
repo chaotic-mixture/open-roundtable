@@ -33,6 +33,8 @@ def main():
     start = commands.add_parser('start', help='start a draft with seated members')
     start.add_argument('db', type=Path)
     start.add_argument('topic')
+    topics = commands.add_parser('topics', help='list saved topics with their IDs, states and balances')
+    topics.add_argument('db', type=Path)
     show = commands.add_parser('show', help='display the saved topic, balance, messages and ballots')
     show.add_argument('db', type=Path)
     show.add_argument('topic')
@@ -77,12 +79,14 @@ def main():
         elif args.command=='verify-batch':
             from examples.verify_preferences import verify
             result=verify(args.directory)
-        elif args.command in ('create','show','join','start','post','top-up','delegate','settle','cite','propose','vote'):
+        elif args.command in ('create','topics','show','join','start','post','top-up','delegate','settle','cite','propose','vote'):
             if args.command != 'create' and not args.db.is_file():
                 raise ValueError('database missing')
             with closing(Kernel(args.db)) as k:
                 if args.command=='create':
                     result = k.get(k.create(args.title,args.credits))
+                elif args.command=='topics':
+                    result = k.list_topics()
                 elif args.command=='delegate':
                     child = k.delegate(args.parent,args.member,args.title,args.budget)
                     result = dict(parent=args.parent, child=child, budget=args.budget)
