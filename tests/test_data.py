@@ -121,6 +121,12 @@ class DataTests(unittest.TestCase):
                 api.assert_called_once()
         self.assertEqual(exit_status.exception.code, 2)
         self.assertEqual(json.loads(output.getvalue()), dict(selected=2, completed=1, skipped=0, failed=1))
+        for error, category in [(ConnectionError('sensitive detail'), 'io_or_http'),
+                                (ValueError('sensitive detail'), 'validation')]:
+            with patch.object(data, 'exchange', side_effect=error):
+                report = data.maintain_pending(self.root, 2, diagnostics=True)
+            self.assertEqual(report, dict(selected=1, completed=0, skipped=0, failed=1,
+                                          failure_counts={category: 1}))
         with closing(data.connect(self.root, 'private')) as db:
             self.assertEqual(db.execute('SELECT source,summary FROM records ORDER BY source').fetchall(),
                              [('profile', None), ('sealed', 'local only')])

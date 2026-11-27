@@ -208,7 +208,7 @@ def maintain(root, source, *, only_pending=False):
         return True
 
 
-def maintain_pending(root, limit, *, preview=False):
+def maintain_pending(root, limit, *, preview=False, diagnostics=False):
     if limit < 1:
         raise ValueError('limit must be positive')
     with closing(connect(root, 'private')) as db, db:
@@ -225,12 +225,19 @@ def maintain_pending(root, limit, *, preview=False):
         if rows:
             db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0
+    failures = {}
     for source, in rows:
         try:
             completed += maintain(root, source, only_pending=True)
-        except (OSError, HTTPException, ValueError, KeyError, IndexError, TypeError):
+        except (OSError, HTTPException, ValueError, KeyError, IndexError, TypeError) as error:
             failed += 1
-    return dict(selected=len(rows), completed=completed, skipped=len(rows)-completed-failed, failed=failed)
+            if diagnostics:
+                category = 'io_or_http' if isinstance(error, (OSError, HTTPException)) else 'validation'
+                failures[category] = failures.get(category, 0) + 1
+    result = dict(selected=len(rows), completed=completed, skipped=len(rows)-completed-failed, failed=failed)
+    if diagnostics:
+        result['failure_counts'] = failures
+    return result
 
 
 def review_public(db, source):
@@ -288,6 +295,7 @@ def main():
     batch = commands.add_parser('maintain-pending', help='maintain a bounded batch of pending private records')
     batch.add_argument('--limit', required=True, type=int)
     batch.add_argument('--preview', action='store_true', help='count records by maintenance mode without advancing the batch')
+    batch.add_argument('--diagnostics', action='store_true', help='include aggregate failure categories during maintenance')
     job=commands.add_parser('maintain-private')
     job.add_argument('source')
     args=parser.parse_args()
@@ -334,7 +342,7 @@ def main():
         elif args.action=='maintain-private':
             maintain(root,args.source)
         elif args.action=='maintain-pending':
-            result = maintain_pending(root, args.limit, preview=args.preview)
+            result = maintain_pending(root, args.limit, preview=args.preview, diagnostics=args.diagnostics)
             print(json.dumps(result))
             if result.get('failed'):
                 raise SystemExit(2)
