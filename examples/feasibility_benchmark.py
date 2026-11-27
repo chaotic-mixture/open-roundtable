@@ -8,20 +8,26 @@ from examples.overnight_score import expected
 from examples.paired_panel_benchmark import seeded_spec
 from examples.refine_schedule import feasibility
 from examples.repair_benchmark import schedule
+from examples.roster_criteria import evaluate
 from examples.user_consult import validate_roster
 
 
 def run(first_seed, budget):
     for seed, size in enumerate(CASE_SIZES, first_seed):
-        rows, _ = validate_roster(seeded_spec(seed, size))
+        rows, criteria = validate_roster(seeded_spec(seed, size))
         start = perf_counter()
         result = feasibility(rows, lambda plan: True, budget)
         elapsed = perf_counter() - start
         plan = result['plan']
-        if plan is not None and any(expected(schedule(rows, plan)).values()):
-            raise ValueError(f'seed {seed} failed independent hard-rule verification')
+        criteria_met = changed_shifts = None
+        if plan is not None:
+            if any(expected(schedule(rows, plan)).values()):
+                raise ValueError(f'seed {seed} failed independent hard-rule verification')
+            criteria_met = evaluate(criteria, rows, plan)
+            changed_shifts = sum(hour != row[1] for hour, row in zip(plan, rows, strict=True))
         print(json.dumps(dict(seed=seed, shifts=size, budget=budget, status=result['status'],
-                              nodes=result['nodes'], seconds=elapsed, plan=plan)))
+                              nodes=result['nodes'], seconds=elapsed, plan=plan,
+                              criteria_met=criteria_met, changed_shifts=changed_shifts)))
 
 
 if __name__ == '__main__':

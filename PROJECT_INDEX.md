@@ -31,6 +31,8 @@ Checking whether any subset of the worker's remaining fixed shift durations can 
 
 Run `python -m examples.feasibility_benchmark` to reproduce the current solver's nine results, or add `--first-seed 510` for a second batch from the same generator. All nine additional plans passed independent verification with the same 10,000-node limit. The three 7-shift cases needed 69–91 visits, the 11-shift cases 235–298, and the 22-shift cases 835–1,058. Each JSON line includes the seed, schedule size, budget, status, visits, search time in seconds and selected start hours in input order. Timing excludes roster generation and independent verification.
 
+The benchmark also scores the first feasible plan against the two preferences after search. Seeds 501–509 kept A's start on all nine rosters, placed B before noon on three, and moved 93 shifts. Seeds 510–518 kept A's start on all nine, placed B before noon on four, and moved 94 shifts. Overall, 7 of 18 plans met both preferences. The search uses input order and tries starts near the original time, so preserving the first shift in these fixtures does not demonstrate that the solver optimized preferences. When there is no plan, both quality fields are null.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
