@@ -9,6 +9,29 @@ from examples.benchmark_consult import ARMS
 from examples.auto_consult import RULES
 
 
+RULE_FIELDS = {f'{rule}_{metric}' for rule in RULES for metric in ('missed', 'extra')}
+
+
+def validate_findings(row, key, arm):
+    present = RULE_FIELDS.intersection(row)
+    if not present:
+        return  # Older CSVs can contain just the aggregate counts.
+    missing = RULE_FIELDS - present
+    if missing:
+        raise ValueError(f'Missing rule columns for {key}, {arm}: {sorted(missing)}')
+    for metric in ('missed', 'extra'):
+        fields = [f'{rule}_{metric}' for rule in RULES]
+        for field in [metric, *fields]:
+            try:
+                value = int(row[field])
+            except (KeyError, TypeError, ValueError):
+                raise ValueError(f'Invalid {field} count for {key}, {arm}') from None
+            if value < 0:
+                raise ValueError(f'Negative {field} count for {key}, {arm}')
+        if sum(int(row[field]) for field in fields) != int(row[metric]):
+            raise ValueError(f'Rule counts disagree with {metric} total for {key}, {arm}')
+
+
 def summarize(rows, design=None):
     trials = defaultdict(dict)
     if design is not None:
@@ -24,6 +47,7 @@ def summarize(rows, design=None):
         arm = row['arm']
         if arm not in ARMS or arm in trials[key]:
             raise ValueError(f'Unexpected or duplicate arm {arm!r} for {key}')
+        validate_findings(row, key, arm)
         trials[key][arm] = row
 
     comparisons = []
@@ -38,8 +62,7 @@ def summarize(rows, design=None):
             for field in ('missed', 'extra', 'calls', 'credits', 'input_tokens', 'output_tokens'):
                 delta[field] = int(arms['table'][field]) - int(arms[baseline][field])
             delta['seconds'] = float(arms['table']['seconds']) - float(arms[baseline]['seconds'])
-            rule_fields = [f'{rule}_{metric}' for rule in RULES for metric in ('missed', 'extra')]
-            if all(field in arms['table'] and field in arms[baseline] for field in rule_fields):
+            if RULE_FIELDS.issubset(arms['table']) and RULE_FIELDS.issubset(arms[baseline]):
                 delta['by_rule'] = {}
                 for rule in RULES:
                     changes = {}
