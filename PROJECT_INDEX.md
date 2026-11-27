@@ -10,7 +10,7 @@ The current directory indexes published node registrations. In a local SQLite co
 
 ## Scheduling experiment results
 
-These three studies use nine synthetic rosters, with three rosters each at 7, 11 and 22 shifts. Each report includes per-roster metrics and commands for reproduction. The observed gains depend on the rules, candidate plans and local model used in these runs.
+The comparisons in the table use nine synthetic rosters, with three rosters each at 7, 11 and 22 shifts. Each report includes per-roster metrics and commands for reproduction. The observed gains depend on the rules, candidate plans and local model used in these runs.
 
 | Question | Result on these rosters | Evidence |
 | --- | --- | --- |
@@ -18,6 +18,16 @@ These three studies use nine synthetic rosters, with three rosters each at 7, 11
 | Can a model choose a better repair from verified plans? | On seeds 505–507, model selection satisfied seven additional preferences over the default in total, with one additional shift change. Ranking the same candidates by the three encoded preferences matched the model on all nine rosters. | [Repair and selection report](examples/repair_results.md) |
 | What changes when preferences have priorities and exceptions? | With the original candidates, the rule selector scored 42/63 and the default scored 31/63 at 9 credits each. Model selection cost 18 credits and scored 28/63 in the English run and 34/63 in the historical Chinese run. Each language ran once with these candidates. Rule-writing effort is excluded. | [English trial and reproduction commands](examples/preference_results.md#english-language-trial) · [Historical Chinese trial](examples/preference_results.md#v005-自然语言排班偏好) |
 | Does generating more candidates help on the same English requests? | Rule ranking improved from 42 to 53 points and moved 91 shifts instead of 94. On seed 508 it gained four points with the same 19 changes. The model scored 27/63 on the expanded candidates in each of two runs and selected the same candidate on every repeat. | [Per-roster comparison and expanded-search command](examples/preference_results.md#does-a-wider-candidate-search-help) |
+
+### Did the panel accept the model's conflict report?
+
+A separate run on three fresh rosters recorded both votes alongside each submitted answer. On seeds 601 and 603, the model and expert agreed and the accepted answers had zero errors. On seed 602, the model omitted one excessive continuous-work block. The expert voted against the answer and the panel paused. The rule tool alone found every violation on all three rosters for three credits in total. The panels used six credits. [Per-arm scores and ballots](examples/paired_601_metrics.csv) · [Run the experiment](examples/paired_benchmark.md#follow-up-on-three-fresh-rosters)
+
+To inspect those votes and error counts offline, run this command from the repository root and read the three entries in `panel_decisions`.
+
+```sh
+python -m examples.summarize_detection examples/paired_601_metrics.csv
+```
 
 ### How often does the bounded search find a hard-rule repair?
 
