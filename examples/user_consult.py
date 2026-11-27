@@ -18,7 +18,7 @@ class NoFeasibleCandidate(ValueError):
         super().__init__(f'hard-constraint feasibility {self.status} after {self.nodes} nodes')
 
 
-def validate_roster(spec):
+def validate_roster(spec, *, for_repair=True):
     if not isinstance(spec,dict) or any(not isinstance(spec.get(k),str) or not spec[k].strip()
                                        for k in ('title','preference')):
         raise ValueError('provide title, preference and shifts')
@@ -40,7 +40,7 @@ def validate_roster(spec):
             raise ValueError(f"duplicate shift ID: {item['id']}")
         if type(start)!=int or type(end)!=int or not 0<=start<end<=168:
             raise ValueError(f"{item['id']}: start and end must be integer hours with 0 <= start < end <= 168")
-        if end-start>8:
+        if for_repair and end-start>8:
             raise ValueError(f"{item['id']} cannot satisfy the 8-hour limit with its fixed duration")
         seen.add(item['id'])
         # The existing interval expert accepts three single-character identifiers.

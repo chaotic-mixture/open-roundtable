@@ -43,6 +43,21 @@ class CliTests(unittest.TestCase):
         self.assertEqual(json.loads(output)['findings'], dict(P=[['early', 'late']], V=[['early', 'late']],
                                                             R=[], L=['Alex@8-18']))
 
+    def test_long_fixed_shift_can_be_audited_before_repair(self):
+        source = self.path.with_suffix('.json')
+        source.write_text(json.dumps(dict(title='Long shift', preference='Keep the start',
+                                          shifts=[dict(id='night', worker='Jo', room='East', start=20, end=29)])))
+        cli = [sys.executable, '-m', 'open_roundtable']
+        audit = subprocess.run(cli + ['audit', str(source), '--consult-input', '--fail-on-findings'],
+                               cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(audit.returncode, 1)
+        self.assertEqual(json.loads(audit.stdout)['findings']['L'], ['Jo@20-29'])
+        repair = subprocess.run(cli + ['consult', str(source), '--db', str(self.path)],
+                                cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(repair.returncode, 2)
+        self.assertIn('fixed duration', repair.stderr)
+        self.assertFalse(self.path.exists())
+
     def test_audit_reads_piped_requests(self):
         cmd = [sys.executable, '-m', 'open_roundtable', 'audit', '-', '--fail-on-findings']
         request = dict(operation='schedule-audit-v1', rules=['V'], shifts=['Axv:1-4', 'Byv:3-5'])

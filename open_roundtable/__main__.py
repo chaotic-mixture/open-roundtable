@@ -84,7 +84,7 @@ def main():
             spec = json.loads(payload)
             if args.consult_input:
                 from examples.user_consult import validate_roster
-                rows, _ = validate_roster(spec)
+                rows, _ = validate_roster(spec, for_repair=False)
                 findings = check([f'{key}:{start}-{start + duration}' for key, start, duration in rows])
                 shifts = {key[0]: shift['id'] for (key, _, _), shift in zip(rows, spec['shifts'])}
                 workers = {key[1]: shift['worker'] for (key, _, _), shift in zip(rows, spec['shifts'])}
