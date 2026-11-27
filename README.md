@@ -179,7 +179,7 @@ Deliver the file to A through a channel both operators trust. On A, compare it w
 python -m examples.peer_node runtime/A reconcile B B-for-A.json
 ```
 
-For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}`. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a difference and a nonzero exit status. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
+For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}` and exit status 0. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a JSON difference report and exit status 1. An unreadable or invalid partner statement produces an error on standard error and exit status 2. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
 
 Add `--list-matched` to `reconcile` or `reconcile-online` to see which job IDs have matching settled receipts on both sides. Look for your job in `matched_jobs`, including when its recorded charge is zero. Pending or differing jobs appear under `differences` with a reason.
 

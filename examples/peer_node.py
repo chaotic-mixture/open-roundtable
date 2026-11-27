@@ -1127,7 +1127,11 @@ if __name__=='__main__':
                         output.write(packed(local))
                     result = dict(entries=len(local['entries']))
                 else:
-                    result = reconcile(local,json.loads(args.file.read_bytes()), list_matched=args.list_matched)
+                    try:
+                        remote = json.loads(args.file.read_bytes())
+                        result = reconcile(local, remote, list_matched=args.list_matched)
+                    except (OSError, ValueError) as error:
+                        parser.error(f'Cannot reconcile partner statement: {error}')
             elif args.action == 'admission':
                 result = admission(args.directory,db,args.partner,args.search_nodes)
             elif args.action == 'reconcile-online':
