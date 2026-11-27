@@ -22,6 +22,8 @@ At commit `53f2cf0`, all 133 tests passed in the extracted 89-file snapshot with
 
 ## Review the candidate files
 
+The post-v0.0.6 snapshot at `d3e2d72` contained 92 files matching the Git inventory (ZIP SHA-256 `4904ac2b636675e63011f81aed21a90e3704628433fa1d0e5350b053f31b2041`). All 139 tests passed in the extracted tree with OpenSSL enabled. Independent SQLite readback and loopback node publication, withdrawal and republication also passed. Running `python -m examples.summarize_detection examples/paired_601_metrics.csv` there reproduced two resolved panel decisions and one paused decision. Reproduce the snapshot with `python tests/verify_snapshot.py reports/check-d3e2d72 --revision d3e2d72 --openssl openssl`. This check used the commit inventory without a separately approved path list.
+
 Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
 
 | Release | Additional candidate evidence |
