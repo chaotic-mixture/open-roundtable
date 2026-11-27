@@ -33,6 +33,24 @@ Run `python -m examples.peer_node runtime/consumer permission-status B` on A to 
 
 Explicitly revoking the grant also closes the receipt-retry path for that peer. The receiving node keeps its existing ledger entry for reconciliation. If the operator grants access again and the original topic is still shared, replaying an identical completed request returns its saved receipt and preserves the new quota for fresh work.
 
+### Reproduce a scheduling consultation
+
+From the repository root, run the scheduling expert with a fixed synthetic model reply, then verify the saved run. Choose a fresh output directory for each run. Verification can be repeated against the same directory.
+
+```sh
+python -m examples.synthetic_consult reports/repro-47
+python -m examples.auto_consult verify reports/repro-47
+```
+
+Both commands should report `RESOLVED` and `credits_spent: 2`. Across the four rules, the `truth` lists contain seven violations. Every `missing` and `extra` list should be empty. The synthetic reply uses zero model tokens.
+
+To measure a real model on the same seed, start local Ollama with `qwen3.5:9b` available, then run the following commands. Compare the rule-level findings, token counts and final state with the offline run.
+
+```sh
+python -m examples.auto_consult run reports/live-47 --seed 47
+python -m examples.auto_consult verify reports/live-47
+```
+
 ### Repair a schedule with your own preferences
 
 To check a roster locally before sharing it, save the following request as `audit.json` and run `python -m open_roundtable audit audit.json`. The offline command reads the file and prints findings using the same validator and scheduling expert as a receiving node.
