@@ -88,6 +88,15 @@ A successful recovery reports two deliveries, one expert call, one model call an
 
 ### Reconcile two nodes' receipts offline
 
+To exercise a disconnect after the consultation result is saved but before B posts the network charge, use a fresh directory:
+
+```sh
+python -m examples.two_node_demo run reports/recovery-before-receipt --language en --temporary-tls openssl --bind-offer --fault before-receipt
+python -m examples.two_node_demo verify reports/recovery-before-receipt
+```
+
+In two independent same-machine runs with the English request and local `qwen3.5:9b`, B had posted zero credits at the `before-receipt` disconnect and two at the `after-commit` disconnect. Both recovered to two posted credits after two deliveries, one expert call and one model call. In both runs B had used its one-request allowance before disconnecting and its remaining allowance stayed at zero after replay.
+
 After a consultation, B can export its statement for A. Use B's node directory and a fresh output filename:
 
 ```sh
