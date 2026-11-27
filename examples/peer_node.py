@@ -303,7 +303,9 @@ def published_offers(root):
     return offers
 
 
-def find_capability(root, db, tag=None, *other_tags, accepting_only=False, required_rules=()):
+def find_capability(root, db, tag=None, *other_tags, accepting_only=False, required_rules=(), search_nodes=None):
+    if search_nodes is not None and (type(search_nodes) is not int or search_nodes < 1):
+        raise ValueError('search_nodes must be a positive integer')
     tags = {tag, *other_tags} if tag is not None else None
     required = set(required_rules)
     node = json.loads((root/'node.json').read_text())['name']
@@ -333,14 +335,14 @@ def find_capability(root, db, tag=None, *other_tags, accepting_only=False, requi
                 if 'rules' in item:
                     match['rules'] = item['rules']
                 matches.append(match)
-    if accepting_only:
+    if accepting_only or search_nodes is not None:
         if json.loads((root/'node.json').read_text()).get('transport') != 'mtls':
             raise ValueError('admission filtering requires mutual TLS')
         accepting = set()
         declined = []
         for peer in sorted({match['node'] for match in matches}):
             try:
-                status = admission(root,db,peer)
+                status = admission(root,db,peer,search_nodes)
             except (HTTPException,OSError,ValueError):
                 unavailable.append(peer)
                 continue
@@ -969,6 +971,8 @@ if __name__=='__main__':
     match.add_argument('need')
     match.add_argument('--require-rule', action='append', default=[], help='require every listed rule before model selection')
     match.add_argument('--accepting-only', action='store_true')
+    for command in (find, match):
+        command.add_argument('--search-nodes', type=int, help='filter by authenticated admission for this repair budget')
     match.add_argument('--allow-tag',action='append',help='only consider this declared operation tag; repeat for alternatives')
     match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
@@ -1049,13 +1053,13 @@ if __name__=='__main__':
                 result = offer(args.directory,args.source,args.tag,args.description,rules=args.rule)
             elif args.action == 'find-capability':
                 result = find_capability(args.directory,db,*args.tag,accepting_only=args.accepting_only,
-                                         required_rules=args.require_rule)
+                                         required_rules=args.require_rule, search_nodes=args.search_nodes)
             elif args.action == 'match-capability':
                 catalog_result = find_capability(args.directory,db,accepting_only=args.accepting_only,
-                                                 required_rules=args.require_rule)
+                                                 required_rules=args.require_rule, search_nodes=args.search_nodes)
                 result = match_offers(args.need,catalog_result['matches'],args.model,allowed_tags=args.allow_tag)
                 result['unavailable'] = catalog_result['unavailable']
-                if args.accepting_only:
+                if 'declined' in catalog_result:
                     result['declined'] = catalog_result['declined']
             elif args.action == 'feedback':
                 result = practice_feedback(args.directory, db, job=args.job, useful=args.outcome=='useful',

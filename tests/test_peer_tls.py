@@ -203,6 +203,10 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual((blocked['matches'],blocked['declined'],blocked['calls']), ([],['B'],0))
             cli(receiver,'permission','A','allow','--remaining','1')
             self.assertEqual({m['tag'] for m in available_repairs()['matches']}, {'repair','reschedule'})
+            over = json.loads(cli(folder/'A','match-capability','repair shifts','--search-nodes','11').stdout)
+            self.assertEqual((over['matches'], over['declined'], over['calls']), ([], ['B'], 0))
+            within = json.loads(cli(folder/'A','find-capability','repair','reschedule','--search-nodes','10').stdout)
+            self.assertEqual({m['tag'] for m in within['matches']}, {'repair','reschedule'})
             with closing(ledger(receiver)) as db:
                 self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (1,))
             eligible = json.loads(cli(folder/'A','find-capability','repair','--accepting-only').stdout)

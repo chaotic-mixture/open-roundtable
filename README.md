@@ -142,6 +142,8 @@ A provider can set `max_search_nodes` to a positive integer in its own `node.jso
 
 Before sending a roster, run `python -m examples.peer_node runtime/A admission B --search-nodes 10000` over mutual TLS. A sends its identity and proposed budget. B checks both its current grant and the budget ceiling without reserving quota. A requires confirmation of the exact budget, so an older peer that only checks grants cannot accidentally confirm eligibility for an expensive repair. B checks again when accepting the actual request.
 
+To find providers for that budget, run `python -m examples.peer_node runtime/A find-capability repair reschedule --search-nodes 10000`. Each matching provider receives one admission query across its offers. The same option on `match-capability` filters providers before model selection. When every provider declines, the result lists the declined nodes and records zero selection calls.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
