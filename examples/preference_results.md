@@ -42,6 +42,31 @@ In one English run with Ollama 0.40.18, all nine model choices passed the hard c
 
 The English model arm earned 28/63 points with 96 changed shifts, 18 calls (nine expert, nine model), 18 credits, 8,917 input tokens, 99 output tokens and 14.53 seconds of member call time. The default earned 31/63 with 90 changed shifts and the rules earned 42/63 with 94. Each used nine calls and nine credits. All 27 rows reconciled and every model call returned a valid choice. The English and historical Chinese runs used the same seeds and scoring rules. A single run per language cannot isolate a language effect.
 
+### Does a wider candidate search help?
+
+With the same English briefs and nine rosters, preference-guided search raised the rule selector's total from 42 to 53 points out of 63 while reducing changed shifts from 94 to 91. Search uses the encoded priorities to try new start times and verify the resulting schedules. The largest gains came on rosters where the original candidates left little room for improvement.
+
+| Seed | Rule points, original → expanded | Changed shifts, original → expanded | Model points with expanded candidates |
+| --- | ---: | ---: | ---: |
+| 501 | 7 → 7 | 5 → 3 | 6 |
+| 502 | 0 → 5 | 4 → 5 | 0 |
+| 503 | 5 → 5 | 4 → 4 | 5 |
+| 504 | 7 → 7 | 6 → 6 | 3 |
+| 505 | 3 → 5 | 10 → 8 | 5 |
+| 506 | 7 → 7 | 8 → 8 | 0 |
+| 507 | 7 → 7 | 19 → 19 | 2 |
+| 508 | 1 → 5 | 19 → 19 | 1 |
+| 509 | 5 → 5 | 19 → 19 | 5 |
+
+For 508, expanding the search bought four points without moving another shift. For 502, five points cost one extra changed shift. On both rosters the model passed over the better candidate. The rule arm used nine calls and nine credits in each run, with member call time rising from 0.33 to 1.24 seconds.
+
+With expanded candidates, model selection earned 27 points and changed 96 shifts. It used 18 calls, 18 credits, 14,664 input tokens, 99 output tokens and 5.26 seconds of member call time. The default scored 31 with 90 changed shifts. All 27 selections passed the hard constraints. Each configuration ran once, so the measured times do not establish a speed advantage.
+
+```sh
+python -m examples.preference_benchmark reports/preferences-en-expanded --language en --expand --model qwen3.5:9b
+python -m open_roundtable verify-batch reports/preferences-en-expanded
+```
+
 ## v0.0.5 自然语言排班偏好
 
 相对专家默认方案，模型只在 506、507 两张表上提高了得分，两张都无需多改班。人工编码的规则排序在九张表上均达到候选内最优，并能在 501、505 找到模型漏掉的改善机会。502、508 即使选到最好候选，也分别只有 0 分和 1 分，继续改善需要扩充候选或检验硬约束下的可行性。
