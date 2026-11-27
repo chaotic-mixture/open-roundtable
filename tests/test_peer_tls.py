@@ -270,3 +270,14 @@ class PeerTLSTests(unittest.TestCase):
             self.assertEqual(report['matched'], 6000)
             self.assertEqual(len(set(report['matched_jobs'])), 6000)
             self.assertNotIn(missing_job, report['matched_jobs'])
+            original = json.loads(synthetic[0][2])
+            revised = dict(original, credits=1)
+            with closing(ledger(receiver)) as writer, writer:
+                writer.execute('INSERT INTO jobs(id,request,result,credits) VALUES (?,?,?,?)',
+                               (missing_job, synthetic[0][1], packed(revised).decode(), 1))
+            compared = cli(folder/'A', 'reconcile-online', 'B', ok=False)
+            self.assertEqual(compared.returncode, 1)
+            self.assertEqual(json.loads(compared.stdout), dict(matched=6000, differences=[
+                dict(job=missing_job, reason='receipt or charge differs', changes=dict(
+                    credits=dict(local=2, partner=1),
+                    receipt=dict(local=digest(original), partner=digest(revised))))]))
