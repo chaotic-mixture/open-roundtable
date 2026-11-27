@@ -56,6 +56,25 @@ class ConsultationTests(unittest.TestCase):
         self.assertEqual(result['state'], 'PAUSED')
         self.assertEqual(result['scores']['P'], {'truth':['DE'], 'extra':['AB'], 'missing':['DE']})
 
+    def test_response_format_replay(self):
+        self.execute()
+        request_path = self.folder / 'request.json'
+        audit_path = self.folder / 'run.json'
+        request = json.loads(request_path.read_text(encoding='utf-8'))
+        audit = json.loads(audit_path.read_text(encoding='utf-8'))
+        original = request['format']
+        for replacement in ('json', dict(original, required=['reason'])):
+            with self.subTest(replacement=replacement):
+                request_path.write_text(json.dumps(dict(request, format=replacement)), encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, 'evidence mismatch'):
+                    verify(self.folder)
+        del audit['response_format']
+        audit_path.write_text(json.dumps(audit), encoding='utf-8')
+        for legacy in ('json', original):
+            request_path.write_text(json.dumps(dict(request, format=legacy)), encoding='utf-8')
+            with redirect_stdout(io.StringIO()):
+                verify(self.folder)
+
     def test_altered_ledger_rejected(self):
         self.execute()
         with closing(sqlite3.connect(self.folder/'ledger.sqlite3')) as db:

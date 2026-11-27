@@ -74,6 +74,13 @@ def save(folder, name, value):
     (folder/name).write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding='utf-8')
 
 
+def verdict_schema():
+    fields = {rule: {'type': 'array', 'items': {'type': 'string'}} for rule in RULES}
+    fields.update(approve_final={'type': 'boolean'}, reason={'type': 'string'})
+    return {'type': 'object', 'properties': fields, 'required': list(fields),
+            'additionalProperties': False}
+
+
 def run(folder, model, seed, provider=api):
     folder.mkdir(parents=True, exist_ok=False)
     shifts = generate(seed, 7)
@@ -81,7 +88,7 @@ def run(folder, model, seed, provider=api):
     installed = next(m for m in models if m['name'] == model)
     audit = {'model': installed, 'ollama': provider('/api/version'), 'python': platform.python_version(),
              'seed': seed, 'shifts': shifts, 'started': datetime.now(timezone.utc).isoformat(),
-             'initial_credits': 2, 'prompt_version': 2}
+             'initial_credits': 2, 'prompt_version': 2, 'response_format': 'verdict-v1'}
     root = Path(__file__).resolve().parents[1]
     audit['source_sha256'] = {s: hashlib.sha256((root/s).read_bytes()).hexdigest() for s in SOURCES}
     save(folder, 'run.json', audit)
@@ -94,11 +101,7 @@ def run(folder, model, seed, provider=api):
         proposal = lists(check(shifts))
         audit['expert_seconds'] = perf_counter()-start
         assert_post(k, topic, 'expert', encoded(proposal))
-        fields = {rule: {'type': 'array', 'items': {'type': 'string'}} for rule in RULES}
-        fields.update(approve_final={'type': 'boolean'}, reason={'type': 'string'})
-        schema = {'type': 'object', 'properties': fields, 'required': list(fields),
-                  'additionalProperties': False}
-        payload = {'model':model, 'stream':False, 'think':False, 'format':schema,
+        payload = {'model':model, 'stream':False, 'think':False, 'format':verdict_schema(),
                    'options':{'temperature':0}, 'messages':[{'role':'user',
                    'content':prompt(shifts, proposal, audit['prompt_version'])}]}
         save(folder, 'request.json', payload)
@@ -139,7 +142,13 @@ def verify(folder):
                               (topic,)).fetchall()
         votes = dict(db.execute('SELECT member,agree FROM votes WHERE topic=?',(topic,)))
         feedback = db.execute('SELECT body FROM feedback WHERE topic=?',(topic,)).fetchall()
-        checks = [db.execute('PRAGMA integrity_check').fetchall()==[('ok',)],
+        # Older transcripts used either plain JSON or the first unversioned verdict schema.
+        formats = [verdict_schema()]
+        if 'response_format' not in audit:
+            formats.append('json')
+        checks = [audit.get('response_format', 'verdict-v1') == 'verdict-v1',
+                  request.get('format') in formats,
+                  db.execute('PRAGMA integrity_check').fetchall()==[('ok',)],
                   not db.execute('PRAGMA foreign_key_check').fetchall(),
                   generate(audit['seed'],7)==shifts,
                   request['messages']==[{'role':'user','content':prompt(shifts,proposal,audit.get('prompt_version',1))}],
