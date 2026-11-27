@@ -114,6 +114,24 @@ class PeerHTTPSHandler(HTTPSHandler):
         return self.do_open(self.connection, request)
 
 
+def allowed_origins(config):
+    origins = config.get('allowed_origins', [])
+    if not isinstance(origins, list):
+        raise ValueError('allowed_origins must be a list')
+    for index, origin in enumerate(origins):
+        try:
+            if not isinstance(origin, str):
+                raise ValueError
+            endpoint = urlsplit(origin)
+            if (endpoint.scheme != 'https' or not endpoint.hostname or not endpoint.port
+                    or endpoint.username is not None or origin != f'https://{endpoint.netloc}'
+                    or any(character.isspace() for character in origin)):
+                raise ValueError
+        except ValueError:
+            raise ValueError(f'allowed_origins[{index}] must be an HTTPS origin with an explicit port') from None
+    return origins
+
+
 def transfer(db,url,data=None,*,peer_name=None):
     u=urlsplit(url)
     location = db.execute('PRAGMA database_list').fetchone()[2]
@@ -124,8 +142,7 @@ def transfer(db,url,data=None,*,peer_name=None):
     if u.scheme!=scheme or not u.hostname or u.username is not None or u.password is not None or not u.port:
         raise ValueError('invalid transport endpoint')
     if u.hostname != '127.0.0.1':
-        origins = config.get('allowed_origins', [])
-        if not context or not isinstance(origins, list) or f'https://{u.netloc}' not in origins:
+        if not context or f'https://{u.netloc}' not in allowed_origins(config):
             raise ValueError('remote origin is not authorized')
     trace(db,'send',url,data)
     request=Request(url,data=None if data is None else packed(data),headers={'Content-Type':'application/json'})
@@ -1017,6 +1034,7 @@ if __name__=='__main__':
     if args.action == 'check-listener':
         try:
             config = json.loads((args.directory/'node.json').read_text())
+            allowed_origins(config)
             context = tls_context(args.directory, server=True)
             print(json.dumps(dict(listen_address=listen_address(config, context),
                                   transport=config.get('transport', 'http'))))
