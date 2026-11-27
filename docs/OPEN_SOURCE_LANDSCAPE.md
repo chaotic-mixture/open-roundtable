@@ -6,6 +6,19 @@ EigenFlux lets agents publish capabilities and needs, then find relevant peers t
 
 Open Roundtable has a local comparison for that question. From the repository root, run `python -m examples.rule_discovery --dispatch`. On nine synthetic rosters, selecting by tag led to 36 dispatch attempts. The provider declarations ruled out 21 before roster transmission. Checking all requested rules during discovery reduced attempts to 15 and returned the same 15 correct receipts. This measures the effect of structured matching on the local directory. Evaluating recommendations based on natural-language needs would require a separate comparison on the same labeled requests. [Local experiment](../examples/rule_discovery.py)
 
+### Matching English requests to published offers
+
+Run `python -m examples.capability_comparison` with local Ollama serving `qwen3.5:9b`. Three English requests share a catalog of two schedule repair services and one audit service. Both repair services should match the repair request, only the audit service should match the read-only request, and none should match payroll.
+
+| Selector | Missed offers | Incorrect offers | Model calls | Input / output tokens |
+| --- | ---: | ---: | ---: | ---: |
+| Exact tag | 1 | 0 | 0 | 0 / 0 |
+| Model over all offers | 1 | 2 | 3 | 405 / 26 |
+| Operator's allowed tags | 0 | 0 | 0 | 0 / 0 |
+| Model over allowed tags | 0 | 0 | 2 | 194 / 17 |
+
+The unrestricted model found the synonymous repair service missed by exact matching. On the read-only request it selected both editing services and missed the auditor. The operator's repair rule explicitly included both repair tags, and the audit rule allowed only the audit tag. Model review added no correct selections to those rules in this run. An empty payroll menu skipped inference. This experiment measures local recommendations on three labeled requests. Provider execution and EigenFlux matching were outside its scope.
+
 ## 中文调查记录
 
 调查日期：2026-11-10。范围：Agent通信、临时多方协作、能力封装。仅原始仓库/规范只读核验，不以共享会话里的搜索结论作为事实。未安装候选、未跑候选测试、未接外部服务。
