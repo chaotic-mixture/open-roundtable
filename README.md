@@ -117,6 +117,8 @@ python -m open_roundtable.data runtime/store-demo preview-private profile
 
 The preview should show `store` as `local` and the effective `mode` as `sealed`, with a null destination. Preview reads the policy without sending the record body. Use `record-limit profile inherit` to let the record follow the store policy again. A sealed store keeps every record sealed, including records with an individual local-model limit.
 
+To inspect the quality of local-model maintenance, run `python -m examples.private_summary_cases --language en` with Ollama serving `qwen3.5:9b`. The example creates a temporary private store and prints each synthetic source alongside its saved summary. Check whose preference is known, whether both conditions on a late shift survive, and whether a pending pilot remains tentative. Use `--language zh` for the original Chinese cases.
+
 ### Compare ways to find a scheduling expert
 
 Run `python -m examples.rule_discovery --dispatch` from the repository root. A requester sends nine synthetic rosters to rule-based experts over loopback HTTP. All four providers advertise the same audit tag, but their offers differ in which checks they declare. Each roster produces two JSON lines. Compare `tag` (select by audit tag) with `rules` (also require every requested check). The rule codes are P for worker overlap, V for room overlap, R for minimum rest and L for maximum continuous work.

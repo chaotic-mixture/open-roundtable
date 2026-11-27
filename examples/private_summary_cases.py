@@ -1,4 +1,5 @@
-"""Run synthetic Chinese qualification cases through the local private store."""
+"""Check whether local private summaries preserve qualifications in English or Chinese."""
+import argparse
 from contextlib import closing
 import json
 from pathlib import Path
@@ -14,14 +15,22 @@ CASES = {
 }
 
 
-def run():
+ENGLISH_CASES = {
+    'ownership': "Jo prefers early shifts. Lee is only passing on Jo's preference. Lee's own preference is unknown.",
+    'exception': 'Chen usually avoids late shifts. Chen can take one only on Fridays when a colleague picks up the children.',
+    'conditional': "If the pilot is approved, Zhao might switch to Wednesday shifts next month. Approval is pending and the current roster still applies.",
+}
+
+
+def run(language='zh'):
+    cases = {'en': ENGLISH_CASES, 'zh': CASES}[language]
     with TemporaryDirectory() as folder:
         root = Path(folder) / 'synthetic'
         data.initialize(root)
-        data.ingest(root, 'private', [dict(source=k, body=v) for k, v in CASES.items()])
+        data.ingest(root, 'private', [dict(source=k, body=v) for k, v in cases.items()])
         data.configure(root, 'local', 'qwen3.5:9b')
-        result = data.maintain_pending(root, len(CASES))
-        if result['completed'] != len(CASES):
+        result = data.maintain_pending(root, len(cases))
+        if result['completed'] != len(cases):
             raise RuntimeError(f'Incomplete synthetic batch: {result}')
         with closing(data.connect(root, 'private')) as db:
             for source, body, summary in db.execute('SELECT source, body, summary FROM records ORDER BY source'):
@@ -29,4 +38,6 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--language', choices=('en', 'zh'), default='zh', help='language of the synthetic records')
+    run(parser.parse_args().language)
