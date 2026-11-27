@@ -187,7 +187,8 @@ def maintain(root, source, *, only_pending=False):
                 'negation, exceptions, uncertainty, and whose preference is described. '
                 'When a record describes both a current arrangement and a possible future change, '
                 'state what applies now in its own sentence. Keep the condition and uncertainty with the future change. '
-                'If the record is already a concise sentence, repeat it verbatim.')},
+                'Retain any explicit decision status, including pending approval. Use the names or pronouns '
+                'given in the record without inferring gender. If the record is already concise, copy it verbatim.')},
                       {'role':'user','content':body}]
             payload=dict(model=model,messages=messages,stream=False)
             if mode=='local':
