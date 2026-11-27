@@ -186,6 +186,17 @@ def discover(db,bootstrap, *, directory_name=None):
     return descriptors
 
 
+def permission_status(db, peer):
+    row = db.execute('''SELECT consult_grants.name, remaining FROM peers
+                        LEFT JOIN consult_grants USING(name,url)
+                        LEFT JOIN grant_limits ON grant_limits.name=consult_grants.name
+                        WHERE peers.name=?''', (peer,)).fetchone()
+    granted = row is not None and row[0] is not None
+    remaining = row[1] if granted else None
+    return dict(peer=peer, discovered=row is not None, granted=granted, remaining=remaining,
+                can_submit=granted and remaining != 0)
+
+
 def set_permission(db, peer, allow, remaining=None):
     if remaining is not None and (not allow or type(remaining) is not int or not 0 <= remaining < 2**63):
         raise ValueError('remaining consultations must be a nonnegative integer on an active grant')
@@ -940,6 +951,7 @@ if __name__=='__main__':
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
     access.add_argument('--remaining', type=int)
+    commands.add_parser('permission-status', help='inspect local consultation permission and quota').add_argument('peer')
     mark = commands.add_parser('mark')
     mark.add_argument('job')
     mark.add_argument('label')
@@ -990,6 +1002,8 @@ if __name__=='__main__':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':
                 result = set_permission(db, args.peer, args.mode == 'allow', args.remaining)
+            elif args.action == 'permission-status':
+                result = permission_status(db, args.peer)
             elif args.action in ('mark', 'revisit'):
                 result = local_history(args.directory, db, args.label, getattr(args, 'job', None))
             else:

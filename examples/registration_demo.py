@@ -65,6 +65,9 @@ def run(openssl=None):
                     raise ValueError(f'withdrawn peer remains in {table}')
         share_public(directory, source, True, imported['sha256'])
         republished = json.loads(cli(consumer, *discovery).stdout)
+        status = json.loads(cli(consumer, 'permission-status', 'B').stdout)
+        if status != dict(peer='B', discovered=True, granted=False, remaining=None, can_submit=False):
+            raise ValueError('unexpected permission status after republication')
         if republished != published:
             raise ValueError('consumer did not rediscover the republished node')
         with closing(ledger(consumer)) as db:
