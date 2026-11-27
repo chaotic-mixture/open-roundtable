@@ -39,13 +39,27 @@ def rule_key(profile, f, moved, index):
     return top,middle,low,-moved,-index
 
 
-def run(folder, model, *, expand=False):
+ENGLISH_BRIEFS = [
+    "A needs to pick up a child. Most importantly, finish by 18:00 inclusive on the day the shift starts. "
+    "If A's original shift crossed midnight, pickup is already covered: keep A's original start instead. "
+    "Next, the night coordinator wants A to start at or after 18:00. Finally, keep B on its original date.",
+    "B takes a shuttle. First, start at or after 06:00 and before 10:00. If B originally started before "
+    "06:00, a car is already booked: keep the original date and start time instead. Next, the evening team "
+    "wants B to start at or after 14:00 and before 22:00. Finally, C would like to start no earlier than originally planned.",
+    "C has an appointment. First, keep C's original date and start time. If C's original shift lasted at "
+    "least eight hours, cover is available that day: keeping the date alone is enough. Next, delay C by "
+    "at least two hours for handover. Finally, keep A's start within two hours of its original start.",
+]
+BRIEFS_BY_LANGUAGE = {'zh': BRIEFS, 'en': ENGLISH_BRIEFS}
+
+
+def run(folder, model, *, expand=False, language='zh'):
     with single_writer(folder):
-        _run(folder, model, expand)
+        _run(folder, model, expand, language)
 
 
-def _run(folder, model, expand):
-    design = dict(expand=expand, briefs=BRIEFS, seeds=list(range(501,510)), profiles='rotate 0,1,2',
+def _run(folder, model, expand, language):
+    design = dict(expand=expand, language=language, briefs=BRIEFS_BY_LANGUAGE[language], seeds=list(range(501,510)), profiles='rotate 0,1,2',
                   weights=[4,2,1], ties='fewest changed shifts, then lowest ID',
                   rubric_sha256=hashlib.sha256(Path(__file__).with_name('preference_rubric.py').read_bytes()).hexdigest(),
                   model={'name':model})
@@ -57,7 +71,7 @@ def _run(folder, model, expand):
     if (folder/'design.json').exists():
         prior=json.loads((folder/'design.json').read_text(encoding='utf8'))
         if prior.get('format') != 2 or prior['model']['name']!=model or any(
-                prior[key]!=value for key,value in design.items() if key!='model'):
+                prior.get(key)!=value for key,value in design.items() if key!='model'):
             raise ValueError('incompatible run directory')
         design=prior
     else:
@@ -120,10 +134,15 @@ def _run(folder, model, expand):
                 request=response=None
                 fallback=''
                 if arm=='model':
-                    msg=(BRIEFS[profile]+'。请按优先级从高到低逐项比较；相同则少改班优先，再选编号小的。'
+                    instructions = (' Compare priorities from highest to lowest. Break ties by fewer changed shifts, '
+                         'then lower candidate ID. Crossing midnight requires working after midnight. A shift ending '
+                         'exactly at midnight does not cross it. All candidates are feasible. Dates start at day 0; '
+                         'absolute start times count hours from midnight on day 0. Return only the candidate ID. Candidates: '
+                         if language == 'en' else '。请按优先级从高到低逐项比较；相同则少改班优先，再选编号小的。'
                          '跨日指午夜之后仍在工作，午夜恰好下班不算。18点下班指开工当天。'
                          '候选均已验证可行。日期从0计，absolute start从第0天午夜计时。'
-                         '仅返回候选编号。候选数据：'+encoded(menu))
+                         '仅返回候选编号。候选数据：')
+                    msg = design['briefs'][profile] + instructions + encoded(menu)
                     request=dict(model=model,stream=False,think=False,options={'temperature':0},
                                  messages=[dict(role='user',content=msg)],format={'type':'object',
                                  'required':['plan'],'additionalProperties':False,'properties':{
@@ -181,5 +200,6 @@ if __name__=='__main__':
     parser.add_argument('directory',type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--expand',action='store_true',help='search additional feasible schedules')
+    parser.add_argument('--language', choices=BRIEFS_BY_LANGUAGE, default='zh', help='model request language (default: zh)')
     args=parser.parse_args()
-    run(args.directory,args.model,expand=args.expand)
+    run(args.directory,args.model,expand=args.expand,language=args.language)

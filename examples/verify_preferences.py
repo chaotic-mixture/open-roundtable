@@ -7,13 +7,17 @@ from pathlib import Path
 from contextlib import closing
 from examples.generate_overnight import generate
 from examples.overnight_score import expected
-from examples.preference_rubric import assess, BRIEFS
+from examples.preference_rubric import assess
+from examples.preference_benchmark import BRIEFS_BY_LANGUAGE
 from examples.repair_benchmark import schedule
 from examples.select_repair import choice
 
 
 def verify(folder):
     design=json.loads((folder/'design.json').read_text(encoding='utf8'))
+    briefs = BRIEFS_BY_LANGUAGE.get(design.get('language', 'zh'))
+    if briefs is None or design['briefs'] != briefs:
+        raise ValueError('preference briefs differ from the declared language')
     source=Path(__file__).with_name('preference_rubric.py').read_bytes()
     # A published Git checkout may have LF or CRLF line endings.
     lf=source.replace(b'\r\n',b'\n')
@@ -93,7 +97,7 @@ def verify(folder):
                     or [m[0] for m in messages] != (['expert','model'] if response is not None else ['expert'])
                     or any(m[2]!=1 for m in messages) or any(int(row[k])!=v for k,v in counts.items())
                     or (response is not None and (messages[-1][0]!='model' or json.loads(messages[-1][1])!=response))
-                    or (arm=='model' and BRIEFS[profile] not in data['request']['messages'][0]['content'])
+                    or (arm=='model' and briefs[profile] not in data['request']['messages'][0]['content'])
                     or (response is not None and data['fallback']!=invalid)):
                 raise ValueError(f'evidence mismatch for {seed}/{arm}')
     return {'verified_rows':len(rows),'retryable':sum(int(r.get('retryable',0)) for r in rows)}

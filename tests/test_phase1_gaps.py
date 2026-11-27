@@ -29,6 +29,18 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_english_batch_rejects_language_change_on_resume(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(batch, 'api', side_effect=provider):
+            folder = Path(tmp) / 'batch'
+            batch.run(folder, 'fixture', language='en')
+            self.assertEqual(verify(folder), {'verified_rows': 27, 'retryable': 0})
+            for seed in range(501, 510):
+                evidence = json.loads((folder / f'{seed}-model.json').read_text(encoding='utf8'))
+                prompt = evidence['request']['messages'][0]['content']
+                self.assertTrue(prompt.startswith(batch.ENGLISH_BRIEFS[(seed-501) % 3]))
+            with self.assertRaisesRegex(ValueError, 'incompatible run directory'):
+                batch.run(folder, 'fixture', language='zh')
+
     def test_provider_error_text_stays_out_of_fallback_and_journal(self):
         source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
         with tempfile.TemporaryDirectory() as tmp:
