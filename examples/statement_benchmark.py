@@ -11,7 +11,7 @@ from examples import peer_node
 
 # Scan baseline from commit 23d8fbe.
 def scan_statement(root, db, partner, *, after='', limit=None):
-    node = json.loads((root/'node.json').read_text())['name']
+    node = peer_node.read_node_config(root)['name']
     if node == partner or not partner.strip():
         raise ValueError('choose a distinct partner')
     entries = []

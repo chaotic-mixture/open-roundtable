@@ -207,6 +207,15 @@ class PeerRecoveryTests(unittest.TestCase):
                                  [('dispatching', 0)])
             self.assertEqual(calls,['/api/chat'])
 
+    def test_statement_readers_preserve_utf8_node_names_with_bom(self):
+        from examples.statement_benchmark import scan_statement
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"圆桌"}', encoding='utf-8-sig')
+            expected = dict(format=1, node='圆桌', partner='B', entries=[])
+            self.assertEqual(scan_statement(root, db, 'B'), expected)
+            self.assertEqual(partner_statement(root, db, 'B'), expected)
+
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
