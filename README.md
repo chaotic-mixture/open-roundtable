@@ -215,6 +215,8 @@ Before changing the policy, `python -m open_roundtable.data runtime/store-demo p
 
 To preview only the next batch, use `python -m open_roundtable.data runtime/store-demo maintain-pending --limit 1000 --preview`. On one local store with 10,000 pending synthetic records (three sealed, three local, the rest inheriting API mode), grouping the policy lookups reduced median preview time from 5.28 to 2.21 ms for a 1,000-record batch and from 36.28 to 6.20 ms for the full backlog. A ten-record batch took about 1.79 ms with either implementation. Each measurement used 20 warmed runs per implementation in alternating order against the same database. These times measure preview only.
 
+A separate local test measured cursor indexing on two identically populated stores with 100,000 synthetic records each. Every eighth record was pending and all used sealed mode. With the cursor halfway through the store, previewing ten records took 5.50 ms before indexing and 1.16 ms afterward. Reading all 12,500 pending records took 10.75 and 3.46 ms respectively. Near the end of the store, a ten-record preview that wrapped to the beginning took 5.40 and 1.16 ms. Counts matched on every run. These are medians of 20 warmed previews per version, with execution order alternated and initial index creation excluded.
+
 ```sh
 python -m open_roundtable.data runtime/store-demo record-limit profile sealed
 python -m open_roundtable.data runtime/store-demo policy local --model qwen3.5:9b
