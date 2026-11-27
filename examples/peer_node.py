@@ -1023,6 +1023,7 @@ if __name__=='__main__':
     online.add_argument('--list-matched', action='store_true', help='include confirmed job IDs')
     for action in ('statement','reconcile'):
         report = commands.add_parser(action)
+        report.add_argument('--read-only', action='store_true', help='open an existing ledger without initializing or migrating it')
         if action == 'reconcile':
             report.add_argument('--list-matched', action='store_true', help='include confirmed job IDs')
         report.add_argument('partner')
@@ -1103,7 +1104,15 @@ if __name__=='__main__':
     elif args.action=='serve':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
-        with closing(ledger(args.directory)) as db:
+        if getattr(args, 'read_only', False):
+            uri = (args.directory/'network.sqlite3').resolve().as_uri() + '?mode=ro'
+            try:
+                connection = sqlite3.connect(uri, uri=True)
+            except sqlite3.Error as error:
+                parser.error(f'Cannot open existing ledger: {error}')
+        else:
+            connection = ledger(args.directory)
+        with closing(connection) as db:
             if args.action == 'register':
                 result = register(args.directory, args.source, args.url)
             elif args.action == 'import-registration':

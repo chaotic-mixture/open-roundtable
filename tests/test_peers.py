@@ -231,13 +231,16 @@ class PeerRecoveryTests(unittest.TestCase):
                                (key, json.dumps(dict(request, id=key)), json.dumps(receipt), 2))
                     db.commit()
             statement = base/'statement.json'
-            cli(base/'Council', 'statement', '圆桌', str(statement))
+            before = {name: (base/name/'network.sqlite3').read_bytes() for name in ('圆桌', 'Council')}
+            cli(base/'Council', 'statement', '圆桌', str(statement), '--read-only')
             exported = json.loads(statement.read_bytes())
             self.assertEqual(exported['partner'], '圆桌')
             self.assertEqual(exported['entries'][0]['credits'], 2)
             statement.write_text(json.dumps(exported, ensure_ascii=False), encoding='utf-8-sig')
-            result = cli(base/'圆桌', 'reconcile', 'Council', str(statement), '--list-matched')
+            result = cli(base/'圆桌', 'reconcile', 'Council', str(statement), '--list-matched', '--read-only')
             self.assertEqual(json.loads(result.stdout), dict(matched=1, differences=[], matched_jobs=[key]))
+            for name, contents in before.items():
+                self.assertEqual((base/name/'network.sqlite3').read_bytes(), contents)
 
     def test_settled_statement_differences_name_changed_fields(self):
         entry = dict(job='1'*64, provider='B', credits=1, receipt='a'*64)
