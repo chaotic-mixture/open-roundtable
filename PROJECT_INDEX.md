@@ -24,7 +24,7 @@ The 18 matching pairs count proposed repairs. In each mode all 18 consultations 
 
 The `fallback_counts` field counts selections replaced by the expert default in each mode. Rechecking all 36 saved model replies with the stricter selection parser gave zero fallbacks in both modes. Every paused proposal in these runs therefore used a model-selected candidate.
 
-Each approach used 36 credits, 59,058 input tokens and 126 output tokens. Total consultation time was 14.25 seconds for direct execution and 12.61 seconds for delegation. Recorded model time was almost identical (7.65 and 7.62 seconds). These runs show no scheduling benefit from delegation on this workload. The timing difference across two runs is insufficient to establish a speed advantage.
+Each approach recorded 18 expert calls and 18 model calls across both rounds, using 36 credits, 59,058 input tokens and 126 output tokens. Total consultation time was 14.25 seconds for direct execution and 12.61 seconds for delegation. Recorded model time was almost identical (7.65 and 7.62 seconds). These runs show no scheduling benefit from delegation on this workload. The timing difference across two runs is insufficient to establish a speed advantage.
 
 Every roster already had a verified candidate satisfying both preferences. Only seed 503 received such a plan. The table compares the selected plan against the fewest shifts that had to move among the available plans meeting both preferences. The first preference preserves shift A's start. The second puts shift B's start before noon.
 

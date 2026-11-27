@@ -82,7 +82,8 @@ def read_receipt(path, nested, expected_input=None):
         if not isinstance(saved, list) or any(type(flag) is not bool for flag in saved) or saved != flags:
             raise ValueError('recorded preference scores differ from the selected schedule')
         result = dict(state=state, selected=proposal['selected'], used_fallback=fallback, criteria_met=flags,
-                      credits=credits, model_calls=len(attempts), model_seconds=seconds,
+                      credits=credits, expert_calls=sum(member == 'expert' for member, _, _ in charges),
+                      model_calls=len(attempts), model_seconds=seconds,
                       input_tokens=response['prompt_eval_count'], output_tokens=response['eval_count'])
         result['best_criteria_met'] = max(scores)  # Earlier criteria have higher priority.
         result['can_meet_all'] = any(all(score) for score in scores)
