@@ -349,8 +349,14 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertNotEqual(duplicate.result(timeout=5).returncode, 0)
             release.set()
             receipts = [json.loads(task.result(timeout=10).stdout) for task in pending]
+            cli(roots['B'], 'permission', 'A', 'revoke')
+            denied = cli(roots['A'], 'send', 'B', SOURCE, ok=False)
+            self.assertNotEqual(denied.returncode, 0)
+            cli(roots['B'], 'permission', 'A', 'allow', '--remaining', '1')
             replay = json.loads(cli(roots['A'], 'send', 'B', SOURCE).stdout)
             self.assertEqual(replay, receipts[0])
+            status = json.loads(cli(roots['B'], 'permission-status', 'A').stdout)
+            self.assertEqual(status, dict(peer='A', discovered=True, granted=True, remaining=1, can_submit=True))
             self.assertEqual([r['credits'] for r in receipts], [2, 2])
             self.assertEqual(calls, ['/api/chat', '/api/chat'])
             for root in roots.values():
