@@ -31,6 +31,7 @@ def verify(folder):
     with closing(sqlite3.connect((folder/'ledger.sqlite3').resolve().as_uri()+'?mode=ro',uri=True)) as db:
         if db.execute('PRAGMA integrity_check').fetchone()!=('ok',) or db.execute('PRAGMA foreign_key_check').fetchone():
             raise ValueError('ledger integrity failure')
+        menus_by_seed = {}
         for row in rows:
             seed,arm=int(row['seed']),row['arm']
             size=(7,11,22)[(seed-501)//3]
@@ -48,6 +49,8 @@ def verify(folder):
             messages=db.execute('SELECT member,body,cost FROM messages WHERE topic=? ORDER BY id',(topic,)).fetchall()
             expert=json.loads(messages[0][1])
             plans=data['plans']
+            if menus_by_seed.setdefault(seed, plans) != plans:
+                raise ValueError(f'candidate lists differ between arms for seed {seed}')
             if any(len(p)!=len(old) or any(type(h)!=int or not 0<=h<=168-d for h,d in zip(p,durations))
                    or any(expected(schedule(shifts,p)).values()) for p in plans):
                 raise ValueError('invalid candidate menu')

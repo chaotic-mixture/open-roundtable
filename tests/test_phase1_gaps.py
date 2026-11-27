@@ -41,6 +41,18 @@ class GapTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'incompatible run directory'):
                 batch.run(folder, 'fixture', language='zh')
 
+    def test_batch_rejects_unpaired_candidate_menus(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(batch, 'api', side_effect=provider):
+            folder = Path(tmp) / 'batch'
+            batch.run(folder, 'fixture')
+            path = folder / '501-model.json'
+            evidence = json.loads(path.read_text(encoding='utf8'))
+            # Preserve the selected plan and its score but change the model arm's options.
+            evidence['plans'].append(evidence['plans'][0])
+            path.write_text(json.dumps(evidence), encoding='utf8')
+            with self.assertRaisesRegex(ValueError, 'candidate lists differ between arms for seed 501'):
+                verify(folder)
+
     def test_provider_error_text_stays_out_of_fallback_and_journal(self):
         source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
         with tempfile.TemporaryDirectory() as tmp:
