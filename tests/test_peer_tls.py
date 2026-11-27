@@ -37,6 +37,9 @@ class PeerTLSTests(unittest.TestCase):
                 root = base/name
                 initialize(root)
                 (root/'node.json').write_text(json.dumps(dict(name=name,transport='mtls',credentials=str(credentials/name))))
+                checked = cli(root, 'check-listener')
+                self.assertEqual(json.loads(checked.stdout), dict(listen_address='127.0.0.1', transport='mtls'))
+                self.assertFalse((root/'ready').exists())
             _, port = start(stack,base/'B',0)
             url = f'https://localhost:{port}'
             with closing(ledger(base/'A')) as db:
