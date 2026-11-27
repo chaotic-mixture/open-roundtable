@@ -19,7 +19,7 @@ def check_archive(snapshot, expected):
         raise ValueError('ZIP entries differ from commit inventory')
 
 
-def verify(output, revision, openssl):
+def verify(output, revision, openssl, approved_files=None):
     repo = Path(__file__).resolve().parents[1]
     executable = shutil.which(openssl)
     if not executable:
@@ -28,6 +28,11 @@ def verify(output, revision, openssl):
         ['git', 'rev-parse', '--verify', '--end-of-options', revision + '^{commit}'], cwd=repo, text=True).strip()
     inventory = subprocess.check_output(['git', 'ls-tree', '-rz', '--name-only', commit], cwd=repo)
     expected = {os.fsdecode(name) for name in inventory.split(b'\0') if name}
+    if approved_files is not None:
+        approved = set(approved_files.read_text(encoding='utf-8-sig').splitlines())
+        if expected != approved:
+            raise ValueError(f'approval inventory mismatch: unapproved={sorted(expected - approved)!r}, '
+                             f'missing={sorted(approved - expected)!r}')
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     archive = output/'source.zip'
@@ -52,6 +57,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='new local evidence directory')
     parser.add_argument('--revision', default='HEAD')
+    parser.add_argument('--approved-files', type=Path, help='reviewed UTF-8 list of repository paths, one per line')
     parser.add_argument('--openssl', default=os.getenv('ROUNDTABLE_TEST_OPENSSL') or 'openssl')
     args = parser.parse_args()
-    print(json.dumps(verify(args.output, args.revision, args.openssl)))
+    print(json.dumps(verify(args.output, args.revision, args.openssl, args.approved_files)))

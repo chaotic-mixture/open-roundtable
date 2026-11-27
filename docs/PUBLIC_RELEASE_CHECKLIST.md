@@ -27,7 +27,7 @@ Keep private references, local reports, runtime directories, databases, `.hermes
 
 ## Verify and publish
 
-1. List the exact files approved for this release. Compare that list with the proposed Git tree before archiving it.
+1. List the exact files approved for this release. Save the reviewed repository-relative paths in UTF-8, one per line, with forward slashes. Pass the list to the snapshot verifier with `--approved-files PATH`. It reports unapproved additions and missing approved files before creating the output directory.
 2. Review licenses and the origin of third-party material. Preserve the original licensing terms.
 3. Inspect the candidate files for private paths, account details, credentials, session identifiers and identifying details from other projects.
 4. Run the tests and synthetic demo from an isolated copy of the approved source. The snapshot verifier checks archive membership against the commit and runs the checks in the extracted tree. See the [contributor commands](../CONTRIBUTING.md#check-a-commit-for-publication).
