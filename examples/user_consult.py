@@ -94,7 +94,20 @@ def prepare_candidates(spec, rows, rules):
     return plans, menu, proof
 
 
-def repair_preview(spec):
+def preference_feasibility(rows, rules, budget):
+    starts = [row[1] for row in rows]
+    by_shift = [[] for row in rows]
+    for rule in rules:
+        by_shift[rule[0]].append(rule)
+
+    def allowed_start(index, hour):
+        starts[index] = hour
+        return all(evaluate(by_shift[index], rows, starts))
+
+    return feasibility(rows, lambda plan: True, budget, allowed_start=allowed_start)
+
+
+def repair_preview(spec, *, require_preferences=False):
     rows, rules = validate_roster(spec)
     starts = [row[1] for row in rows]
     met = evaluate(rules, rows, starts)
@@ -102,12 +115,22 @@ def repair_preview(spec):
         proof = dict(status='feasible', nodes=0, plan=starts) if rules else None
         return dict(schedule=[dict(shift) for shift in spec['shifts']], original_criteria_met=met, criteria_met=met,
                     changed_shifts=0, changes=[], top_priority_search=proof)
-    plans, menu, proof = prepare_candidates(spec, rows, rules)
+    if require_preferences and rules:
+        proof = preference_feasibility(rows, rules, spec.get('search_nodes', 10000))
+        plan = proof['plan']
+        if plan is None:
+            raise NoFeasibleCandidate(proof)
+        if any(expected(schedule(rows, plan)).values()) or not all(evaluate(rules, rows, plan)):
+            raise ValueError('strict repair failed independent verification')
+        selected = [dict(shift, start=h, end=h+row[2]) for shift, h, row in zip(spec['shifts'], plan, rows)]
+    else:
+        plans, menu, proof = prepare_candidates(spec, rows, rules)
+        plan, selected = plans[0], menu[0]
     changes = [dict(id=old['id'], old_start=old['start'], old_end=old['end'],
                     new_start=new['start'], new_end=new['end'])
-               for old, new in zip(spec['shifts'], menu[0], strict=True)
+               for old, new in zip(spec['shifts'], selected, strict=True)
                if old['start'] != new['start']]
-    return dict(schedule=menu[0], original_criteria_met=met, criteria_met=evaluate(rules, rows, plans[0]),
+    return dict(schedule=selected, original_criteria_met=met, criteria_met=evaluate(rules, rows, plan),
                 changed_shifts=len(changes), changes=changes, top_priority_search=proof)
 
 

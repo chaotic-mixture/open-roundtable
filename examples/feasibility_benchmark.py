@@ -9,23 +9,17 @@ from examples.paired_panel_benchmark import seeded_spec
 from examples.refine_schedule import feasibility
 from examples.repair_benchmark import schedule
 from examples.roster_criteria import evaluate
-from examples.user_consult import validate_roster
+from examples.user_consult import preference_feasibility, validate_roster
 
 
 def run(first_seed, budget, require_preferences=False):
     for seed, size in enumerate(CASE_SIZES, first_seed):
         rows, criteria = validate_roster(seeded_spec(seed, size))
         start = perf_counter()
-        allowed_start = None
         if require_preferences:
-            starts = [row[1] for row in rows]
-            by_shift = [[rule for rule in criteria if rule[0] == i] for i in range(size)]
-
-            def allowed_start(index, hour):
-                starts[index] = hour
-                return all(evaluate(by_shift[index], rows, starts))
-
-        result = feasibility(rows, lambda plan: True, budget, allowed_start=allowed_start)
+            result = preference_feasibility(rows, criteria, budget)
+        else:
+            result = feasibility(rows, lambda plan: True, budget)
         elapsed = perf_counter() - start
         plan = result['plan']
         criteria_met = changed_shifts = None

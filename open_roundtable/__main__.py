@@ -19,6 +19,7 @@ def main():
     audit.add_argument('--consult-input', action='store_true', help='check all four rules on a scheduling consultation input')
     audit.add_argument('--fail-on-findings', action='store_true', help='exit with status 1 if any requested rule has findings')
     preview = commands.add_parser('repair-preview', help='preview the expert default repair offline')
+    preview.add_argument('--require-preferences', action='store_true', help='require every encoded preference')
     preview.add_argument('input', type=Path, help='scheduling consultation JSON file')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
@@ -83,7 +84,7 @@ def main():
         if args.command == 'repair-preview':
             from examples.user_consult import NoFeasibleCandidate, repair_preview
             try:
-                result = repair_preview(json.loads(args.input.read_bytes()))
+                result = repair_preview(json.loads(args.input.read_bytes()), require_preferences=args.require_preferences)
             except NoFeasibleCandidate as exc:
                 print(json.dumps(dict(status=exc.status, nodes=exc.nodes, schedule=None)))
                 raise SystemExit(3 if exc.status == 'infeasible' else 4)

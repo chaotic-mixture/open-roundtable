@@ -78,6 +78,8 @@ To obtain the expert's default candidate directly, run `python -m open_roundtabl
 
 Read the preview's `changes` array to review just the moved shifts in input order. Each entry includes the original shift ID and its old and new start and end hours. An empty array means the original schedule was retained.
 
+Add `--require-preferences` to require every encoded criterion alongside the hard rules. This mode returns the first qualifying plan within the search budget. Exit codes 3 and 4 then refer to that combined requirement. For the English pickup example, the ranked default offers a compromise, while the strict search proves that preserving the late start and meeting the pickup deadline together is infeasible.
+
 When the hard-rule search returns no candidate, the preview prints JSON with a null `schedule` and the number of search nodes visited. Exit code 3 and status `infeasible` indicate that the capacity check or completed search ruled out a repair. Exit code 4 and status `unknown` indicate that the search reached its node budget. For the latter, increase `search_nodes` in the request to try a larger search. Invalid inputs still exit with code 2.
 
 Compare `original_criteria_met` with `criteria_met` in the same priority order as the input. In the English example, both preferences hold before repair even though the shifts overlap. The flags change from `[true, true]` to `[true, false]` because moving the late shift preserves the pickup deadline but changes its start time. Both arrays are empty when the request supplies no encoded criteria.
