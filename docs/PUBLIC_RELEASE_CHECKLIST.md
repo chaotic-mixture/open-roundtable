@@ -10,6 +10,8 @@ The verifier exported commit `5bf270003eb5112265dddecd7f29e7709fd1a236` and matc
 
 To reproduce, run `python tests/verify_snapshot.py reports/check-5bf2700 --revision 5bf2700 --openssl openssl` with a fresh output directory. Supply the executable path if OpenSSL is outside your PATH. This record covers a main branch commit after v0.0.6.
 
+The follow-up snapshot at `33fbd32ad0b8944838e3f5de3703d919fb9eaefd` matched the earlier snapshot's 88 paths. All 116 tests passed in the extracted tree, including private maintenance recovery. Independent SQLite readback and loopback registration, discovery and withdrawal over mutual TLS also passed. ZIP SHA-256: `9d0cae2ee183e7a8803b40168a9cc48a3c76e75d8d474a8d8f187028f720445f`. Supplied path list SHA-256: `e1c12fa261a0c3ae3fa3e7be684793d640898843e21200fa08a00a9edfbb1bc7`.
+
 ## Review the candidate files
 
 Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
