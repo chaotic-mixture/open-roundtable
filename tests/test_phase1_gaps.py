@@ -1,5 +1,5 @@
 import csv
-from http.client import IncompleteRead
+from http.client import BadStatusLine, IncompleteRead
 import json
 from contextlib import closing
 from pathlib import Path
@@ -29,6 +29,18 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_provider_error_text_stays_out_of_fallback_and_journal(self):
+        source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / 'consult.sqlite3'
+            with patch('examples.user_consult.api', side_effect=BadStatusLine('private upstream detail')):
+                result = consult(source, database, 'fixture')
+            expected = 'model dispatch failed (BadStatusLine)'
+            self.assertEqual(result['fallback'], expected)
+            with closing(sqlite3.connect(database)) as db:
+                self.assertEqual(db.execute('SELECT error FROM attempts').fetchone(), (expected,))
+                self.assertEqual(json.loads(db.execute('SELECT body FROM proposals').fetchone()[0])['fallback'], expected)
+
     def test_truncated_http_reply_is_recorded_without_model_charge(self):
         source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
         with tempfile.TemporaryDirectory() as tmp:

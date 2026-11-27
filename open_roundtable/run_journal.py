@@ -46,10 +46,11 @@ def dispatch(kernel, topic, request, provider):
         response = provider('/api/chat',request)
     except (HTTPException,URLError,TimeoutError,ConnectionError,ValueError) as exc:
         seconds = perf_counter()-start
+        error = f'model dispatch failed ({type(exc).__name__})'
         with db:
             db.execute("UPDATE attempts SET status='failed',error=?,seconds=? WHERE id=?",
-                       (repr(exc),seconds,call))
-        return None, repr(exc), seconds
+                       (error,seconds,call))
+        return None, error, seconds
     seconds = perf_counter()-start
     with db:
         db.execute("UPDATE attempts SET status='returned',response=?,seconds=? WHERE id=?",
