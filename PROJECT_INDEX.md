@@ -19,6 +19,12 @@ These three studies use nine synthetic rosters, with three rosters each at 7, 11
 | What changes when preferences have priorities and exceptions? | With the original candidates, the rule selector scored 42/63 and the default scored 31/63 at 9 credits each. Model selection cost 18 credits and scored 28/63 in the English run and 34/63 in the historical Chinese run. Each language ran once with these candidates. Rule-writing effort is excluded. | [English trial and reproduction commands](examples/preference_results.md#english-language-trial) · [Historical Chinese trial](examples/preference_results.md#v005-自然语言排班偏好) |
 | Does generating more candidates help on the same English requests? | Rule ranking improved from 42 to 53 points and moved 91 shifts instead of 94. On seed 508 it gained four points with the same 19 changes. The model scored 27/63 on the expanded candidates in each of two runs and selected the same candidate on every repeat. | [Per-roster comparison and expanded-search command](examples/preference_results.md#does-a-wider-candidate-search-help) |
 
+### How often does the bounded search find a hard-rule repair?
+
+We compared the fallback search at commits `8b875ea` and `68d3894` on the nine seeded consultation rosters, allowing 10,000 search nodes per roster per version. The earlier version returned `unknown` on all nine after 90,000 visits. Checking rest and continuous work as soon as a worker's last shift was assigned found a feasible plan for seed 503 after 2,835 visits. The other eight seeds used all 10,000 visits each, including all six 11- and 22-shift rosters. Total visits fell to 82,835. The returned plan passed the independent hourly checker.
+
+For reproduction in each checkout, generate rows with `validate_roster(seeded_spec(seed, size))[0]` using seeds 501–509 and sizes 7, 7, 7, 11, 11, 11, 22, 22, 22. Call `examples.refine_schedule.feasibility(rows, lambda plan: True, 10000)` and compare its `status` and `nodes`. This isolates search from the heuristic candidate generator and preference ranking. An unknown result leaves feasibility open.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
