@@ -20,12 +20,14 @@ python tests/verify_core.py
 
 Read `reports/core_verification.md` for failures and skipped tests. The peer integration tests start temporary loopback services. To include certificate-based tests, put OpenSSL on PATH or set `ROUNDTABLE_TEST_OPENSSL` to its executable path.
 
+For changes to private-store permissions, summary provenance or batch recovery, run `python -m unittest -v tests.test_data` while developing. These tests use synthetic records and temporary databases. One test starts a local HTTP service to check which record bodies reach the model endpoint.
+
 ## Check a commit for publication
 
 Review the proposed file list, licenses and data provenance against the [public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md). Keep local evidence under `reports/`. Once the intended changes are committed, verify the exact revision in a fresh directory.
 
 ```sh
-python tests/verify_snapshot.py reports/snapshot-review --revision HEAD --openssl openssl
+python tests/verify_snapshot.py reports/snapshot-review --revision HEAD --openssl openssl --approved-files reports/reviewed-paths.txt
 ```
 
-The verifier compares the archive inventory with the Git tree, runs the core checks in the extracted snapshot, and exercises registration and withdrawal over mutual TLS. A successful run writes the commit ID, archive SHA-256 and file count to `reports/snapshot-review/verified.json`. Use a new output directory for each run.
+Prepare `reports/reviewed-paths.txt` from the file list reviewed for this revision, using UTF-8 and one repository-relative path per line. The verifier compares it with the Git tree before creating the archive, runs the core checks in the extracted snapshot, and exercises registration and withdrawal over mutual TLS. A successful run writes the commit ID, archive SHA-256, file count and reviewed list SHA-256 to `reports/snapshot-review/verified.json`. Keep the list with the report and use a new output directory for each run. For a development snapshot, omitting `--approved-files` still checks the archive against Git.
