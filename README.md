@@ -22,7 +22,7 @@ To try node discovery, run `python -m examples.registration_demo`. It starts tem
 
 Discovery refreshes the current directory snapshot. If B is withdrawn and republished at the same address between two refreshes, A can miss the withdrawal. The demo reports A's remaining grant in `remaining_after_missed_withdrawal`. To revoke A's permission for B directly, run `python -m examples.peer_node runtime/consumer permission B revoke` on A.
 
-Run `python -m examples.peer_node runtime/consumer permission-status B` on A to inspect its local decision. A discovered node can have no grant. A grant with zero remaining uses cannot admit a new request. For an active grant, a null remaining count means unlimited uses.
+Run `python -m examples.peer_node runtime/consumer permission-status B` on A to inspect its local decision. A discovered node can have no grant. With a grant still in place, `remaining: 0` and `can_submit: false` mean the peer has exhausted its quota for new requests. Retrying an identical, already completed request can still retrieve its saved receipt. For an active grant, a null remaining count means unlimited uses.
 
 ### Repair a schedule with your own preferences
 

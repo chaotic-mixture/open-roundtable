@@ -474,6 +474,8 @@ class PeerRecoveryTests(unittest.TestCase):
                 thread.join()
             self.assertEqual(result['discovered'], ['A', 'B'])
             self.assertEqual((result['deliveries'], result['credits']), (2, 2))
+            status = json.loads(cli(folder/'B', 'permission-status', 'A').stdout)
+            self.assertEqual(status, dict(peer='A', discovered=True, granted=True, remaining=0, can_submit=False))
             self.assertEqual([path for path, _ in requests], ['/api/chat'])
             self.assertEqual(result, audit(folder))
             statement = folder/'statement.json'
