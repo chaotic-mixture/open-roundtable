@@ -52,7 +52,20 @@ def summarize(rows, design=None):
 
     comparisons = []
     incomplete = []
+    decisions = []
     for (shifts, seed), arms in sorted(trials.items()):
+        table = arms.get('table', {})
+        if 'topic_state' in table:
+            votes = [table.get(field) for field in ('model_vote', 'expert_vote')]
+            if any(vote not in ('0', '1', 0, 1) for vote in votes):
+                raise ValueError(f'Invalid panel votes for roster {seed}')
+            model_vote, expert_vote = map(int, votes)
+            expected = 'RESOLVED' if model_vote and expert_vote else 'PAUSED'
+            if table['topic_state'] != expected:
+                raise ValueError(f'Panel state disagrees with votes for roster {seed}')
+            decisions.append(dict(seed=seed, shifts=shifts, state=expected,
+                                  model_vote=model_vote, expert_vote=expert_vote,
+                                  missed=int(table['missed']), extra=int(table['extra'])))
         missing = sorted(ARMS.keys() - arms.keys())
         if missing:
             incomplete.append(dict(shifts=shifts, seed=seed, missing=missing))
@@ -71,7 +84,10 @@ def summarize(rows, design=None):
                         changes[metric] = int(arms['table'][field]) - int(arms[baseline][field])
                     delta['by_rule'][rule] = changes
             comparisons.append(dict(shifts=shifts, seed=seed, baseline=baseline, table_minus_baseline=delta))
-    return dict(comparisons=comparisons, incomplete=incomplete)
+    report = dict(comparisons=comparisons, incomplete=incomplete)
+    if decisions:
+        report['panel_decisions'] = decisions
+    return report
 
 
 if __name__ == '__main__':

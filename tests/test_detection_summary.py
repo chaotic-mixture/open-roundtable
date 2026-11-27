@@ -36,3 +36,14 @@ class DetectionSummaryTests(unittest.TestCase):
     def test_inconsistent_rule_total_rejected_even_for_partial_roster(self):
         with self.assertRaisesRegex(ValueError, 'disagree with missed total'):
             summarize([dict(self.rows[0], missed='999')], self.design)
+
+    def test_panel_decision_survives_missing_baselines(self):
+        panel = dict(next(row for row in self.rows if row['arm'] == 'table'),
+                     topic_state='PAUSED', model_vote='1', expert_vote='0')
+        report = summarize([panel])
+        self.assertEqual(report['comparisons'], [])
+        self.assertEqual(report['panel_decisions'], [dict(seed=501, shifts=7, state='PAUSED',
+                                                        model_vote=1, expert_vote=0, missed=0, extra=0)])
+        with self.assertRaisesRegex(ValueError, 'disagrees with votes'):
+            summarize([dict(panel, topic_state='RESOLVED')])
+        self.assertNotIn('panel_decisions', summarize(self.rows))
