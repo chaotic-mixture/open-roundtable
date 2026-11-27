@@ -298,6 +298,12 @@ class GapTests(unittest.TestCase):
         self.assertEqual(feasibility(rows, lambda p: True, 1), dict(status='infeasible', nodes=0, plan=None))
 
     def test_exhausted_domain_differs_from_exhausted_budget(self):
+        # Fourteen five-hour shifts need fourteen blocks and thirteen rest gaps.
+        rows = [(chr(65+i)+'xu', 0, 5) for i in range(14)]
+        self.assertEqual(feasibility(rows, lambda plan: True, 1),
+                         dict(status='infeasible', nodes=0, plan=None))
+        feasible = [(key, i*13, duration) for i, (key, _, duration) in enumerate(rows[:13])]
+        self.assertEqual(feasibility(feasible, lambda plan: True, 13)['status'], 'feasible')
         rows=[('Axu',8,4)]
         impossible=lambda plan:plan[0]>168
         self.assertEqual(feasibility(rows,impossible,200)['status'],'infeasible')

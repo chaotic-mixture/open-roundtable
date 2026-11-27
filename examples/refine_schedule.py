@@ -56,13 +56,19 @@ def exceeds_weekly_capacity(rows):
     # A room or worker can occupy at most 168 distinct hours in one week.
     for field in (1, 2):
         hours = {}
+        long_shifts = {}
         for key, _, duration in rows:
             resource = key[field]
             hours[resource] = hours.get(resource, 0) + duration
             work = hours[resource]
             # Each worker needs eight hours off between blocks of at most eight hours.
             # Touching shifts can share a block, so count blocks from total hours.
-            rest = 8 * ((work - 1) // 8) if field == 1 else 0
+            rest = 0
+            if field == 1:
+                # Two shifts longer than four hours cannot share an eight-hour block.
+                long_shifts[resource] = long_shifts.get(resource, 0) + (duration > 4)
+                blocks = max((work + 7) // 8, long_shifts[resource])
+                rest = 8 * (blocks - 1)
             if work + rest > 168:
                 return True
     return False
