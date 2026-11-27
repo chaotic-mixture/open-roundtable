@@ -49,6 +49,7 @@ def connect(root, scope):
         if db.execute('SELECT scope FROM metadata').fetchall() != [(scope,)]:
             raise ValueError('store identity mismatch')
         if scope == 'private':
+            db.execute('CREATE INDEX IF NOT EXISTS pending_sources ON records(source) WHERE summary IS NULL')
             db.execute("""CREATE TABLE IF NOT EXISTS summary_origin (
                 source TEXT PRIMARY KEY, mode TEXT NOT NULL, model TEXT)""")
             db.execute("""CREATE TABLE IF NOT EXISTS summary_reported_model (
@@ -237,11 +238,24 @@ def maintain_pending(root, limit, *, preview=False, diagnostics=False):
             row = db.execute('SELECT source FROM maintenance_cursor WHERE id=1').fetchone()
             if row:
                 cursor = row[0]
-        selection = 'SELECT source FROM records WHERE summary IS NULL ORDER BY source <= ?, source LIMIT ?'
+        # Walk forward from the cursor, then wrap; each range uses the pending-source index.
+        rows = []
+        modes = dict(sealed=0, local=0, api=0)
+        remaining = limit
+        for comparison in ('>', '<='):
+            selection = f'SELECT source FROM records WHERE summary IS NULL AND source {comparison} ? ORDER BY source LIMIT ?'
+            if preview:
+                counts = pending_modes(db, selection, (cursor, remaining))
+                for mode, count in counts.items():
+                    modes[mode] += count
+                remaining -= sum(counts.values())
+            else:
+                rows.extend(db.execute(selection, (cursor, remaining)))
+                remaining = limit - len(rows)
+            if not remaining or not cursor:
+                break
         if preview:
-            modes = pending_modes(db, selection, (cursor, limit))
             return dict(selected=sum(modes.values()), modes=modes)
-        rows = db.execute(selection, (cursor, limit)).fetchall()
         if rows:
             db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0
