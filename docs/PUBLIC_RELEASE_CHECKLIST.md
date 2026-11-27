@@ -4,6 +4,12 @@
 
 Version 0.0.6 ships as a Git source snapshot. The build backend disables wheel and source distribution builds.
 
+### Main branch snapshot verified on 2026-11-27
+
+The verifier exported commit `5bf270003eb5112265dddecd7f29e7709fd1a236` and matched all 88 archived files against Git. The ZIP SHA-256 was `94151eced01f926b590f5ecc6bcb32e9b537e2e7cdd2a2be5386380f022baa13`. All 114 tests passed in the extracted tree with OpenSSL enabled, including mutual authentication and sender binding. The SQLite demo passed independent readback. The loopback registration demo discovered node B after publication and returned an empty directory after withdrawal.
+
+To reproduce, run `python tests/verify_snapshot.py reports/check-5bf2700 --revision 5bf2700 --openssl openssl` with a fresh output directory. Supply the executable path if OpenSSL is outside your PATH. This record covers a main branch commit after v0.0.6.
+
 ## Review the candidate files
 
 Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
