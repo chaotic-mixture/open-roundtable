@@ -18,6 +18,8 @@ def main():
     audit.add_argument('input', help='audit request JSON file, or - to read from standard input')
     audit.add_argument('--consult-input', action='store_true', help='check all four rules on a scheduling consultation input')
     audit.add_argument('--fail-on-findings', action='store_true', help='exit with status 1 if any requested rule has findings')
+    preview = commands.add_parser('repair-preview', help='preview the expert default repair offline')
+    preview.add_argument('input', type=Path, help='scheduling consultation JSON file')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
     consult.add_argument('--db',required=True,type=Path)
@@ -78,7 +80,10 @@ def main():
             command.add_argument('ballot',choices=['yes','no'])
     args = parser.parse_args()
     try:
-        if args.command == 'audit':
+        if args.command == 'repair-preview':
+            from examples.user_consult import repair_preview
+            result = repair_preview(json.loads(args.input.read_bytes()))
+        elif args.command == 'audit':
             from .schedule_expert import audit_rules, check
             payload = sys.stdin.buffer.read() if args.input == '-' else Path(args.input).read_bytes()
             spec = json.loads(payload)

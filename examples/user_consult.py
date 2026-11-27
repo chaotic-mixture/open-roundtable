@@ -61,8 +61,11 @@ def selection_messages(spec, menu):
                  'zero-based integer}. Request and candidates: '+encoded([spec,menu]))]
 
 
-def consult(source, database, model, *, nested=False):
-    spec=json.loads(source.read_text(encoding='utf-8-sig'))
+def candidate_rank(rules, rows, plan):
+    return evaluate(rules, rows, plan), -sum(h != row[1] for h, row in zip(plan, rows))
+
+
+def prepare_candidates(spec):
     rows, rules = validate_roster(spec)
     if exceeds_weekly_capacity(rows):
         raise NoFeasibleCandidate(dict(status='infeasible', nodes=0))
@@ -75,8 +78,8 @@ def consult(source, database, model, *, nested=False):
         plans=[attempt['plan']]
     proof=None
     if rules:
-        def rank(p):
-            return evaluate(rules,rows,p), -sum(h!=r[1] for h,r in zip(p,rows))
+        def rank(plan):
+            return candidate_rank(rules, rows, plan)
         plans=refine(rows,plans,rank,dict.fromkeys(r[0] for r in rules))
         plans.sort(key=rank,reverse=True)
         if evaluate(rules[:1],rows,plans[0])[0]:
@@ -86,6 +89,22 @@ def consult(source, database, model, *, nested=False):
             if proof['plan'] is not None:
                 plans.append(proof['plan'])
                 plans.sort(key=rank,reverse=True)
+    if any(any(expected(schedule(rows,p)).values()) for p in plans):
+        raise ValueError('expert candidate failed independent verification')
+    menu=[[dict(item,start=h,end=h+row[2]) for item,h,row in zip(shifts,p,rows)] for p in plans]
+    return rows, rules, plans, menu, proof
+
+
+def repair_preview(spec):
+    rows, rules, plans, menu, proof = prepare_candidates(spec)
+    return dict(schedule=menu[0], criteria_met=evaluate(rules, rows, plans[0]),
+                changed_shifts=sum(start != row[1] for start, row in zip(plans[0], rows)),
+                top_priority_search=proof)
+
+
+def consult(source, database, model, *, nested=False):
+    spec=json.loads(source.read_text(encoding='utf-8-sig'))
+    rows, rules, plans, menu, proof = prepare_candidates(spec)
     database.touch(exist_ok=False)
     with closing(Kernel(database)) as k:
         initialize(k.db)
@@ -97,9 +116,6 @@ def consult(source, database, model, *, nested=False):
         k.join(topic,'expert',kind='expert')
         k.join(topic,'model',kind='model',source=model)
         k.start(topic)
-        if any(any(expected(schedule(rows,p)).values()) for p in plans):
-            raise ValueError('expert candidate failed independent verification')
-        menu=[[dict(item,start=h,end=h+row[2]) for item,h,row in zip(shifts,p,rows)] for p in plans]
         assert_post(k,topic,'expert',encoded(dict(input=spec,candidates=menu)))
         request=dict(model=model,stream=False,think=False,format='json',options={'temperature':0},
                      messages=selection_messages(spec,menu))
@@ -114,7 +130,7 @@ def consult(source, database, model, *, nested=False):
         body=encoded(dict(selected=selected,schedule=menu[selected],fallback=error,
                           criteria_met=evaluate(rules,rows,plans[selected]),top_priority_search=proof))
         version=k.propose(topic,body,previous_version=0)
-        expert_agrees=(not rules or rank(plans[selected])==rank(plans[0]))
+        expert_agrees=(not rules or candidate_rank(rules, rows, plans[selected]) == candidate_rank(rules, rows, plans[0]))
         k.vote(topic,'expert',expert_agrees,version=version)
         if not error:
             k.vote(topic,'model',True,version=version)
