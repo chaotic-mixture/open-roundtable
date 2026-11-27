@@ -368,7 +368,10 @@ def match_offers(need, offers, model, *, allowed_tags=None):
     for entry, offer in zip(menu, offers):
         if 'rules' in offer:
             entry['rules'] = offer['rules']
-    prompt = 'Select all offers explicitly able to fulfill the entire need. Return {"ids": [integer IDs]}, empty if none.'
+    prompt = ('Select all offers explicitly able to fulfill the entire need. Match the requested action '
+              'and respect constraints on changes. For a read-only request, choose services that inspect '
+              'or report while leaving the input unchanged. Evaluate each offer independently and include '
+              'every equivalent service even if its tag differs. Return {"ids": [integer IDs]}, empty if none.')
     reply = api('/api/chat',dict(model=model, stream=False, think=False, format='json',options={'temperature':0},
         messages=[dict(role='system',content=prompt),dict(role='user',content=json.dumps(dict(need=need,offers=menu),ensure_ascii=False))]))
     if not isinstance(reply, dict) or reply.get('done') is not True or reply.get('done_reason') != 'stop':

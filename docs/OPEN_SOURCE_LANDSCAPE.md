@@ -19,6 +19,8 @@ Run `python -m examples.capability_comparison` with local Ollama serving `qwen3.
 
 The unrestricted model found the synonymous repair service missed by exact matching. On the read-only request it selected both editing services and missed the auditor. The operator's repair rule explicitly included both repair tags, and the audit rule allowed only the audit tag. Model review added no correct selections to those rules in this run. An empty payroll menu skipped inference. This experiment measures local recommendations on three labeled requests. Provider execution and EigenFlux matching were outside its scope.
 
+The table records the original prompt at commit `cec7400`. A follow-up prompt made the read-only constraint explicit. It found the auditor but missed one repair provider. The current prompt also asks the model to evaluate every offer independently, including equivalent services with different tags. On one rerun with the same three requests it returned both repair providers, only the auditor for the read-only request, and no payroll provider. Unrestricted selection used 3 calls and 534 input / 23 output tokens. Restricting tags first used 2 calls and 280 input / 17 output tokens. The tag rules alone still returned the same correct sets. These requests were used to tune the prompt, so this result measures fit to the examples.
+
 ## 中文调查记录
 
 调查日期：2026-11-10。范围：Agent通信、临时多方协作、能力封装。仅原始仓库/规范只读核验，不以共享会话里的搜索结论作为事实。未安装候选、未跑候选测试、未接外部服务。
