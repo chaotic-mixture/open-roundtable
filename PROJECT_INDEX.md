@@ -6,6 +6,8 @@ See the [roadmap](docs/ROADMAP.md) for evidence and open questions across all si
 
 For the two-node discovery and recovery test, see the [v0.0.6 acceptance results, reproduction commands and verification limits](docs/V0.0.6.md).
 
+The current directory indexes published node registrations. In a local SQLite comparison, two stores contained the same 100,000 synthetic records, including 100 node registrations of which 90 were published. The directory query returned the same 90 records in the same order on every run. Across 40 warmed reads per store in alternating order, median query time was 10.699 ms without the index and 0.225 ms with it. These timings cover the database query and fetching its rows. Index construction, HTTP transport and peer identity checks were outside the measurement.
+
 ## Scheduling experiment results
 
 These three studies use nine synthetic rosters, with three rosters each at 7, 11 and 22 shifts. Each report includes per-roster metrics and commands for reproduction. The observed gains depend on the rules, candidate plans and local model used in these runs.
