@@ -102,6 +102,18 @@ python -m examples.peer_node runtime/A reconcile B B-for-A.json
 
 For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}`. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a difference and a nonzero exit status. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
 
+### Reconcile receipts online
+
+With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
+
+After A has discovered B at its current address, run:
+
+```sh
+python -m examples.peer_node runtime/A reconcile-online B
+```
+
+A checks B's certificate identity. B checks the caller's certificate against the requested identity and its statement-sharing configuration. The command reports the same match count and differences as offline reconciliation. If a statement changes while pages are being read, rerun the comparison to read a consistent revision.
+
 ### Prepare a node for a cross-host trial
 
 The recovery demo runs on loopback. For a trial across machines, set `transport` to `mtls` in each node's `node.json` and set `listen_address` to a specific IPv4 address assigned to that machine. The default is `127.0.0.1`. List every remote HTTPS origin the node will contact in `allowed_origins`, including the directory when it is remote. Each entry includes the explicit port, for example `https://peer-b.example:8443`, with no path or trailing slash.
