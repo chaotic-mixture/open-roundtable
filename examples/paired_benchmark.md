@@ -1,4 +1,28 @@
-# v0.0.3 排班对照实验
+# Scheduling conflict detection on nine rosters (v0.0.3)
+
+[中文报告](#v003-排班对照实验)
+
+For these four scheduling rules, the expert alone found every violation on all nine rosters. Giving the model the expert's findings reduced errors on every roster compared with asking the model alone. Model review still introduced errors on three rosters compared with accepting the expert's findings directly.
+
+| Participant producing the answer | Missed violations | False positives | Total calls | Total credits |
+| --- | ---: | ---: | ---: | ---: |
+| Model alone | 312 | 77 | 9 | 9 |
+| Rule expert alone | 0 | 0 | 9 | 9 |
+| Model reviewing the expert's findings | 3 | 1 | 18 | 18 |
+
+On the three largest rosters (22 shifts each), expert input eliminated all 234 misses and 40 false positives from the model-only answers for 3 additional credits and about 4.48 additional seconds of participant time in total. Each size had only three rosters, so this comparison cannot establish a general roster-size threshold.
+
+### Reproduce the comparison
+
+Start Ollama with `qwen3.5:9b` installed. From the repository root, choose a fresh output directory and run
+
+```sh
+python -m examples.benchmark_consult reports/paired-reproduction --model qwen3.5:9b --first-seed 501 --repetitions 3
+```
+
+The three arms receive the same rosters. The benchmark alternates the order of the two model-based arms and records 18 model calls and 18 expert calls on a successful run. Compare your `results.csv` with the [27 reference rows](paired_501_metrics.csv). The per-rule columns use P for worker overlap, V for room overlap, R for insufficient rest and L for excessive continuous work. Each returned call costs one local credit. Seeds fix the inputs. Model outputs and times can vary. The reference run used Ollama 0.40.16, model digest prefix `6488c96fa5fa` and temperature 0.
+
+## v0.0.3 排班对照实验
 
 需要模型提交最终清单时，给它一次排班专家调用，在本轮九张表上逐张减少了错误。收益最大的是 22 班次档：三张表共多用 3 credits、4.48 秒，消除了 234 项漏报和 40 项误报。若目标只是判定这四条明确规则，单工具在九张表上已经全部正确。增加模型复核后，六张表持平，三张出现了新错误：种子 502、505 各漏掉一项、两项连续工作超时，503 多报了一对人员冲突。
 
