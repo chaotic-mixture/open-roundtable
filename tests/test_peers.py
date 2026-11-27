@@ -251,7 +251,10 @@ class PeerRecoveryTests(unittest.TestCase):
                             reconcile_online(root,db,'B')
 
     def test_search_limit_returns_replayable_zero_charge(self):
-        self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
+        self.check_no_plan_receipt(11, 'unknown', 1, start=8)
+
+    def test_worker_rest_capacity_returns_replayable_zero_charge(self):
+        self.check_no_plan_receipt(14, 'infeasible', 0, duration=5)
 
     def test_provider_search_ceiling_preserves_unused_grant(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
@@ -275,7 +278,7 @@ class PeerRecoveryTests(unittest.TestCase):
             self.check_no_plan_receipt(22, 'infeasible', 0, separate_workers=True)
             generate.assert_not_called()
 
-    def check_no_plan_receipt(self, count, status, nodes, separate_workers=False, duration=8):
+    def check_no_plan_receipt(self, count, status, nodes, separate_workers=False, duration=8, start=0):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
             budget = 10 if separate_workers else 1
@@ -283,7 +286,7 @@ class PeerRecoveryTests(unittest.TestCase):
             (root/'node.json').write_text(json.dumps(config))
             spec = dict(title='crowded week', preference='keep starts', search_nodes=budget,
                         shifts=[dict(id=str(i), worker=str(i) if separate_workers else 'w',
-                                     room='r', start=0, end=duration) for i in range(count)])
+                                     room='r', start=start, end=start+duration) for i in range(count)])
             body = dict(sender='A', recipient='B', source='public', spec=spec)
             request = dict(body, id=digest(body))
             db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
