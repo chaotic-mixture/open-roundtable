@@ -361,6 +361,9 @@ class PeerRecoveryTests(unittest.TestCase):
                 with patch('examples.peer_node.transfer', return_value=receipt):
                     send(sender, consumer, 'B', 'public')
                 self.assertEqual(reconcile(partner_statement(sender, consumer, 'B'), provider), dict(matched=1, differences=[]))
+                self.assertEqual(reconcile(partner_statement(sender, consumer, 'B'), provider, list_matched=True),
+                                 dict(matched=1, matched_jobs=[request['id']], differences=[]))
+                self.assertEqual(reconcile(pending, provider, list_matched=True)['matched_jobs'], [])
                 account = service_account(sender, consumer)
                 self.assertEqual((account['pending'], account['consumed'], account['entries'][0]['state']), (0, 0, 'NO_PLAN'))
 

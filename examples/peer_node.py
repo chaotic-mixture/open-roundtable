@@ -684,13 +684,14 @@ def statement_entries(remote, provider, partner):
     return entries
 
 
-def reconcile(local, remote):
+def reconcile(local, remote, *, list_matched=False):
     entries = statement_entries(remote, local['partner'], local['node'])
     expected = {entry['job']:entry for entry in local['entries']}
     reported = {entry['job']:entry for entry in entries}
     if len(reported) != len(entries):
         raise ValueError('duplicate statement job')
     differences = []
+    matched_jobs = []
     for key in sorted(expected.keys() | reported.keys()):
         if key not in expected:
             reason = 'missing locally'
@@ -705,9 +706,14 @@ def reconcile(local, remote):
         elif expected[key]['receipt'] is None:
             reason = 'pending at both nodes'
         else:
+            if list_matched:
+                matched_jobs.append(key)
             continue
         differences.append(dict(job=key, reason=reason))
-    return dict(matched=len(expected.keys() | reported.keys())-len(differences), differences=differences)
+    result = dict(matched=len(expected.keys() | reported.keys())-len(differences), differences=differences)
+    if list_matched:
+        result['matched_jobs'] = matched_jobs
+    return result
 
 
 def resume(root, db):
@@ -797,7 +803,7 @@ def statement_revision(db, node, partner):
     return row[0] if row else 'initial'
 
 
-def reconcile_online(root, db, partner):
+def reconcile_online(root, db, partner, *, list_matched=False):
     config = json.loads((root/'node.json').read_text())
     if config.get('transport') != 'mtls':
         raise ValueError('online reconciliation requires mutual TLS')
@@ -831,7 +837,7 @@ def reconcile_online(root, db, partner):
     local = partner_statement(root,db,partner)
     if statement_revision(db, config['name'], partner) != local_revision:
         raise ValueError('local statement changed during reconciliation')
-    return reconcile(local, dict(remote,entries=entries))
+    return reconcile(local, dict(remote,entries=entries), list_matched=list_matched)
 
 
 
@@ -972,9 +978,13 @@ if __name__=='__main__':
     admission_parser = commands.add_parser('admission')
     admission_parser.add_argument('partner')
     admission_parser.add_argument('--search-nodes', type=int, help='check eligibility for this exact search budget')
-    commands.add_parser('reconcile-online').add_argument('partner')
+    online = commands.add_parser('reconcile-online')
+    online.add_argument('partner')
+    online.add_argument('--list-matched', action='store_true', help='include confirmed job IDs')
     for action in ('statement','reconcile'):
         report = commands.add_parser(action)
+        if action == 'reconcile':
+            report.add_argument('--list-matched', action='store_true', help='include confirmed job IDs')
         report.add_argument('partner')
         report.add_argument('file',type=Path)
     feedback = commands.add_parser('feedback')
@@ -1073,11 +1083,11 @@ if __name__=='__main__':
                         output.write(packed(local))
                     result = dict(entries=len(local['entries']))
                 else:
-                    result = reconcile(local,json.loads(args.file.read_bytes()))
+                    result = reconcile(local,json.loads(args.file.read_bytes()), list_matched=args.list_matched)
             elif args.action == 'admission':
                 result = admission(args.directory,db,args.partner,args.search_nodes)
             elif args.action == 'reconcile-online':
-                result = reconcile_online(args.directory,db,args.partner)
+                result = reconcile_online(args.directory,db,args.partner, list_matched=args.list_matched)
             elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':

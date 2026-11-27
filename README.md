@@ -159,6 +159,8 @@ python -m examples.peer_node runtime/A reconcile B B-for-A.json
 
 For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}`. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a difference and a nonzero exit status. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
 
+Add `--list-matched` to `reconcile` or `reconcile-online` to see which job IDs have matching settled receipts on both sides. Look for your job in `matched_jobs`, including when its recorded charge is zero. Pending or differing jobs appear under `differences` with a reason.
+
 If the receiver stopped during inference, run `python -m examples.peer_node runtime/A account` on A and the corresponding command with `runtime/B` on B. Look for the same `job` ID under `pending_jobs` on both sides and check its `consumer` and `provider`. In the interruption test, the model service received one request before B stopped. After restart and retry, both accounts still listed the job as pending with zero posted credits. Offline reconciliation returned `matched: 0` and the reason `pending at both nodes`. Keep that job open for investigation. Reproduce this fault window locally with:
 
 ```sh
