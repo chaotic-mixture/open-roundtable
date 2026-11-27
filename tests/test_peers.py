@@ -216,6 +216,29 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(scan_statement(root, db, 'B'), expected)
             self.assertEqual(partner_statement(root, db, 'B'), expected)
 
+    def test_offline_statement_cli_matches_non_ascii_nodes_and_bom(self):
+        request = dict(sender='圆桌', recipient='Council', source='synthetic', spec={})
+        key = digest(request)
+        receipt = dict(id=key, sender='Council', recipient='圆桌', credits=2, outcome=dict(state='RESOLVED'))
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            for name in ('圆桌', 'Council'):
+                root = base/name
+                root.mkdir()
+                (root/'node.json').write_text(json.dumps(dict(name=name), ensure_ascii=False), encoding='utf-8-sig')
+                with closing(ledger(root)) as db:
+                    db.execute('INSERT INTO jobs VALUES (?,?,?,?)',
+                               (key, json.dumps(dict(request, id=key)), json.dumps(receipt), 2))
+                    db.commit()
+            statement = base/'statement.json'
+            cli(base/'Council', 'statement', '圆桌', str(statement))
+            exported = json.loads(statement.read_bytes())
+            self.assertEqual(exported['partner'], '圆桌')
+            self.assertEqual(exported['entries'][0]['credits'], 2)
+            statement.write_text(json.dumps(exported, ensure_ascii=False), encoding='utf-8-sig')
+            result = cli(base/'圆桌', 'reconcile', 'Council', str(statement), '--list-matched')
+            self.assertEqual(json.loads(result.stdout), dict(matched=1, differences=[], matched_jobs=[key]))
+
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
         with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
             root = Path(tmp)
