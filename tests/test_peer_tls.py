@@ -262,3 +262,11 @@ class PeerTLSTests(unittest.TestCase):
                     transfer(db,endpoint,dict(sender='A',after=page['next'],revision=page['revision']),peer_name='B')
                 stale.exception.close()
                 self.assertEqual(stale.exception.code,409)
+            compared = cli(folder/'A', 'reconcile-online', 'B', '--list-matched', ok=False)
+            self.assertEqual(compared.returncode, 1)
+            report = json.loads(compared.stdout)
+            missing_job = synthetic[0][0]
+            self.assertEqual(report['differences'], [dict(job=missing_job, reason='missing at partner')])
+            self.assertEqual(report['matched'], 6000)
+            self.assertEqual(len(set(report['matched_jobs'])), 6000)
+            self.assertNotIn(missing_job, report['matched_jobs'])
