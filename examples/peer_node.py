@@ -777,16 +777,23 @@ def local_history(root, network, label, job=None):
         return matches
 
 
-def admission(root, db, partner):
+def admission(root, db, partner, search_nodes=None):
     config = json.loads((root/'node.json').read_text())
     if config.get('transport') != 'mtls':
         raise ValueError('admission lookup requires mutual TLS')
     row = db.execute('SELECT url FROM peers WHERE name=?',(partner,)).fetchone()
     if row is None:
         raise ValueError('discover partner before checking admission')
-    response = transfer(db,row[0]+'/admission',dict(sender=config['name']),peer_name=partner)
+    query = dict(sender=config['name'])
+    if search_nodes is not None:
+        if type(search_nodes) is not int or search_nodes < 1:
+            raise ValueError('search_nodes must be a positive integer')
+        query['search_nodes'] = search_nodes
+    response = transfer(db,row[0]+'/admission',query,peer_name=partner)
     if not isinstance(response,dict) or type(response.get('accepting')) is not bool:
         raise ValueError('invalid admission response')
+    if search_nodes is not None and (type(response.get('search_nodes')) is not int or response['search_nodes'] != search_nodes):
+        raise ValueError('partner did not confirm the requested search budget')
     return dict(node=partner,accepting=response['accepting'])
 
 
@@ -885,7 +892,15 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                         eligible = db.execute('''SELECT 1 FROM peers JOIN consult_grants USING(name,url)
                             LEFT JOIN grant_limits USING(name) WHERE name=? AND (remaining IS NULL OR remaining>0)''',
                             (request['sender'],)).fetchone()
-                        return self.reply(200,dict(accepting=eligible is not None))
+                        answer = dict(accepting=eligible is not None)
+                        if 'search_nodes' in request:
+                            budget = request['search_nodes']
+                            if type(budget) is not int or budget < 1:
+                                raise ValueError('search_nodes must be a positive integer')
+                            settings = json.loads((root/'node.json').read_text())
+                            ceiling = settings.get('max_search_nodes', budget)
+                            answer.update(search_nodes=budget, accepting=bool(eligible) and type(ceiling) is int and budget <= ceiling)
+                        return self.reply(200,answer)
                     if self.path == '/statement':
                         partner = request['sender']
                         permitted = config.get('statement_partners', [])
@@ -958,7 +973,9 @@ if __name__=='__main__':
     match.add_argument('--model', default='qwen3.5:9b')
     commands.add_parser('resume')
     commands.add_parser('account')
-    commands.add_parser('admission').add_argument('partner')
+    admission_parser = commands.add_parser('admission')
+    admission_parser.add_argument('partner')
+    admission_parser.add_argument('--search-nodes', type=int, help='check eligibility for this exact search budget')
     commands.add_parser('reconcile-online').add_argument('partner')
     for action in ('statement','reconcile'):
         report = commands.add_parser(action)
@@ -1054,7 +1071,7 @@ if __name__=='__main__':
                 else:
                     result = reconcile(local,json.loads(args.file.read_bytes()))
             elif args.action == 'admission':
-                result = admission(args.directory,db,args.partner)
+                result = admission(args.directory,db,args.partner,args.search_nodes)
             elif args.action == 'reconcile-online':
                 result = reconcile_online(args.directory,db,args.partner)
             elif args.action == 'account':

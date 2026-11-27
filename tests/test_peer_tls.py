@@ -160,6 +160,7 @@ class PeerTLSTests(unittest.TestCase):
             receiver = folder/'B'
             configuration = json.loads((receiver/'node.json').read_text())
             configuration['statement_partners'] = ['A']
+            configuration['max_search_nodes'] = 10
             (receiver/'node.json').write_text(json.dumps(configuration))
             _, new_port = start(stack,receiver,0)
             with closing(ledger(folder/'A')) as db, db:
@@ -169,6 +170,9 @@ class PeerTLSTests(unittest.TestCase):
             self.assertFalse(accepting())  # Earlier consultation exhausted the single grant.
             cli(receiver,'permission','A','allow','--remaining','1')
             self.assertTrue(accepting())
+            for budget, expected in [(10, True), (11, False)]:
+                answer = cli(folder/'A', 'admission', 'B', '--search-nodes', str(budget))
+                self.assertEqual(json.loads(answer.stdout), dict(node='B', accepting=expected))
             self.assertTrue(accepting())
             with closing(ledger(receiver)) as db:
                 self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (1,))

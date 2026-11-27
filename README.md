@@ -140,6 +140,8 @@ To increase that budget, change the positive integer `search_nodes` in the sched
 
 A provider can set `max_search_nodes` to a positive integer in its own `node.json`. A new repair request whose search budget exceeds that ceiling is rejected before it uses a consultation allowance. Requests that omit `search_nodes` use the 10,000-node default for this check. The ceiling applies to exact search; model tokens and candidate generation have separate costs.
 
+Before sending a roster, run `python -m examples.peer_node runtime/A admission B --search-nodes 10000` over mutual TLS. A sends its identity and proposed budget. B checks both its current grant and the budget ceiling without reserving quota. A requires confirmation of the exact budget, so an older peer that only checks grants cannot accidentally confirm eligibility for an expensive repair. B checks again when accepting the actual request.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
