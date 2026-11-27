@@ -55,7 +55,17 @@ def evaluate(k, folder, seed, size, shifts, arm, model):
         else:
             payload = request(model, shifts, proposal)
             start = perf_counter()
-            response = api('/api/chat', payload)
+            try:
+                response = api('/api/chat', payload)
+            except Exception as error:
+                elapsed = perf_counter() - start
+                posted = k.get(topic)['messages']
+                failed_attempt = dict(member=member, input=payload, error_type=type(error).__name__,
+                                      seconds=elapsed, input_tokens=None, output_tokens=None)
+                save(folder, f'{seed}-{arm}.json',
+                     dict(topic=topic, shifts=shifts, calls=calls, failed_attempt=failed_attempt,
+                          credits_spent=sum(message['cost'] for message in posted)))
+                raise
             elapsed = perf_counter()-start
             event = {'input': payload, 'response': response}
             body = response['message']['content']

@@ -32,6 +32,8 @@ Each comparison subtracts the single participant's result from the roundtable's.
 
 For an interrupted run, pass its saved design to include planned rosters with zero recorded results. All three arms appear as missing for those rosters.
 
+If the model service raises an error during a request, inspect the run directory's `SEED-ARM.json`. The `calls` list contains completed responses. The separate `failed_attempt` records the request, elapsed time and error type. Its token counts are unknown. The `credits_spent` field records the charges already posted for this roster and arm. The failed arm has no scored CSV row.
+
 ```sh
 python -m examples.summarize_detection reports/paired-reproduction/results.csv --design reports/paired-reproduction/design.json
 ```
