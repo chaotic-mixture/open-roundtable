@@ -198,6 +198,28 @@ class DataTests(unittest.TestCase):
             data.configure(self.root, 'sealed')
             self.assertEqual(status('--by-mode')['pending_by_mode'], dict(sealed=2, local=0, api=0))
 
+    def test_pending_mode_counts_exclude_ready_records_and_follow_policy_changes(self):
+        data.ingest(self.root, 'private', [
+            dict(source=source, body='synthetic') for source in ('local-a', 'local-b', 'remote', 'sealed')
+        ])
+        with patch.object(data, 'exchange', side_effect=AssertionError):
+            data.maintain(self.root, 'profile')
+            data.limit_record(self.root, 'sealed', 'sealed')
+            for source in ('local-a', 'local-b'):
+                data.limit_record(self.root, source, 'local', source + '-model')
+            for mode, model, endpoint, counts in [
+                ('api', 'remote-model', 'https://example.org/chat', dict(sealed=1, local=2, api=1)),
+                ('local', 'default-model', None, dict(sealed=1, local=3, api=0)),
+                ('sealed', None, None, dict(sealed=4, local=0, api=0)),
+            ]:
+                with self.subTest(mode=mode):
+                    data.configure(self.root, mode, model, endpoint)
+                    output = StringIO()
+                    with patch('sys.argv', ['data', str(self.root), 'private-status', '--by-mode']), redirect_stdout(output):
+                        data.main()
+                    self.assertEqual(json.loads(output.getvalue()), dict(total=5, ready=1, pending=4,
+                                                                        pending_by_mode=counts))
+
     def setUp(self):
         port = patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='11434')
         port.start()
