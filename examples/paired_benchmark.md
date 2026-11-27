@@ -32,6 +32,8 @@ Each comparison subtracts the single participant's result from the roundtable's.
 
 For an interrupted run, pass its saved design to include planned rosters with zero recorded results. All three arms appear as missing for those rosters.
 
+To finish the other arms after a model request fails or its verdict cannot be scored, add `--continue-on-model-error` to the benchmark command. The runner prints `unscored`, saves the affected arm's evidence and proceeds without retrying it. Only scored arms enter the CSV. Use the design alongside the CSV to identify gaps before comparing performance.
+
 If the model service raises an error during a request, inspect the run directory's `SEED-ARM.json`. The `calls` list contains completed responses. The separate `failed_attempt` records the request, elapsed time and error type. Its token counts are unknown. The `credits_spent` field records the charges already posted for this roster and arm. The failed arm has no scored CSV row.
 
 If the model returns an incomplete generation or an invalid verdict, the same file preserves the response, its reported token counts, posted credits and a `scoring_error`. An unscored reply can therefore still consume credits.

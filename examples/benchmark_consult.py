@@ -36,7 +36,7 @@ def request(model, shifts, proposal):
             'format': SCHEMA, 'stream': False, 'think': False, 'options': {'temperature': 0}}
 
 
-def evaluate(k, folder, seed, size, shifts, arm, model):
+def evaluate(k, folder, seed, size, shifts, arm, model, *, continue_on_model_error=False):
     members = ARMS[arm]
     topic = k.create(f'{seed}/{arm}', credits=2)
     for member in members:
@@ -65,6 +65,8 @@ def evaluate(k, folder, seed, size, shifts, arm, model):
                 save(folder, f'{seed}-{arm}.json',
                      dict(topic=topic, shifts=shifts, calls=calls, failed_attempt=failed_attempt,
                           credits_spent=sum(message['cost'] for message in posted)))
+                if continue_on_model_error:
+                    return None
                 raise
             elapsed = perf_counter()-start
             event = {'input': payload, 'response': response}
@@ -85,6 +87,8 @@ def evaluate(k, folder, seed, size, shifts, arm, model):
             except (ValueError, KeyError, TypeError) as error:
                 evidence['scoring_error'] = str(error)
                 save(folder, f'{seed}-{arm}.json', evidence)
+                if continue_on_model_error:
+                    return None
                 raise
     if arm == 'tool':
         scores = grade(shifts, final)
@@ -105,13 +109,14 @@ def evaluate(k, folder, seed, size, shifts, arm, model):
     return row
 
 
-def run(folder, model, repetitions, first_seed):
+def run(folder, model, repetitions, first_seed, *, continue_on_model_error=False):
     if repetitions < 1:
         raise ValueError('at least one schedule per difficulty')
     folder.mkdir(parents=True, exist_ok=False)
     installed = next(m for m in api('/api/tags')['models'] if m['name']==model)
     save(folder,'design.json',dict(model=installed, ollama=api('/api/version'), sizes=[7,11,22],
-                                   repetitions=repetitions, first_seed=first_seed, budget=2))
+                                   repetitions=repetitions, first_seed=first_seed, budget=2,
+                                   continue_on_model_error=continue_on_model_error))
     with closing(Kernel(folder/'ledger.sqlite3')) as k, (folder/'results.csv').open('x', newline='') as out:
         writer = None
         for level, size in enumerate((7,11,22)):
@@ -121,7 +126,11 @@ def run(folder, model, repetitions, first_seed):
                 shifts = generate(seed, size)
                 order = ('solo','tool','table') if index%2==0 else ('table','tool','solo')
                 for arm in order:
-                    row = evaluate(k, folder, seed, size, shifts, arm, model)
+                    row = evaluate(k, folder, seed, size, shifts, arm, model,
+                                   continue_on_model_error=continue_on_model_error)
+                    if row is None:
+                        print(seed, size, arm, 'unscored', flush=True)
+                        continue
                     if writer is None:
                         writer = csv.DictWriter(out, fieldnames=list(row))
                         writer.writeheader()
@@ -136,5 +145,8 @@ if __name__ == '__main__':
     parser.add_argument('--model', default='qwen3.5:9b')
     parser.add_argument('--repetitions', type=int, default=3)
     parser.add_argument('--first-seed', type=int, default=501)
+    parser.add_argument('--continue-on-model-error', action='store_true',
+                        help='Record model request and verdict failures and continue with the next arm')
     args = parser.parse_args()
-    run(args.directory, args.model, args.repetitions, args.first_seed)
+    run(args.directory, args.model, args.repetitions, args.first_seed,
+        continue_on_model_error=args.continue_on_model_error)
