@@ -66,13 +66,24 @@ def trace(db,direction,route,body):
         db.execute('INSERT INTO traffic VALUES (?,?,?)',(direction,route,packed(body).decode()))
 
 
-def tls_context(root, *, server=False):
-    config = json.loads((root/'node.json').read_text())
+def read_node_config(root):
+    config = json.loads((root/'node.json').read_text(encoding='utf-8-sig'))
+    if not isinstance(config, dict):
+        raise ValueError('node.json must contain a JSON object')
+    return config
+
+
+def tls_context(root, *, server=False, config=None):
+    if config is None:
+        config = read_node_config(root)
     if config.get('transport', 'http') == 'http':
         return None
     if config['transport'] != 'mtls':
         raise ValueError('unknown node transport')
-    root = Path(config.get('credentials', root))
+    if 'credentials' in config:
+        if not isinstance(config['credentials'], str) or not config['credentials'].strip():
+            raise ValueError('credentials must be a nonempty directory path')
+        root = Path(config['credentials'])
     purpose = ssl.Purpose.CLIENT_AUTH if server else ssl.Purpose.SERVER_AUTH
     context = ssl.create_default_context(purpose, cafile=str(root/'ca.pem'))
     context.verify_mode = ssl.CERT_REQUIRED
@@ -81,6 +92,8 @@ def tls_context(root, *, server=False):
 
 
 def listen_address(config, context):
+    if not isinstance(config.get('listen_address', '127.0.0.1'), str):
+        raise ValueError('listen_address must be an IPv4 address string')
     address = IPv4Address(config.get('listen_address', '127.0.0.1'))
     if address.is_unspecified or address.is_multicast or (not context and str(address) != '127.0.0.1'):
         raise ValueError('an explicit interface and mutual TLS are required for remote service')
@@ -136,8 +149,8 @@ def transfer(db,url,data=None,*,peer_name=None):
     u=urlsplit(url)
     location = db.execute('PRAGMA database_list').fetchone()[2]
     root = Path(location).parent
-    config = json.loads((root/'node.json').read_text())
-    context = tls_context(root)
+    config = read_node_config(root)
+    context = tls_context(root, config=config)
     scheme = 'https' if context else 'http'
     if u.scheme!=scheme or not u.hostname or u.username is not None or u.password is not None or not u.port:
         raise ValueError('invalid transport endpoint')
@@ -170,7 +183,7 @@ def confirms_public_record(records, source, expected):
 
 def discover(db,bootstrap, *, directory_name=None):
     root = Path(db.execute('PRAGMA database_list').fetchone()[2]).parent
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     if directory_name is not None and (not directory_name.strip() or config.get('transport') != 'mtls'):
         raise ValueError('directory identity verification requires mutual TLS and a node name')
     feed = fetch_public_subset(db, bootstrap, directory_name, '/nodes')
@@ -263,7 +276,7 @@ def validate_registration_origin(config, source, url):
 
 
 def register(root, source, url):
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     validate_registration_origin(config, source, url)
     body = packed(dict(name=config['name'], url=url)).decode()
     ingest(root,'public',[dict(source=source,body=body)])
@@ -271,7 +284,7 @@ def register(root, source, url):
 
 
 def import_registration(root, db, name, source, url):
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     validate_registration_origin(config, source, url)
     records = transfer(db, url + '/record?' + urlencode({'source': source}), peer_name=name)
     if not isinstance(records, list) or len(records) != 1:
@@ -284,7 +297,7 @@ def import_registration(root, db, name, source, url):
 
 
 def offer(root, source, tag, description, *, rules=()):
-    node = json.loads((root/'node.json').read_text())['name']
+    node = read_node_config(root)['name']
     if not tag.strip() or not description.strip():
         raise ValueError('provide a capability tag and description')
     item = dict(kind='capability', node=node, tag=tag.strip(), description=description.strip())
@@ -315,7 +328,7 @@ def valid_offer(item, node):
 
 
 def published_offers(root):
-    name = json.loads((root/'node.json').read_text())['name']
+    name = read_node_config(root)['name']
     offers = []
     for record in catalog(root):
         try:
@@ -332,7 +345,7 @@ def find_capability(root, db, tag=None, *other_tags, accepting_only=False, requi
         raise ValueError('search_nodes must be a positive integer')
     tags = {tag, *other_tags} if tag is not None else None
     required = set(required_rules)
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     check_admission = accepting_only or search_nodes is not None
     if check_admission and config.get('transport') != 'mtls':
         raise ValueError('admission filtering requires mutual TLS')
@@ -444,7 +457,7 @@ def verify_dispatch(records, node, reference, rules):
 
 
 def envelope(root,recipient,source):
-    config=json.loads((root/'node.json').read_text())
+    config=read_node_config(root)
     record=next((r for r in catalog(root) if r['source']==source),None)
     if record is None:
         raise ValueError('topic must be explicitly shared')
@@ -459,7 +472,7 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
         body['offer'] = request['offer']
     if set(request)!=set(body)|{'id'} or key!=digest(body):
         raise ValueError('invalid envelope')
-    config=json.loads((root/'node.json').read_text())
+    config=read_node_config(root)
     if request['recipient']!=config['name']:
         raise ValueError('wrong recipient')
     row = db.execute('''SELECT peers.url FROM peers JOIN consult_grants USING(name,url)
@@ -639,7 +652,7 @@ def validate_job_identity(key, request):
 
 def service_account(root, db):
     """Summarize each durable service receipt once from this node's perspective."""
-    node = json.loads((root / 'node.json').read_text())['name']
+    node = read_node_config(root)['name']
     account = dict(node=node, contributed=0, consumed=0, pending=0, pending_jobs=[], entries=[])
     for key, raw, saved, credits in db.execute('SELECT id,request,result,credits FROM jobs ORDER BY id'):
         request = json.loads(raw)
@@ -665,7 +678,7 @@ def service_account(root, db):
 
 
 def partner_statement(root, db, partner, *, after='', limit=None):
-    node = json.loads((root/'node.json').read_text())['name']
+    node = read_node_config(root)['name']
     if node == partner or not partner.strip():
         raise ValueError('choose a distinct partner')
     entries = []
@@ -742,7 +755,7 @@ def reconcile(local, remote, *, list_matched=False):
 
 def resume(root, db):
     """Retry pending outbound jobs whose original topic is still shared."""
-    name = json.loads((root / 'node.json').read_text())['name']
+    name = read_node_config(root)['name']
     rows = db.execute('SELECT id,request FROM jobs WHERE result IS NULL ORDER BY rowid').fetchall()
     outcomes = {}
     for key, raw in rows:
@@ -802,7 +815,7 @@ def local_history(root, network, label, job=None):
 
 
 def admission(root, db, partner, search_nodes=None):
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     if config.get('transport') != 'mtls':
         raise ValueError('admission lookup requires mutual TLS')
     row = db.execute('SELECT url FROM peers WHERE name=?',(partner,)).fetchone()
@@ -828,7 +841,7 @@ def statement_revision(db, node, partner):
 
 
 def reconcile_online(root, db, partner, *, list_matched=False):
-    config = json.loads((root/'node.json').read_text())
+    config = read_node_config(root)
     if config.get('transport') != 'mtls':
         raise ValueError('online reconciliation requires mutual TLS')
     row = db.execute('SELECT url FROM peers WHERE name=?', (partner,)).fetchone()
@@ -866,7 +879,8 @@ def reconcile_online(root, db, partner, *, list_matched=False):
 
 
 def serve(root,port,interrupt,interrupt_before_receipt=False):
-    context = tls_context(root, server=True)
+    config = read_node_config(root)
+    context = tls_context(root, server=True, config=config)
     class Handler(BaseHTTPRequestHandler):
         def reply(self,code,value):
             raw=packed(value)
@@ -921,7 +935,7 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                             budget = request['search_nodes']
                             if type(budget) is not int or budget < 1:
                                 raise ValueError('search_nodes must be a positive integer')
-                            settings = json.loads((root/'node.json').read_text())
+                            settings = read_node_config(root)
                             ceiling = settings.get('max_search_nodes', budget)
                             answer.update(search_nodes=budget, accepting=bool(eligible) and type(ceiling) is int and budget <= ceiling)
                         return self.reply(200,answer)
@@ -951,7 +965,6 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
             except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):
                 self.reply(409,{'error':'request could not be completed'})
 
-    config = json.loads((root/'node.json').read_text())
     with ThreadingHTTPServer((listen_address(config, context),port),Handler) as server:
         if context:
             server.socket = context.wrap_socket(server.socket, server_side=True)
@@ -1033,9 +1046,9 @@ if __name__=='__main__':
     args=parser.parse_args()
     if args.action == 'check-listener':
         try:
-            config = json.loads((args.directory/'node.json').read_text())
+            config = read_node_config(args.directory)
             allowed_origins(config)
-            context = tls_context(args.directory, server=True)
+            context = tls_context(args.directory, server=True, config=config)
             print(json.dumps(dict(listen_address=listen_address(config, context),
                                   transport=config.get('transport', 'http'))))
         except (ValueError, OSError) as error:
