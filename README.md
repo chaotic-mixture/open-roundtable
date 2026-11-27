@@ -138,6 +138,8 @@ For a repair that ended before model selection, inspect `no_plan.feasibility`. A
 
 To increase that budget, change the positive integer `search_nodes` in the scheduling request (default 10,000), then review and share the revised public record before sending it. This value limits the expert's exact search. For example, in a direct search for two four-hour shifts originally starting at hour 8 in the same room with different workers, a budget of 1 returned `unknown`. A budget of 100 found starts at hours 8 and 4 after visiting 9 nodes. This example measures the search routine; the ordinary repair workflow tries its candidate generator first.
 
+A provider can set `max_search_nodes` to a positive integer in its own `node.json`. A new repair request whose search budget exceeds that ceiling is rejected before it uses a consultation allowance. Requests that omit `search_nodes` use the 10,000-node default for this check. The ceiling applies to exact search; model tokens and candidate generation have separate costs.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.

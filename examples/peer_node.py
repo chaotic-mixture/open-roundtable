@@ -507,6 +507,12 @@ def deliver(root,db,request,*,interrupt_before_receipt=False):
                 raise ValueError('consultation allowance exhausted')
         if rules is None:
             validate_roster(request['spec'])
+            if 'max_search_nodes' in config:
+                ceiling = config['max_search_nodes']
+                if type(ceiling) is not int or ceiling < 1:
+                    raise ValueError('max_search_nodes must be a positive integer')
+                if request['spec'].get('search_nodes', 10000) > ceiling:
+                    raise ValueError('requested search budget exceeds provider limit')
         if limit is not None:
             db.execute('UPDATE grant_limits SET remaining=remaining-1 WHERE name=?', (request['sender'],))
         if rules:

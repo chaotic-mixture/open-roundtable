@@ -253,6 +253,23 @@ class PeerRecoveryTests(unittest.TestCase):
     def test_search_limit_returns_replayable_zero_charge(self):
         self.check_no_plan_receipt(14, 'unknown', 1, duration=5)
 
+    def test_provider_search_ceiling_preserves_unused_grant(self):
+        with tempfile.TemporaryDirectory() as tmp, closing(ledger(Path(tmp))) as db:
+            root = Path(tmp)
+            (root/'node.json').write_text(json.dumps(dict(name='B', model='fixture', max_search_nodes=10)))
+            db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
+            set_permission(db, 'A', True, 1)
+            spec = dict(title='Shift', preference='Keep start', shifts=[
+                dict(id='one', worker='Alex', room='East', start=0, end=4)])
+            for override in ({}, {'search_nodes': 11}):
+                item = spec | override
+                body = dict(sender='A', recipient='B', source='public', spec=item)
+                with patch('examples.peer_node.transfer', return_value=[dict(source='public', body=json.dumps(item))]):
+                    with self.assertRaisesRegex(ValueError, 'exceeds provider limit'):
+                        deliver(root, db, dict(body, id=digest(body)))
+                self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (1,))
+                self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone(), (0,))
+
     def test_room_capacity_returns_replayable_zero_charge(self):
         with patch('examples.user_consult.candidates') as generate:
             self.check_no_plan_receipt(22, 'infeasible', 0, separate_workers=True)
