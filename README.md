@@ -108,6 +108,8 @@ If the receiver stopped during inference, run `python -m examples.peer_node runt
 python -m unittest tests.test_peers.PeerRecoveryTests.test_restart_after_model_dispatch_without_receipt_keeps_job_pending
 ```
 
+On the provider, the job ID also identifies a local consultation database named `JOB_ID.sqlite3` in the node directory. Open it read-only and run `SELECT status, response IS NOT NULL AS has_response FROM attempts ORDER BY id` to inspect the journal without displaying prompts or responses. In the interruption test it contains one `dispatching` row with `has_response = 0` after the retry. The journal records dispatch intent before network I/O. Only the test service's independent request count confirms that this particular call reached it.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.

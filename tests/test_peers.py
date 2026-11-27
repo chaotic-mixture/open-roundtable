@@ -197,6 +197,10 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertNotEqual(outcome.returncode,0)
             self.assertEqual(json.loads(outcome.stdout), dict(matched=0,
                 differences=[dict(job=key, reason='pending at both nodes')]))
+            journal_uri = (b / f'{key}.sqlite3').resolve().as_uri() + '?mode=ro'
+            with closing(sqlite3.connect(journal_uri, uri=True)) as journal:
+                self.assertEqual(journal.execute('SELECT status,response IS NOT NULL FROM attempts').fetchall(),
+                                 [('dispatching', 0)])
             self.assertEqual(calls,['/api/chat'])
 
     def test_last_statement_page_requires_cursor_order_and_explicit_end(self):
