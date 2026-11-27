@@ -51,6 +51,8 @@ python -m examples.auto_consult run reports/live-47 --seed 47
 python -m examples.auto_consult verify reports/live-47
 ```
 
+Run `python -m examples.auto_consult usage reports/live-47` to read posted credits by member and the model's reported token counts. This also works if the model request failed after the expert posted its findings. A token count of `null` means the count was unavailable.
+
 In one seed-47 run, `qwen3.5:9b` missed one worker overlap and one short rest period, and reported two excess continuous-work violations. It found all three room overlaps. The expert disagreed with the revision, so the ledger recorded `PAUSED` after two credits, 425 input tokens and 667 output tokens. Offline verification reproduced that score. Model results can vary by installation.
 
 ### Repair a schedule with your own preferences

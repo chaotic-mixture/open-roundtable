@@ -6,7 +6,7 @@ import unittest
 from contextlib import closing, redirect_stdout
 from pathlib import Path
 
-from examples.auto_consult import run, verify
+from examples.auto_consult import run, usage, verify
 from examples.overnight_score import expected
 from examples.synthetic_consult import MODEL, fixture
 from open_roundtable.schedule_expert import check
@@ -55,6 +55,16 @@ class ConsultationTests(unittest.TestCase):
         result = self.execute(dissent)
         self.assertEqual(result['state'], 'PAUSED')
         self.assertEqual(result['scores']['P'], {'truth':['DE'], 'extra':['AB'], 'missing':['DE']})
+
+    def test_usage_after_provider_failure(self):
+        def interrupted(path, payload=None):
+            if path == '/api/chat':
+                raise TimeoutError()
+            return fixture(path, payload)
+        with self.assertRaises(TimeoutError):
+            self.execute(interrupted)
+        self.assertEqual(usage(self.folder), dict(credits_by_member={'expert': 1}, credits_spent=1,
+                                                 prompt_tokens=None, completion_tokens=None))
 
     def test_response_format_replay(self):
         self.execute()

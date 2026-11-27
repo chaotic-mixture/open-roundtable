@@ -165,14 +165,28 @@ def verify(folder):
                    'completion_tokens':response['eval_count'],'scores':scores}))
 
 
+def usage(folder):
+    """Read posted charges even if the provider never returned a response."""
+    ledger = (folder/'ledger.sqlite3').resolve().as_uri() + '?mode=ro'
+    with closing(sqlite3.connect(ledger, uri=True)) as db:
+        charges = dict(db.execute('SELECT member, SUM(cost) FROM messages GROUP BY member'))
+    path = folder/'response.json'
+    response = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    return dict(credits_by_member=charges, credits_spent=sum(charges.values()),
+                prompt_tokens=response.get('prompt_eval_count'),
+                completion_tokens=response.get('eval_count'))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['run','verify'])
+    parser.add_argument('action', choices=['run','verify','usage'])
     parser.add_argument('directory', type=Path)
     parser.add_argument('--model',default='qwen3.5:9b')
     parser.add_argument('--seed', type=int, default=31)
     args = parser.parse_args()
     if args.action == 'run':
         run(args.directory, args.model, args.seed)
+    elif args.action == 'usage':
+        print(encoded(usage(args.directory)))
     else:
         verify(args.directory)
