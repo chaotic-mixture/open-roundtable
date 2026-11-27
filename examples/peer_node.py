@@ -418,9 +418,12 @@ def audit_rules(spec):
         return None
     rules = spec.get('rules')
     shifts = spec.get('shifts')
-    if (not isinstance(rules, list) or not rules or
-            not all(isinstance(rule, str) and rule in ('P', 'V', 'R', 'L') for rule in rules)):
-        raise ValueError('invalid audit rules')
+    if not isinstance(rules, list) or not rules:
+        raise ValueError('provide a nonempty array of audit rules')
+    for index, rule in enumerate(rules):
+        if rule not in ('P', 'V', 'R', 'L'):
+            raise ValueError(f'rules[{index}] must be P (worker overlap), V (room overlap), '
+                             'R (minimum rest), or L (maximum continuous work)')
     if not isinstance(shifts, list) or not 1 <= len(shifts) <= 52:
         raise ValueError('provide 1 to 52 audit shifts')
     ids = set()
