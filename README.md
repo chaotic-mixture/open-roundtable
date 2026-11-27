@@ -51,6 +51,8 @@ python -m examples.auto_consult run reports/live-47 --seed 47
 python -m examples.auto_consult verify reports/live-47
 ```
 
+In one seed-47 run, `qwen3.5:9b` missed one worker overlap and one short rest period, and reported two excess continuous-work violations. It found all three room overlaps. The expert disagreed with the revision, so the ledger recorded `PAUSED` after two credits, 425 input tokens and 667 output tokens. Offline verification reproduced that score. Model results can vary by installation.
+
 ### Repair a schedule with your own preferences
 
 To check a roster locally before sharing it, save the following request as `audit.json` and run `python -m open_roundtable audit audit.json`. The offline command reads the file and prints findings using the same validator and scheduling expert as a receiving node.

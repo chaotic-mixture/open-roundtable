@@ -94,7 +94,11 @@ def run(folder, model, seed, provider=api):
         proposal = lists(check(shifts))
         audit['expert_seconds'] = perf_counter()-start
         assert_post(k, topic, 'expert', encoded(proposal))
-        payload = {'model':model, 'stream':False, 'think':False, 'format':'json',
+        fields = {rule: {'type': 'array', 'items': {'type': 'string'}} for rule in RULES}
+        fields.update(approve_final={'type': 'boolean'}, reason={'type': 'string'})
+        schema = {'type': 'object', 'properties': fields, 'required': list(fields),
+                  'additionalProperties': False}
+        payload = {'model':model, 'stream':False, 'think':False, 'format':schema,
                    'options':{'temperature':0}, 'messages':[{'role':'user',
                    'content':prompt(shifts, proposal, audit['prompt_version'])}]}
         save(folder, 'request.json', payload)
