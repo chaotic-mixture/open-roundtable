@@ -100,14 +100,14 @@ def repair_preview(spec):
     met = evaluate(rules, rows, starts)
     if all(met) and not any(expected(schedule(rows, starts)).values()):
         proof = dict(status='feasible', nodes=0, plan=starts) if rules else None
-        return dict(schedule=[dict(shift) for shift in spec['shifts']], criteria_met=met,
+        return dict(schedule=[dict(shift) for shift in spec['shifts']], original_criteria_met=met, criteria_met=met,
                     changed_shifts=0, changes=[], top_priority_search=proof)
     plans, menu, proof = prepare_candidates(spec, rows, rules)
     changes = [dict(id=old['id'], old_start=old['start'], old_end=old['end'],
                     new_start=new['start'], new_end=new['end'])
                for old, new in zip(spec['shifts'], menu[0], strict=True)
                if old['start'] != new['start']]
-    return dict(schedule=menu[0], criteria_met=evaluate(rules, rows, plans[0]),
+    return dict(schedule=menu[0], original_criteria_met=met, criteria_met=evaluate(rules, rows, plans[0]),
                 changed_shifts=len(changes), changes=changes, top_priority_search=proof)
 
 

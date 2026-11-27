@@ -78,6 +78,8 @@ To obtain the expert's default candidate directly, run `python -m open_roundtabl
 
 Read the preview's `changes` array to review just the moved shifts in input order. Each entry includes the original shift ID and its old and new start and end hours. An empty array means the original schedule was retained.
 
+Compare `original_criteria_met` with `criteria_met` in the same priority order as the input. In the English example, both preferences hold before repair even though the shifts overlap. The flags change from `[true, true]` to `[true, false]` because moving the late shift preserves the pickup deadline but changes its start time. Both arrays are empty when the request supplies no encoded criteria.
+
 If the consultation is `PAUSED` and the expert voted against the first proposal, revise it in a fresh ledger:
 
 ```sh
