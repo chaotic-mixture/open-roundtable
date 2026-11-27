@@ -123,6 +123,8 @@ Each output row includes the requested `model`, the service's `reported_model` w
 
 After the prompt was changed to ask for a separate sentence about the current arrangement, the same model produced “The current roster still applies while approval is pending. If the pilot is approved, Zhao might switch to Wednesday shifts next month.” The ownership and late-shift qualifications also survived this rerun. Each case was sampled once with the revised prompt.
 
+The same revised prompt was also run once on each Chinese case with `qwen3.5:9b`. The stored summaries repeated the ownership and pending-pilot records verbatim. The late-shift summary shortened the wording while retaining both Friday and a colleague picking up the child as necessary conditions. All three receipts reported the requested model.
+
 ### Compare ways to find a scheduling expert
 
 Run `python -m examples.rule_discovery --dispatch` from the repository root. A requester sends nine synthetic rosters to rule-based experts over loopback HTTP. All four providers advertise the same audit tag, but their offers differ in which checks they declare. Each roster produces two JSON lines. Compare `tag` (select by audit tag) with `rules` (also require every requested check). The rule codes are P for worker overlap, V for room overlap, R for minimum rest and L for maximum continuous work.
