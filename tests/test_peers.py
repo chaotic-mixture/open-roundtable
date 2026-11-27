@@ -305,6 +305,15 @@ class PeerRecoveryTests(unittest.TestCase):
                                  dict(job=request['id'], attempts=[], has_consultation_receipt=True,
                                       no_plan=dict(feasibility=status, nodes=nodes)))
                 self.assertEqual(receipt['credits'], 0)
+                checkpoint_path = root / (request['id'] + '.sqlite3')
+                with closing(sqlite3.connect(checkpoint_path)) as checkpoint:
+                    bad = receipt | dict(outcome=receipt['outcome'] | dict(nodes=budget + 1))
+                    with checkpoint:
+                        checkpoint.execute('UPDATE peer_receipt SET result=?', (json.dumps(bad),))
+                    inspected = cli(root, 'dispatch-status', request['id'], '--checkpoint', ok=False)
+                    self.assertEqual(inspected.returncode, 2)
+                    with checkpoint:
+                        checkpoint.execute('UPDATE peer_receipt SET result=?', (json.dumps(receipt),))
                 if budget > 1:
                     (root/'node.json').write_text(json.dumps(config | {'max_search_nodes': budget - 1}))
                 self.assertEqual(deliver(root, db, request), (receipt, False))

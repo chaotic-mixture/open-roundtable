@@ -1016,11 +1016,16 @@ if __name__=='__main__':
                 elif saved:
                     receipt = json.loads(saved[0])
                     outcome = receipt.get('outcome') if isinstance(receipt, dict) else None
-                    if (not isinstance(outcome, dict) or receipt.get('id') != args.job
-                            or outcome.get('state') != 'NO_PLAN' or type(receipt.get('credits')) is not int
-                            or receipt['credits'] != 0 or outcome.get('feasibility') not in ('unknown', 'infeasible')
-                            or type(outcome.get('nodes')) is not int or outcome['nodes'] < 0):
+                    if not isinstance(outcome, dict) or outcome.get('state') != 'NO_PLAN':
                         parser.error('invalid no-plan checkpoint')
+                    network = args.directory / 'network.sqlite3'
+                    with closing(sqlite3.connect(network.resolve().as_uri() + '?mode=ro', uri=True)) as db:
+                        job = db.execute('SELECT request FROM jobs WHERE id=?', (args.job,)).fetchone()
+                    if not job:
+                        parser.error('missing request for no-plan checkpoint')
+                    request = json.loads(job[0])
+                    validate_job_identity(args.job, request)
+                    validate_receipt(request, receipt)
                     no_plan = dict(feasibility=outcome['feasibility'], nodes=outcome['nodes'])
                     rows = []
                 else:
@@ -1030,7 +1035,7 @@ if __name__=='__main__':
                     report['has_consultation_receipt'] = bool(saved)
                     if no_plan is not None:
                         report['no_plan'] = no_plan
-        except (sqlite3.Error, ValueError):
+        except (sqlite3.Error, ValueError, KeyError, TypeError):
             parser.error('unable to read a model dispatch journal for this job')
         print(json.dumps(report))
     elif args.action=='serve':
