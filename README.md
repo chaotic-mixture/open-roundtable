@@ -100,6 +100,24 @@ python -m examples.peer_node runtime/consumer discover https://directory.example
 
 The directory name is the identity in the certificate URI. A successful empty list means the directory returned no eligible peers. To exercise publication and withdrawal on one machine first, run `python -m examples.registration_demo --openssl openssl`.
 
+To publish provider B, start its configured service with `python -m examples.peer_node runtime/provider serve 8443` on the provider host. In another terminal on that host, create and review the registration. Replace the example hostname with B's reachable hostname throughout:
+
+```sh
+python -m examples.peer_node runtime/provider register https://peer-b.example/node https://peer-b.example:8443
+python -m open_roundtable.data runtime/provider review-public https://peer-b.example/node
+python -m open_roundtable.data runtime/provider share-public https://peer-b.example/node --if-sha256 PROVIDER_HASH
+```
+
+Use the hash of the reviewed registration for `PROVIDER_HASH`. On the directory host, allow B's HTTPS origin in the directory configuration, then import the published registration and review the directory's copy:
+
+```sh
+python -m examples.peer_node runtime/directory import-registration B https://peer-b.example/node https://peer-b.example:8443
+python -m open_roundtable.data runtime/directory review-public https://peer-b.example/node
+python -m open_roundtable.data runtime/directory share-public https://peer-b.example/node --if-sha256 DIRECTORY_HASH
+```
+
+Use the hash from the directory review for `DIRECTORY_HASH`. Run the consumer's discovery command again to see B. To withdraw this listing, run `python -m open_roundtable.data runtime/directory share-public https://peer-b.example/node --off` on the directory host. The consumer's next discovery refresh removes B from this directory snapshot.
+
 ### Keep a private preference and publish a service notice
 
 From the repository root, create two UTF-8 JSON files. In `preference.json`, save `[{"source":"profile","body":"I prefer morning meetings."}]`. In `notice.json`, save `[{"source":"https://example.org/hours","body":"Office hours start at 9."}]`. The HTTPS address identifies the notice. Importing the file reads its contents from disk.
