@@ -12,7 +12,7 @@ from urllib.error import URLError
 from examples import preference_benchmark as batch
 from examples.compare_panel_receipts import compare
 from examples.paired_panel_benchmark import seeded_spec
-from examples.user_consult import consult, validate_roster
+from examples.user_consult import consult, repair_preview, validate_roster
 from examples.refine_schedule import feasibility
 from examples.revise_panel_proposal import revise
 from examples.verify_preferences import verify
@@ -29,6 +29,17 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_preview_skips_search_for_an_already_optimal_roster(self):
+        spec = dict(title='Night shift', preference='Keep Jo on the original shift',
+                    shifts=[dict(id='night', worker='Jo', room='East', start=22, end=30)],
+                    criteria=[dict(shift='night', field='delta', min=0, max=0)])
+        with patch('examples.user_consult.candidates') as generate:
+            result = repair_preview(spec)
+            generate.assert_not_called()
+        self.assertEqual(result['schedule'], spec['shifts'])
+        self.assertEqual(result['changed_shifts'], 0)
+        self.assertEqual(result['criteria_met'], (True,))
+
     def test_english_batch_rejects_language_change_on_resume(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(batch, 'api', side_effect=provider):
             folder = Path(tmp) / 'batch'

@@ -65,8 +65,7 @@ def candidate_rank(rules, rows, plan):
     return evaluate(rules, rows, plan), -sum(h != row[1] for h, row in zip(plan, rows))
 
 
-def prepare_candidates(spec):
-    rows, rules = validate_roster(spec)
+def prepare_candidates(spec, rows, rules):
     if exceeds_weekly_capacity(rows):
         raise NoFeasibleCandidate(dict(status='infeasible', nodes=0))
     shifts = spec['shifts']
@@ -92,11 +91,18 @@ def prepare_candidates(spec):
     if any(any(expected(schedule(rows,p)).values()) for p in plans):
         raise ValueError('expert candidate failed independent verification')
     menu=[[dict(item,start=h,end=h+row[2]) for item,h,row in zip(shifts,p,rows)] for p in plans]
-    return rows, rules, plans, menu, proof
+    return plans, menu, proof
 
 
 def repair_preview(spec):
-    rows, rules, plans, menu, proof = prepare_candidates(spec)
+    rows, rules = validate_roster(spec)
+    starts = [row[1] for row in rows]
+    met = evaluate(rules, rows, starts)
+    if all(met) and not any(expected(schedule(rows, starts)).values()):
+        proof = dict(status='feasible', nodes=0, plan=starts) if rules else None
+        return dict(schedule=[dict(shift) for shift in spec['shifts']], criteria_met=met,
+                    changed_shifts=0, top_priority_search=proof)
+    plans, menu, proof = prepare_candidates(spec, rows, rules)
     return dict(schedule=menu[0], criteria_met=evaluate(rules, rows, plans[0]),
                 changed_shifts=sum(start != row[1] for start, row in zip(plans[0], rows)),
                 top_priority_search=proof)
@@ -104,7 +110,8 @@ def repair_preview(spec):
 
 def consult(source, database, model, *, nested=False):
     spec=json.loads(source.read_text(encoding='utf-8-sig'))
-    rows, rules, plans, menu, proof = prepare_candidates(spec)
+    rows, rules = validate_roster(spec)
+    plans, menu, proof = prepare_candidates(spec, rows, rules)
     database.touch(exist_ok=False)
     with closing(Kernel(database)) as k:
         initialize(k.db)
