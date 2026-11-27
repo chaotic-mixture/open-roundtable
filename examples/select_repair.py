@@ -16,9 +16,12 @@ from open_roundtable.schedule_expert import check
 
 
 def choice(response, count):
-    if not response['done'] or response.get('done_reason') != 'stop':
+    if response['done'] is not True or response.get('done_reason') != 'stop':
         raise ValueError('incomplete reply')
-    answer = json.loads(response['message']['content'])
+    message = response['message']
+    if not isinstance(message, dict) or message.get('refusal') or message.get('tool_calls'):
+        raise ValueError('model did not finalize a selection')
+    answer = json.loads(message['content'])
     if not isinstance(answer, dict) or set(answer) != {'plan'}:
         raise ValueError('expected a plan ID only')
     index = answer['plan']

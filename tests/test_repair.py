@@ -50,6 +50,13 @@ class RepairTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 select.choice(response(raw),2)
         self.assertEqual(select.choice(response('{"plan":1}'),2),1)
+        for field, value in [('refusal', 'declined'), ('tool_calls', [{'name': 'inspect'}])]:
+            reply = response('{"plan":1}')
+            reply['message'][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                select.choice(reply, 2)
+        with self.assertRaises(ValueError):
+            select.choice(dict(response('{"plan":1}'), done='false'), 2)
 
     def test_default_delivered_and_charged_on_bad_reply_or_outage(self):
         calls = 0
