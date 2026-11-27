@@ -1,4 +1,35 @@
-# v0.0.5 自然语言排班偏好
+# Choosing a schedule from verified candidates (v0.0.5)
+
+[中文报告](#v005-自然语言排班偏好)
+
+**An extra model call improved on the expert's default for two of nine rosters.** On seed 506 it gained one preference point, and on 507 it gained seven. Both gains came with the same number of changed shifts. When the priorities and exceptions were already encoded as rules, the rules captured both gains and reached the best available score on all nine rosters.
+
+| Selector | Hard constraints passed | Preference points | Shifts changed | Calls / credits | Input / output tokens | Member call time |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Expert default | 9/9 | 31/63 | 90 | 9 / 9 | 0 / 0 | 0.32 s |
+| Rule ranking | 9/9 | 42/63 | 94 | 9 / 9 | 0 / 0 | 0.32 s |
+| Model selection | 9/9 | 34/63 | 94 | 18 / 18 | 8,878 / 100 | 13.89 s |
+
+Each selector saw the same feasible schedules for each roster. The model read the original Chinese request and returned a candidate ID. An independent scorer awarded 4, 2 and 1 points for the high, medium and low priorities, applying exceptions before scoring. Ties favored fewer changed shifts and then the lower candidate ID. The timing covers member calls and excludes the human work of encoding the rules.
+
+- **501 and 505:** Rule ranking gained one and two points respectively over the default, at the cost of moving two more shifts on each roster. The model missed both improvements.
+- **502 and 508:** Even the best candidates scored only zero and one point respectively. Improving these scores requires finding other feasible schedules or establishing which requests can be met together.
+- **503, 504 and 509:** The default already reached the best available score. The model matched the default on 503, moved two extra shifts for the same score on 504, and lost five points while moving one extra shift on 509.
+
+These results cover three fixed preference briefs and nine synthetic rosters. The best score among generated candidates is an upper bound for a selector using those candidates. Other feasible schedules may score higher. [Per-roster scores, priority flags and usage](preference_501_metrics.csv) · [Independent scoring rules](preference_rubric.py)
+
+### Reproduce the results
+
+From the repository root with Python 3.11 or later, run the first command to check the published scores and exception boundaries offline. For a new model run, start Ollama with `qwen3.5:9b` installed and give the second command a fresh output directory.
+
+```sh
+python -m unittest discover -s tests -p test_preferences.py -v
+python -m examples.preference_benchmark reports/preference-repro --model qwen3.5:9b
+```
+
+The benchmark uses seeds 501–509 and calls the model once per roster. Compare the new `results.csv` with the published measurements. Model choices, token counts and timing may vary.
+
+## v0.0.5 自然语言排班偏好
 
 相对专家默认方案，模型只在 506、507 两张表上提高了得分，两张都无需多改班。人工编码的规则排序在九张表上均达到候选内最优，并能在 501、505 找到模型漏掉的改善机会。502、508 即使选到最好候选，也分别只有 0 分和 1 分，继续改善需要扩充候选或检验硬约束下的可行性。
 
