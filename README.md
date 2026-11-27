@@ -119,6 +119,8 @@ The preview should show `store` as `local` and the effective `mode` as `sealed`,
 
 To inspect the quality of local-model maintenance, run `python -m examples.private_summary_cases --language en` with Ollama serving `qwen3.5:9b`. The example creates a temporary private store and prints each synthetic source alongside its saved summary. Check whose preference is known, whether both conditions on a late shift survive, and whether a pending pilot remains tentative. Use `--language zh` for the original Chinese cases.
 
+Each output row includes the requested `model`, the service's `reported_model` when available, and the maintenance `mode` read back from SQLite. In a local English run on 2026-11-27, all three rows recorded `qwen3.5:9b` for both model fields. The summaries preserved Jo's ownership of the preference and both conditions on Chen's late shifts. The pilot summary retained pending approval and the tentative change, but its “otherwise” phrasing made the current roster's present status less explicit. These observations cover one generation per record in that run.
+
 ### Compare ways to find a scheduling expert
 
 Run `python -m examples.rule_discovery --dispatch` from the repository root. A requester sends nine synthetic rosters to rule-based experts over loopback HTTP. All four providers advertise the same audit tag, but their offers differ in which checks they declare. Each roster produces two JSON lines. Compare `tag` (select by audit tag) with `rules` (also require every requested check). The rule codes are P for worker overlap, V for room overlap, R for minimum rest and L for maximum continuous work.
