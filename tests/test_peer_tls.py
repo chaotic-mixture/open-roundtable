@@ -220,6 +220,8 @@ class PeerTLSTests(unittest.TestCase):
 
             self.assertEqual(json.loads(cli(folder/'A','reconcile-online','B').stdout),
                              dict(matched=1,differences=[]))
+            listed = json.loads(cli(folder/'A','reconcile-online','B','--list-matched').stdout)
+            self.assertEqual(listed, dict(matched=1, matched_jobs=[receipt['id']], differences=[]))
             with closing(ledger(folder/'A')) as db:
                 with self.assertRaises(HTTPError) as denied:
                     transfer(db,f'https://127.0.0.1:{new_port}/statement',dict(sender='C'),peer_name='B')
