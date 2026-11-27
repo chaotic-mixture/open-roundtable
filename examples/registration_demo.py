@@ -1,11 +1,12 @@
 """Publish, discover and withdraw a synthetic registration on loopback."""
 import argparse
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from examples.demo_certificates import issue_certificates
+from examples.peer_node import ledger
 from examples.two_node_demo import cli, start
 from open_roundtable.data import initialize, share_public
 
@@ -40,10 +41,20 @@ def run(openssl=None):
         before = json.loads(cli(consumer, *discovery).stdout)
         share_public(directory, source, True, imported['sha256'])
         published = json.loads(cli(consumer, *discovery).stdout)
+        cli(consumer, 'permission', 'B', 'allow', '--remaining', '1')
+        with closing(ledger(consumer)) as db:
+            granted = db.execute('''SELECT url,remaining FROM peers JOIN consult_grants USING(name,url)
+                                    JOIN grant_limits USING(name) WHERE name='B' ''').fetchall()
+        if granted != [(endpoint, 1)]:
+            raise ValueError('consumer did not persist the bounded grant')
         share_public(directory, source, False)
         withdrawn = json.loads(cli(consumer, *discovery).stdout)
         if before or published != [dict(name='B', url=endpoint)] or withdrawn:
             raise ValueError('unexpected discovery result')
+        with closing(ledger(consumer)) as db:
+            for table in ('peers', 'consult_grants', 'grant_limits'):
+                if db.execute(f'SELECT 1 FROM {table} WHERE name=?', ('B',)).fetchone():
+                    raise ValueError(f'withdrawn peer remains in {table}')
         return dict(before_publication=before, published=published, after_withdrawal=withdrawn)
 
 
