@@ -18,7 +18,7 @@ from examples.paired_panel_benchmark import summarize_rounds
 class BenchmarkTests(unittest.TestCase):
     def test_within_round_agreement_can_hide_changed_selections(self):
         def result(position, selected):
-            metrics = dict(model_seconds=1, consultation_seconds=2, credits=2,
+            metrics = dict(model_calls=1, model_seconds=1, consultation_seconds=2, credits=2,
                            input_tokens=10, output_tokens=3, selected=selected, changed_shifts=2+selected,
                            criteria_met=[True, bool(selected)], best_criteria_met=[True, True],
                            min_changes_at_best_score=3, state='RESOLVED' if selected else 'PAUSED',
@@ -45,6 +45,7 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(report['changed_selections'][mode], [dict(seed=501, first=0, second=1)])
             self.assertEqual(report['preferences'][mode], dict(met=3, evaluated=4, all_met_runs=1))
             self.assertEqual(report['totals'][mode]['changed_shifts'], 5)
+            self.assertEqual(report['totals'][mode]['model_calls'], 2)
 
     def test_nested_summary_detects_a_missing_pair(self):
         with tempfile.TemporaryDirectory() as tmp:

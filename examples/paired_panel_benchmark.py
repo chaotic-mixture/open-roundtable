@@ -50,7 +50,7 @@ def run(directory, model, *, verify_only=False, reverse_order=False):
 
 
 def summarize_rounds(first, second):
-    totals = {mode: dict(model_seconds=0.0, consultation_seconds=0.0, credits=0,
+    totals = {mode: dict(model_calls=0, model_seconds=0.0, consultation_seconds=0.0, credits=0,
                          input_tokens=0, output_tokens=0, changed_shifts=0) for mode in ('direct', 'nested')}
     preferences = {mode: dict(met=0, evaluated=0, all_met_runs=0) for mode in totals}
     topic_states = {mode: {'PAUSED': 0, 'RESOLVED': 0} for mode in totals}
