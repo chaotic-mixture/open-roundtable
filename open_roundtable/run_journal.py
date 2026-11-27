@@ -1,5 +1,6 @@
 """Persist model dispatch attempts before I/O and receipts before charging."""
 from contextlib import closing, contextmanager
+from http.client import HTTPException
 import json
 import sqlite3
 from time import perf_counter
@@ -43,7 +44,7 @@ def dispatch(kernel, topic, request, provider):
     start = perf_counter()
     try:
         response = provider('/api/chat',request)
-    except (URLError,TimeoutError,ConnectionError,ValueError) as exc:
+    except (HTTPException,URLError,TimeoutError,ConnectionError,ValueError) as exc:
         seconds = perf_counter()-start
         with db:
             db.execute("UPDATE attempts SET status='failed',error=?,seconds=? WHERE id=?",

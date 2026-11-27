@@ -1,4 +1,5 @@
 import csv
+from http.client import IncompleteRead
 import json
 from contextlib import closing
 from pathlib import Path
@@ -28,6 +29,16 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_truncated_http_reply_is_recorded_without_model_charge(self):
+        source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
+        with tempfile.TemporaryDirectory() as tmp:
+            database = Path(tmp) / 'consult.sqlite3'
+            with patch('examples.user_consult.api', side_effect=IncompleteRead(b'partial', 10)):
+                consult(source, database, 'fixture')
+            with closing(sqlite3.connect(database)) as db:
+                self.assertEqual(db.execute('SELECT status,response FROM attempts').fetchall(), [('failed', None)])
+                self.assertEqual(db.execute('SELECT member,cost FROM messages').fetchall(), [('expert', 1)])
+
     def test_invalid_second_criterion_identifies_its_location(self):
         spec = seeded_spec(501, 7)
         first, second = spec['criteria']
