@@ -54,6 +54,9 @@ class PeerTLSTests(unittest.TestCase):
                     share_public(base/'B', record['source'], True)
                 self.assertEqual(transfer(db,url+'/nodes',peer_name='B'), [registration])
                 self.assertEqual(discover(db, url, directory_name='B'), [dict(name='B', url=url)])
+                denied_statement = cli(base/'A', 'reconcile-online', 'B', ok=False)
+                self.assertEqual((denied_statement.returncode, denied_statement.stdout), (2, b''))
+                self.assertIn(b'403', denied_statement.stderr)
                 with self.assertRaises(URLError) as mismatch:
                     discover(db, url, directory_name='directory')
                 self.assertIsInstance(mismatch.exception.reason, ssl.SSLCertVerificationError)

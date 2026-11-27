@@ -1135,7 +1135,10 @@ if __name__=='__main__':
             elif args.action == 'admission':
                 result = admission(args.directory,db,args.partner,args.search_nodes)
             elif args.action == 'reconcile-online':
-                result = reconcile_online(args.directory,db,args.partner, list_matched=args.list_matched)
+                try:
+                    result = reconcile_online(args.directory,db,args.partner, list_matched=args.list_matched)
+                except (OSError, HTTPException, ValueError) as error:
+                    parser.error(f'Cannot complete online reconciliation: {error}')
             elif args.action == 'account':
                 result = service_account(args.directory, db)
             elif args.action == 'permission':

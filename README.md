@@ -218,6 +218,8 @@ To find providers for that budget, run `python -m examples.peer_node runtime/A f
 
 ### Reconcile receipts online
 
+For automation, exit status 0 means the comparison finished with no differences. Status 1 accompanies a JSON report of differences. If the peer cannot be reached, access is denied or the statement changes during pagination, the command reports the error on standard error and exits with status 2. Run the comparison again once the peer is available and both ledgers are stable.
+
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
 
 After A has discovered B at its current address, run:
