@@ -18,6 +18,8 @@ At commit `4c2e1b1`, all 124 tests passed from an extracted 88-file snapshot wit
 
 Reproduce with `python tests/verify_snapshot.py reports/check-4c2e1b1 --revision 4c2e1b1 --openssl openssl` and a fresh output directory. The ZIP SHA-256 was `3797dfd09cf5f87fc38b5e2cb2f184769880f169b223dd6bb9c68a7ddf17dd62`. The inventory check compared the archive with Git. Independent file approval and cross-host deployment are separate checks.
 
+At commit `53f2cf0`, all 133 tests passed in the extracted 89-file snapshot with OpenSSL enabled. Separate peer tests replayed a budget-limited unknown result and a proven weekly worker capacity failure, both at zero charge. SQLite readback and the same-machine registration exercise passed. Reproduce with `python tests/verify_snapshot.py reports/check-53f2cf0 --revision 53f2cf0 --openssl openssl` using a fresh directory. The ZIP SHA-256 was `3d73ce3f04f7b0b1db6ad99914f05dcc8642077304d6f8488e2c53b9210cbb35`.
+
 ## Review the candidate files
 
 Review each path for the proposed revision. Candidates include the license, notices, README, charter, project index, contributor and security guides, Git ignore rules, reviewed packaging metadata, Python modules under `open_roundtable/` and `tests/`, and original experiments with synthetic inputs and instructions under `examples/`. The documentation candidates cover architecture, design decisions, the roadmap, related projects and this checklist. The references index may describe sources. Keep the original reference material private.
