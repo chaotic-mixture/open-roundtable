@@ -216,20 +216,28 @@ def maintain(root, source, *, only_pending=False):
         return True
 
 
+def pending_modes(db, selection, parameters=()):
+    counts = dict(sealed=0, local=0, api=0)
+    groups = db.execute(f'''SELECT min(r.source), count(*) FROM ({selection}) AS r
+        LEFT JOIN record_limits l USING(source) GROUP BY l.mode''', parameters)
+    for source, count in groups:
+        counts[effective_policy(db, source)['mode']] += count
+    return counts
+
+
 def maintain_pending(root, limit, *, preview=False, diagnostics=False):
     if limit < 1:
         raise ValueError('limit must be positive')
     with closing(connect(root, 'private')) as db, db:
         db.execute('BEGIN IMMEDIATE')
         db.execute('CREATE TABLE IF NOT EXISTS maintenance_cursor (id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL)')
-        rows = db.execute("""SELECT source FROM records WHERE summary IS NULL
+        selection = """SELECT source FROM records WHERE summary IS NULL
             ORDER BY source <= coalesce((SELECT source FROM maintenance_cursor WHERE id=1), ''), source
-            LIMIT ?""", (limit,)).fetchall()
+            LIMIT ?"""
         if preview:
-            modes = dict(sealed=0, local=0, api=0)
-            for source, in rows:
-                modes[effective_policy(db, source)['mode']] += 1
-            return dict(selected=len(rows), modes=modes)
+            modes = pending_modes(db, selection, (limit,))
+            return dict(selected=sum(modes.values()), modes=modes)
+        rows = db.execute(selection, (limit,)).fetchall()
         if rows:
             db.execute('INSERT OR REPLACE INTO maintenance_cursor VALUES (1, ?)', rows[-1])
     completed = failed = 0
@@ -354,12 +362,7 @@ def main():
                 total, ready = db.execute('SELECT count(*), count(summary) FROM records').fetchone()
                 report = dict(total=total, ready=ready, pending=total-ready)
                 if args.by_mode:
-                    counts = dict(sealed=0, local=0, api=0)
-                    groups = db.execute('''SELECT min(r.source), count(*) FROM records r
-                        LEFT JOIN record_limits l USING(source) WHERE r.summary IS NULL GROUP BY l.mode''')
-                    for source, count in groups:
-                        counts[effective_policy(db, source)['mode']] += count
-                    report['pending_by_mode'] = counts
+                    report['pending_by_mode'] = pending_modes(db, 'SELECT source FROM records WHERE summary IS NULL')
             print(json.dumps(report))
         elif args.action=='maintain-private':
             maintain(root,args.source)
