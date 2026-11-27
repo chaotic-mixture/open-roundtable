@@ -30,6 +30,12 @@ python -m examples.summarize_detection examples/paired_501_metrics.csv
 
 Each comparison subtracts the single participant's result from the roundtable's. Negative values for missed findings or false positives mean fewer errors. Seeds 502 and 505 gained missed findings relative to the tool, and seed 503 gained a false positive. The other six matched the tool at one additional credit each. If a run stopped mid-roster, the report lists the missing arms for that roster.
 
+For an interrupted run, pass its saved design to include planned rosters with zero recorded results. All three arms appear as missing for those rosters.
+
+```sh
+python -m examples.summarize_detection reports/paired-reproduction/results.csv --design reports/paired-reproduction/design.json
+```
+
 ## v0.0.3 排班对照实验
 
 需要模型提交最终清单时，给它一次排班专家调用，在本轮九张表上逐张减少了错误。收益最大的是 22 班次档：三张表共多用 3 credits、4.48 秒，消除了 234 项漏报和 40 项误报。若目标只是判定这四条明确规则，单工具在九张表上已经全部正确。增加模型复核后，六张表持平，三张出现了新错误：种子 502、505 各漏掉一项、两项连续工作超时，503 多报了一对人员冲突。

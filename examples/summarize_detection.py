@@ -8,10 +8,18 @@ from pathlib import Path
 from examples.benchmark_consult import ARMS
 
 
-def summarize(rows):
+def summarize(rows, design=None):
     trials = defaultdict(dict)
+    if design is not None:
+        seed = design['first_seed']
+        for size in design['sizes']:
+            for _ in range(design['repetitions']):
+                trials[size, seed] = {}
+                seed += 1
     for row in rows:
         key = int(row['shifts']), int(row['seed'])
+        if design is not None and key not in trials:
+            raise ValueError(f'Roster outside benchmark design: {key}')
         arm = row['arm']
         if arm not in ARMS or arm in trials[key]:
             raise ValueError(f'Unexpected or duplicate arm {arm!r} for {key}')
@@ -36,6 +44,8 @@ def summarize(rows):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('results', type=Path)
+    parser.add_argument('--design', type=Path, help='Benchmark design.json used to identify unstarted rosters')
     args = parser.parse_args()
     with args.results.open(encoding='utf-8-sig', newline='') as source:
-        print(json.dumps(summarize(csv.DictReader(source)), indent=2))
+        design = json.loads(args.design.read_text(encoding='utf-8')) if args.design else None
+        print(json.dumps(summarize(csv.DictReader(source), design), indent=2))
