@@ -322,7 +322,14 @@ class PeerRecoveryTests(unittest.TestCase):
                         checkpoint.execute('UPDATE peer_receipt SET result=?', (json.dumps(receipt),))
                 if budget > 1:
                     (root/'node.json').write_text(json.dumps(config | {'max_search_nodes': budget - 1}))
-                self.assertEqual(deliver(root, db, request), (receipt, False))
+                # Recreate the durable state between checkpointing and posting the network result.
+                with db:
+                    db.execute('UPDATE jobs SET result=NULL WHERE id=?', (request['id'],))
+                with patch('examples.peer_node.consult') as consult:
+                    self.assertEqual(deliver(root, db, request), (receipt, False))
+                    consult.assert_not_called()
+                restored, charge = db.execute('SELECT result,credits FROM jobs WHERE id=?', (request['id'],)).fetchone()
+                self.assertEqual((json.loads(restored), charge), (receipt, 0))
                 self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
                 model.assert_not_called()
             provider = partner_statement(root, db, 'A')
