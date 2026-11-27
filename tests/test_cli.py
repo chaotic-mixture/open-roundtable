@@ -58,6 +58,18 @@ class CliTests(unittest.TestCase):
         self.assertIn('fixed duration', repair.stderr)
         self.assertFalse(self.path.exists())
 
+    def test_preview_distinguishes_a_limited_search_from_impossible_capacity(self):
+        source = self.path.with_suffix('.json')
+        for count, code, status, nodes in [(11, 4, 'unknown', 1), (12, 3, 'infeasible', 0)]:
+            with self.subTest(count=count):
+                shifts = [dict(id=str(i), worker='Jo', room='East', start=8, end=16) for i in range(count)]
+                source.write_text(json.dumps(dict(title='Weekly cover', preference='Minimize changes',
+                                                  search_nodes=1, shifts=shifts)))
+                result = subprocess.run([sys.executable, '-m', 'open_roundtable', 'repair-preview', str(source)],
+                                        cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, code)
+                self.assertEqual(json.loads(result.stdout), dict(status=status, nodes=nodes, schedule=None))
+
     def test_audit_reads_piped_requests(self):
         cmd = [sys.executable, '-m', 'open_roundtable', 'audit', '-', '--fail-on-findings']
         request = dict(operation='schedule-audit-v1', rules=['V'], shifts=['Axv:1-4', 'Byv:3-5'])

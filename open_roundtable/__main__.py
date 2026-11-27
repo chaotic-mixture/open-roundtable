@@ -81,8 +81,12 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == 'repair-preview':
-            from examples.user_consult import repair_preview
-            result = repair_preview(json.loads(args.input.read_bytes()))
+            from examples.user_consult import NoFeasibleCandidate, repair_preview
+            try:
+                result = repair_preview(json.loads(args.input.read_bytes()))
+            except NoFeasibleCandidate as exc:
+                print(json.dumps(dict(status=exc.status, nodes=exc.nodes, schedule=None)))
+                raise SystemExit(3 if exc.status == 'infeasible' else 4)
         elif args.command == 'audit':
             from .schedule_expert import audit_rules, check
             payload = sys.stdin.buffer.read() if args.input == '-' else Path(args.input).read_bytes()
