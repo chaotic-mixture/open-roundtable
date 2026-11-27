@@ -74,6 +74,20 @@ def exceeds_weekly_capacity(rows):
     return False
 
 
+def worker_blocks_fit(rows, starts, indices, *, complete):
+    """Nonoverlapping intervals with a short gap must eventually form one block."""
+    intervals = sorted((starts[j], starts[j] + rows[j][2]) for j in indices if j < len(starts))
+    block_start, end = intervals[0]
+    for start, stop in intervals[1:]:
+        gap = start - end
+        if gap >= 8:
+            block_start = start
+        elif stop - block_start > 8 or (gap > 0 and complete):
+            return False
+        end = stop
+    return True
+
+
 def feasibility(rows, accepts, budget):
     """Exact finite-domain search; a node limit yields unknown, never infeasible."""
     if type(budget)!=int or budget<1:
@@ -106,16 +120,11 @@ def feasibility(rows, accepts, budget):
                 continue
             starts.append(h)
             indices = worker_indices[key[1]]
-            if i == indices[-1] and i < len(rows)-1 and len(indices) > 1:
-                # Only this worker's own later shifts could fill a short gap.
-                tokens = schedule([rows[j] for j in indices], [starts[j] for j in indices])
-                if any(check(tokens, rules='RL').values()):
-                    starts.pop()
-                    continue
-            result=search()
+            if worker_blocks_fit(rows, starts, indices, complete=i == indices[-1]):
+                result=search()
+                if result is not None:
+                    return result
             starts.pop()
-            if result is not None:
-                return result
         return None
 
     try:

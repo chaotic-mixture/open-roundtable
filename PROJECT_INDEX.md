@@ -25,6 +25,8 @@ We compared the fallback search at commits `8b875ea` and `68d3894` on the nine s
 
 For reproduction in each checkout, generate rows with `validate_roster(seeded_spec(seed, size))[0]` using seeds 501–509 and sizes 7, 7, 7, 11, 11, 11, 22, 22, 22. Call `examples.refine_schedule.feasibility(rows, lambda plan: True, 10000)` and compare its `status` and `nodes`. This isolates search from the heuristic candidate generator and preference ranking. An unknown result leaves feasibility open.
 
+A subsequent search check groups assigned shifts separated by less than eight hours. Any positive gap within such a group must be filled to satisfy minimum rest. If filling it would create more than eight continuous work hours, the branch can be discarded immediately. With the same inputs and budgets, seeds 502–509 produced independently verified plans after 164, 64, 227, 218, 285, 1,325, 1,230 and 1,004 visits respectively. Seed 501 remained unknown after 10,000 visits. This raised coverage to eight of nine, including all six larger rosters. The measurement covers search nodes and feasibility only.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
