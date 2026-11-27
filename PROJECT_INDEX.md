@@ -29,6 +29,8 @@ A subsequent search check groups assigned shifts separated by less than eight ho
 
 Checking whether any subset of the worker's remaining fixed shift durations can exactly fill each short gap found a plan for seed 501 in 80 visits. Under the same 10,000-node budget per roster, all nine plans passed the independent hourly check. The other eight visit counts were unchanged. This check is a necessary condition for filling each gap individually. Final verification still evaluates the complete roster.
 
+Run `python -m examples.feasibility_benchmark` to reproduce the current solver's nine results, or add `--first-seed 510` for a second batch from the same generator. All nine additional plans passed independent verification with the same 10,000-node limit. The three 7-shift cases needed 69–91 visits, the 11-shift cases 235–298, and the 22-shift cases 835–1,058. Each JSON line includes the seed, schedule size, budget, status, visits, search time in seconds and selected start hours in input order. Timing excludes roster generation and independent verification.
+
 ### Does delegating the repair change the decision?
 
 In two runs on the same nine rosters with `qwen3.5:9b`, direct and delegated consultations selected the same schedule in all 18 pairs. The second run reversed execution order on each roster. Each approach met 18 of 36 individual preferences, met both preferences in 2 of 18 consultations, and moved 194 shifts in total across the repeated rosters.
