@@ -991,18 +991,27 @@ if __name__=='__main__':
                     "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('attempts','peer_receipt')")}
                 saved = journal.execute('SELECT result FROM peer_receipt WHERE id=? AND result IS NOT NULL',
                                         (args.job,)).fetchone() if 'peer_receipt' in tables else None
+                no_plan = None
                 if 'attempts' in tables:
                     rows = journal.execute('SELECT status,response IS NOT NULL FROM attempts ORDER BY id').fetchall()
-                elif saved and journal.execute("""SELECT json_extract(result,'$.id')=? AND
-                        json_extract(result,'$.outcome.state')='NO_PLAN' AND json_extract(result,'$.credits')=0
-                        FROM peer_receipt WHERE id=?""", (args.job, args.job)).fetchone() == (1,):
+                elif saved:
+                    receipt = json.loads(saved[0])
+                    outcome = receipt.get('outcome') if isinstance(receipt, dict) else None
+                    if (not isinstance(outcome, dict) or receipt.get('id') != args.job
+                            or outcome.get('state') != 'NO_PLAN' or type(receipt.get('credits')) is not int
+                            or receipt['credits'] != 0 or outcome.get('feasibility') not in ('unknown', 'infeasible')
+                            or type(outcome.get('nodes')) is not int or outcome['nodes'] < 0):
+                        parser.error('invalid no-plan checkpoint')
+                    no_plan = dict(feasibility=outcome['feasibility'], nodes=outcome['nodes'])
                     rows = []
                 else:
                     parser.error('missing model dispatch journal')
                 report = dict(job=args.job, attempts=[dict(status=s, has_response=bool(r)) for s,r in rows])
                 if args.checkpoint:
                     report['has_consultation_receipt'] = bool(saved)
-        except sqlite3.Error:
+                    if no_plan is not None:
+                        report['no_plan'] = no_plan
+        except (sqlite3.Error, ValueError):
             parser.error('unable to read a model dispatch journal for this job')
         print(json.dumps(report))
     elif args.action=='serve':

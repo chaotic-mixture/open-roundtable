@@ -134,6 +134,8 @@ On the provider, run `python -m examples.peer_node runtime/B dispatch-status JOB
 
 Add `--checkpoint` to inspect the attempt and the consultation receipt in the same database snapshot. A saved model response and a saved consultation receipt are separate milestones. `has_consultation_receipt` reports whether the provider saved a receipt for this job; use the two-node verifier to check its contents and reconcile the charge.
 
+For a repair that ended before model selection, inspect `no_plan.feasibility`. An `infeasible` result means the expert ruled out a schedule under the submitted constraints. An `unknown` result leaves feasibility open; a new request with a larger search budget may find a plan. The `nodes` field counts search nodes visited. Replaying the same request returns its saved result.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.

@@ -275,7 +275,8 @@ class PeerRecoveryTests(unittest.TestCase):
                 validate_receipt(request, receipt)
                 self.assertEqual(receipt['outcome'], dict(state='NO_PLAN', feasibility=status, nodes=nodes))
                 self.assertEqual(json.loads(cli(root, 'dispatch-status', request['id'], '--checkpoint').stdout),
-                                 dict(job=request['id'], attempts=[], has_consultation_receipt=True))
+                                 dict(job=request['id'], attempts=[], has_consultation_receipt=True,
+                                      no_plan=dict(feasibility=status, nodes=nodes)))
                 self.assertEqual(receipt['credits'], 0)
                 self.assertEqual(deliver(root, db, request), (receipt, False))
                 self.assertEqual(db.execute('SELECT remaining FROM grant_limits').fetchone(), (0,))
