@@ -229,6 +229,10 @@ def maintain_pending(root, limit, *, preview=False, diagnostics=False):
     for source, in rows:
         try:
             completed += maintain(root, source, only_pending=True)
+        except sqlite3.IntegrityError:
+            failed += 1
+            if diagnostics:
+                failures['storage_constraint'] = failures.get('storage_constraint', 0) + 1
         except (OSError, HTTPException, ValueError, KeyError, IndexError, TypeError) as error:
             failed += 1
             if diagnostics:

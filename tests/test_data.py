@@ -14,6 +14,20 @@ from open_roundtable import data
 
 
 class DataTests(unittest.TestCase):
+    def test_batch_continues_after_a_record_constraint_and_retries_it(self):
+        data.ingest(self.root, 'private', [dict(source='second', body='another record')])
+        with closing(data.connect(self.root, 'private')) as db, db:
+            db.execute("""CREATE TRIGGER reject_profile BEFORE INSERT ON summary_origin
+                WHEN NEW.source='profile' BEGIN SELECT RAISE(ABORT, 'private detail'); END""")
+        result = data.maintain_pending(self.root, 2, diagnostics=True)
+        self.assertEqual(result, dict(selected=2, completed=1, failed=1, skipped=0,
+                                      failure_counts={'storage_constraint': 1}))
+        with closing(data.connect(self.root, 'private')) as db, db:
+            self.assertEqual(db.execute('SELECT source,summary FROM records ORDER BY source').fetchall(),
+                             [('profile', None), ('second', 'another record')])
+            db.execute('DROP TRIGGER reject_profile')
+        self.assertEqual(data.maintain_pending(self.root, 2), dict(selected=1, completed=1, failed=0, skipped=0))
+
     def test_failed_origin_write_rolls_back_new_summary(self):
         data.maintain(self.root, 'profile')
         with closing(data.connect(self.root, 'private')) as db, db:

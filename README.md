@@ -125,7 +125,7 @@ After the prompt was changed to ask for a separate sentence about the current ar
 
 The same revised prompt was also run once on each Chinese case with `qwen3.5:9b`. The stored summaries repeated the ownership and pending-pilot records verbatim. The late-shift summary shortened the wording while retaining both Friday and a colleague picking up the child as necessary conditions. All three receipts reported the requested model.
 
-If batch maintenance fails, run `python -m open_roundtable.data runtime/store-demo maintain-pending --limit 2 --diagnostics` to retry up to two pending records. The report counts I/O or HTTP failures under `io_or_http` and validation failures under `validation`. It omits source names, record contents and exception messages. This command performs maintenance under each record's effective policy.
+If batch maintenance fails, run `python -m open_roundtable.data runtime/store-demo maintain-pending --limit 2 --diagnostics` to retry up to two pending records. The report counts I/O or HTTP failures under `io_or_http`, individual record constraint failures under `storage_constraint`, and validation failures under `validation`. It omits source names, record contents and exception messages. This command performs maintenance under each record's effective policy.
 
 ### Compare ways to find a scheduling expert
 
