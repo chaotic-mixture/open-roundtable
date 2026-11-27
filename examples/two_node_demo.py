@@ -72,6 +72,7 @@ def audit(folder):
     body=json.loads(read(b,key+'.sqlite3','SELECT body FROM proposals ORDER BY version DESC LIMIT 1')[0][0])
     require(all(res['outcome'][k]==v for k,v in body.items()),'proposal mismatch')
     expert_agrees = True
+    preferences = {}
     if req['spec'].get('criteria'):
         from examples.user_consult import validate_roster
         from examples.roster_criteria import evaluate
@@ -83,7 +84,10 @@ def audit(folder):
         require(body['schedule'] == candidates[body['selected']], 'selected schedule mismatch')
         score = rank(body['schedule'])
         require(list(score[0]) == body['criteria_met'], 'preference score mismatch')
-        expert_agrees = score == max(map(rank, candidates))
+        best_score = max(map(rank, candidates))
+        expert_agrees = score == best_score
+        preferences = dict(criteria_met=list(score[0]), best_candidate_criteria_met=list(best_score[0]),
+                           changed_shifts=-score[1], best_candidate_changed_shifts=-best_score[1])
     expected_state = 'RESOLVED' if expert_agrees else 'PAUSED'
     require((topic,state,balance)==(res['outcome']['topic'],expected_state,0)
             and res['outcome']['state']==state,'consultation state mismatch')
@@ -175,7 +179,7 @@ def audit(folder):
                 receiver_credits_at_disconnect=fault['receiver_credits'],
                 prompt_tokens=model['prompt_eval_count'],output_tokens=model['eval_count'],
                 state=state,private_markers_found=0,private_stores_checked=[root.name for root in marker_roots],
-                request_id=key, **allowance)
+                request_id=key, **allowance, **preferences)
 
 
 def run(folder,model,fault='after-commit', *, credentials=None, bind_offer=False, language='zh', with_criteria=False):

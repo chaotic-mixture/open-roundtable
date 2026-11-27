@@ -102,6 +102,9 @@ class PeerTLSTests(unittest.TestCase):
                              language='en', with_criteria=True)
             self.assertEqual(audit(folder), result)
             self.assertEqual(result['state'], 'PAUSED')
+            self.assertEqual(result['criteria_met'], [False, True])
+            self.assertEqual(result['best_candidate_criteria_met'], [True, False])
+            self.assertEqual((result['changed_shifts'], result['best_candidate_changed_shifts']), (1, 1))
             with closing(ledger(folder/'A')) as db:
                 receipt = json.loads(db.execute('SELECT result FROM jobs').fetchone()[0])
             self.assertEqual(receipt['outcome']['criteria_met'], [False, True])
