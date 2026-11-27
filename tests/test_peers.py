@@ -198,6 +198,8 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(json.loads(outcome.stdout), dict(matched=0,
                 differences=[dict(job=key, reason='pending at both nodes')]))
             journal_uri = (b / f'{key}.sqlite3').resolve().as_uri() + '?mode=ro'
+            self.assertEqual(json.loads(cli(b, 'dispatch-status', key).stdout),
+                             dict(job=key, attempts=[dict(status='dispatching', has_response=False)]))
             with closing(sqlite3.connect(journal_uri, uri=True)) as journal:
                 self.assertEqual(journal.execute('SELECT status,response IS NOT NULL FROM attempts').fetchall(),
                                  [('dispatching', 0)])

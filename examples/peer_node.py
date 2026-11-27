@@ -947,6 +947,7 @@ if __name__=='__main__':
     feedback.add_argument('outcome', choices=['useful','not-useful'])
     feedback.add_argument('observation_file', type=Path)
     commands.add_parser('quality').add_argument('provider')
+    commands.add_parser('dispatch-status', help='read model attempt states from a local job journal').add_argument('job')
     access = commands.add_parser('permission')
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
@@ -961,7 +962,17 @@ if __name__=='__main__':
     submit.add_argument('source')
     submit.add_argument('--offer',nargs=2,metavar=('SOURCE','SHA256'))
     args=parser.parse_args()
-    if args.action=='serve':
+    if args.action == 'dispatch-status':
+        if not re.fullmatch(r'[0-9a-f]{64}', args.job):
+            parser.error('expected a 64-character lowercase hexadecimal job ID')
+        path = args.directory / (args.job + '.sqlite3')
+        try:
+            with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as journal:
+                rows = journal.execute('SELECT status,response IS NOT NULL FROM attempts ORDER BY id').fetchall()
+        except sqlite3.Error:
+            parser.error('unable to read a model dispatch journal for this job')
+        print(json.dumps(dict(job=args.job, attempts=[dict(status=s, has_response=bool(r)) for s,r in rows])))
+    elif args.action=='serve':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:
         with closing(ledger(args.directory)) as db:

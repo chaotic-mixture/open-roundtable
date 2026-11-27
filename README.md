@@ -108,7 +108,7 @@ If the receiver stopped during inference, run `python -m examples.peer_node runt
 python -m unittest tests.test_peers.PeerRecoveryTests.test_restart_after_model_dispatch_without_receipt_keeps_job_pending
 ```
 
-On the provider, the job ID also identifies a local consultation database named `JOB_ID.sqlite3` in the node directory. Open it read-only and run `SELECT status, response IS NOT NULL AS has_response FROM attempts ORDER BY id` to inspect the journal without displaying prompts or responses. In the interruption test it contains one `dispatching` row with `has_response = 0` after the retry. The journal records dispatch intent before network I/O. Only the test service's independent request count confirms that this particular call reached it.
+On the provider, run `python -m examples.peer_node runtime/B dispatch-status JOB_ID` with the job ID from the account. The command opens the consultation database read-only and reports the status of each attempt and whether a response was saved. In the interruption test it reports one `dispatching` attempt with `has_response: false` after the retry. The journal records dispatch intent before network I/O. Only the test service's independent request count confirms that this particular call reached it.
 
 ### Reconcile receipts online
 
