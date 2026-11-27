@@ -55,6 +55,12 @@ def run(openssl=None):
         with closing(ledger(consumer)) as db:
             quota = db.execute('''SELECT remaining FROM peers JOIN consult_grants USING(name,url)
                                  JOIN grant_limits USING(name) WHERE name=?''', ('B',)).fetchone()
+        if quota or json.loads(cli(consumer, 'permission-status', 'B').stdout)['granted']:
+            raise ValueError('missed withdrawal preserved a stale consultation grant')
+        cli(consumer, 'permission', 'B', 'allow', '--remaining', '1')
+        cli(consumer, *discovery)
+        if json.loads(cli(consumer, 'permission-status', 'B').stdout)['remaining'] != 1:
+            raise ValueError('unchanged publication lost its renewed grant')
         share_public(directory, source, False)
         withdrawn = json.loads(cli(consumer, *discovery).stdout)
         if before or published != [dict(name='B', url=endpoint)] or withdrawn:

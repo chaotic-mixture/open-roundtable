@@ -56,6 +56,11 @@ def connect(root, scope):
             db.execute("""CREATE TABLE IF NOT EXISTS record_limits (
                 source TEXT PRIMARY KEY REFERENCES records(source),
                 mode TEXT NOT NULL CHECK(mode IN ('sealed','local')), model TEXT)""")
+        else:
+            db.execute('CREATE TABLE IF NOT EXISTS node_withdrawals (source TEXT PRIMARY KEY, token TEXT NOT NULL)')
+            db.execute("""CREATE TRIGGER IF NOT EXISTS track_node_withdrawal AFTER UPDATE OF shared ON records
+                WHEN OLD.shared=1 AND NEW.shared=0 AND substr(NEW.source,-5)='/node'
+                BEGIN INSERT OR REPLACE INTO node_withdrawals VALUES (NEW.source,lower(hex(randomblob(16)))); END""")
         return db
     except BaseException:
         db.close()

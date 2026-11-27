@@ -36,6 +36,7 @@ PAIR_COLUMNS = """min(json_extract(request,'$.sender'),json_extract(request,'$.r
 def ledger(root):
     db=sqlite3.connect(root/'network.sqlite3')
     db.execute('CREATE TABLE IF NOT EXISTS peers (name TEXT PRIMARY KEY, url TEXT NOT NULL)')
+    db.execute('CREATE TABLE IF NOT EXISTS peer_publications (name TEXT PRIMARY KEY, token TEXT NOT NULL)')
     db.execute('''CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, request TEXT NOT NULL,
         result TEXT, credits INTEGER NOT NULL DEFAULT 0)''')
     db.execute(f'CREATE INDEX IF NOT EXISTS jobs_partner_page ON jobs ({PAIR_COLUMNS}, id)')
@@ -153,6 +154,7 @@ def discover(db,bootstrap, *, directory_name=None):
         raise ValueError('invalid public directory snapshot')
     registrations = []
     sources = set()
+    publications = {}
     for record in feed:
         if not isinstance(record, dict) or not isinstance(record.get('source'), str):
             raise ValueError('invalid public directory record')
@@ -166,6 +168,11 @@ def discover(db,bootstrap, *, directory_name=None):
                                                  for k in ('name', 'url')):
             raise ValueError('invalid public node registration')
         validate_registration_origin(config, source, peer['url'])
+        if 'publication' in record:
+            token = record['publication']
+            if not isinstance(token, str) or not re.fullmatch('[0-9a-f]{32}', token):
+                raise ValueError('invalid directory publication token')
+            publications[peer['name']] = token
         sources.add(source)
         registrations.append((source, peer))
     descriptors = [peer for source, peer in registrations]
@@ -178,6 +185,12 @@ def discover(db,bootstrap, *, directory_name=None):
             raise ValueError('advertised node did not confirm registration')
     with db:
         db.execute('BEGIN IMMEDIATE')
+        previous = dict(db.execute('SELECT name,token FROM peer_publications'))
+        db.executemany('DELETE FROM consult_grants WHERE name=?',
+                       [(name,) for name in previous.keys() | publications.keys()
+                        if previous.get(name) != publications.get(name)])
+        db.execute('DELETE FROM peer_publications')
+        db.executemany('INSERT INTO peer_publications VALUES (?,?)', publications.items())
         db.execute('DELETE FROM peers')
         db.executemany('INSERT INTO peers VALUES (?,?)', [(p['name'], p['url']) for p in descriptors])
         db.execute('''DELETE FROM consult_grants WHERE NOT EXISTS (
@@ -836,7 +849,10 @@ def serve(root,port,interrupt,interrupt_before_receipt=False):
                                           (query['source'][0],)).fetchall()
                 result = [dict(source=source,body=body) for source,body in rows]
             elif self.path == '/nodes':
-                result = [record for record in catalog(root) if record['source'].endswith('/node')]
+                with closing(connect(root,'public')) as public:
+                    rows = public.execute("""SELECT source,body,token FROM records LEFT JOIN node_withdrawals USING(source)
+                        WHERE shared=1 AND substr(source,-5)='/node' ORDER BY source""")
+                    result = [dict(source=s, body=b, **({'publication': t} if t else {})) for s,b,t in rows]
             elif self.path in ('/catalog','/offers'):
                 result = published_offers(root) if self.path=='/offers' else catalog(root)
             else:
