@@ -92,6 +92,15 @@ For a run with ordered preferences, compare `criteria_met` and `best_candidate_c
 
 Add `--with-criteria` to a fresh recovery run to send the fixture's ordered preferences with the roster. The verifier recomputes the selected schedule's preference score and checks the expert vote against the candidate list. In an English run, the selected schedule preserved the late shift's start but missed the higher-priority pickup deadline. A received B's `PAUSED` decision after reconnecting. Both ledgers recorded two credits for one expert call and one model call.
 
+When the expert dissents, you can review an alternative offline on B. Use the `request_id` from the verification output in place of `REQUEST_ID` below, and substitute your recovery directory for `reports/recovery-first`. Choose a fresh destination for the revised ledger.
+
+```sh
+python -m examples.revise_panel_proposal reports/recovery-first/B/REQUEST_ID.sqlite3 reports/recovery-first/revision-v2.sqlite3
+python -m examples.two_node_demo verify reports/recovery-first
+```
+
+In the English run above, version 2 met the pickup deadline and moved one shift relative to the original roster. The expert approved it in the local copy. A second vote is still needed there. The network verifier continues to report the original decision that A received, with its original charge. The revision command performs no model call or network delivery.
+
 To exercise a disconnect after the consultation result is saved but before B posts the network charge, use a fresh directory:
 
 ```sh
