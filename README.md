@@ -232,7 +232,9 @@ A checks B's certificate identity. B checks the caller's certificate against the
 
 The recovery demo runs on loopback. For a trial across machines, set `transport` to `mtls` in each node's `node.json` and set `listen_address` to a specific IPv4 address assigned to that machine. The default is `127.0.0.1`. List every remote HTTPS origin the node will contact in `allowed_origins`, including the directory when it is remote. Each entry includes the explicit port, for example `https://peer-b.example:8443`, with no path or trailing slash.
 
-The `credentials` directory holds `ca.pem`, `node.pem` and `node.key`. The node certificate must cover the hostname or IP used by clients and identify the configured node name with a URI such as `urn:roundtable:peer:B`. The demo issues certificates for localhost and the loopback address. A cross-host acceptance run still needs to demonstrate connectivity, identity checks and lost-receipt recovery on separate machines.
+Place `ca.pem`, `node.pem` and `node.key` beside `node.json` to use the default credentials location. To keep the files elsewhere, set `credentials` in `node.json` to their directory. An absolute path works across launch directories. A relative `credentials` value is resolved from the process's working directory.
+
+The node certificate must cover the hostname or IP used by clients and identify the configured node name with a URI such as `urn:roundtable:peer:B`. The demo issues certificates for localhost and the loopback address. A cross-host acceptance run still needs to demonstrate connectivity, identity checks and lost-receipt recovery on separate machines.
 
 Before starting each service, run `python -m examples.peer_node runtime/provider check-listener` with that node's directory. This offline check loads the configured server credentials for mutual TLS, applies the listener's address policy and validates each entry in `allowed_origins`. An invalid entry is identified by its zero-based position. The JSON output on success shows the address and transport. Binding the interface, verifying peer identities and testing connectivity require the live trial.
 
