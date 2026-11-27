@@ -136,6 +136,8 @@ Add `--checkpoint` to inspect the attempt and the consultation receipt in the sa
 
 For a repair that ended before model selection, inspect `no_plan.feasibility`. An `infeasible` result means the expert ruled out a schedule under the submitted constraints. An `unknown` result leaves feasibility open; a new request with a larger search budget may find a plan. The `nodes` field counts search nodes visited. Replaying the same request returns its saved result.
 
+To increase that budget, change the positive integer `search_nodes` in the scheduling request (default 10,000), then review and share the revised public record before sending it. This value limits the expert's exact search. For example, in a direct search for two four-hour shifts originally starting at hour 8 in the same room with different workers, a budget of 1 returned `unknown`. A budget of 100 found starts at hours 8 and 4 after visiting 9 nodes. This example measures the search routine; the ordinary repair workflow tries its candidate generator first.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
