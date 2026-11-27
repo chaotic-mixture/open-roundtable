@@ -101,11 +101,14 @@ def repair_preview(spec):
     if all(met) and not any(expected(schedule(rows, starts)).values()):
         proof = dict(status='feasible', nodes=0, plan=starts) if rules else None
         return dict(schedule=[dict(shift) for shift in spec['shifts']], criteria_met=met,
-                    changed_shifts=0, top_priority_search=proof)
+                    changed_shifts=0, changes=[], top_priority_search=proof)
     plans, menu, proof = prepare_candidates(spec, rows, rules)
+    changes = [dict(id=old['id'], old_start=old['start'], old_end=old['end'],
+                    new_start=new['start'], new_end=new['end'])
+               for old, new in zip(spec['shifts'], menu[0], strict=True)
+               if old['start'] != new['start']]
     return dict(schedule=menu[0], criteria_met=evaluate(rules, rows, plans[0]),
-                changed_shifts=sum(start != row[1] for start, row in zip(plans[0], rows)),
-                top_priority_search=proof)
+                changed_shifts=len(changes), changes=changes, top_priority_search=proof)
 
 
 def consult(source, database, model, *, nested=False):

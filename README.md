@@ -76,6 +76,8 @@ A follow-up trial inserted the following instructions immediately before “Cand
 
 To obtain the expert's default candidate directly, run `python -m open_roundtable repair-preview examples/consult_input.en.json`. This offline command uses the consultation's candidate generator and hard-rule verification. Ranking uses the explicitly encoded criteria. In this example it keeps the early shift at 8–14 and moves the late shift to 22–28, meeting the pickup deadline with one change. The result is a preview drawn from the generated candidates. It creates no topic and makes no model call.
 
+Read the preview's `changes` array to review just the moved shifts in input order. Each entry includes the original shift ID and its old and new start and end hours. An empty array means the original schedule was retained.
+
 If the consultation is `PAUSED` and the expert voted against the first proposal, revise it in a fresh ledger:
 
 ```sh
