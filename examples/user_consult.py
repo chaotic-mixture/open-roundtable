@@ -84,7 +84,7 @@ def prepare_candidates(spec, rows, rules):
         if evaluate(rules[:1],rows,plans[0])[0]:
             proof=dict(status='feasible',nodes=0,plan=plans[0])
         else:
-            proof=feasibility(rows,lambda p:evaluate(rules[:1],rows,p)[0],spec.get('search_nodes',10000))
+            proof = preference_feasibility(rows, rules[:1], spec.get('search_nodes', 10000))
             if proof['plan'] is not None:
                 plans.append(proof['plan'])
                 plans.sort(key=rank,reverse=True)

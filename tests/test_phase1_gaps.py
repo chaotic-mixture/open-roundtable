@@ -29,6 +29,15 @@ def provider(path, payload=None):
 
 
 class GapTests(unittest.TestCase):
+    def test_impossible_deadline_preserves_ranked_repair(self):
+        spec = dict(title='Early finish', preference='Finish by hour 3', search_nodes=1,
+                    shifts=[dict(id='day', worker='Jo', room='East', start=8, end=14)],
+                    criteria=[dict(shift='day', field='end', min=0, max=3)])
+        preview = repair_preview(spec)
+        self.assertEqual(preview['top_priority_search'], dict(status='infeasible', nodes=0, plan=None))
+        self.assertEqual(preview['schedule'], spec['shifts'])
+        self.assertEqual(preview['criteria_met'], (False,))
+
     def test_preview_skips_search_for_an_already_optimal_roster(self):
         spec = dict(title='Night shift', preference='Keep Jo on the original shift',
                     shifts=[dict(id='night', worker='Jo', room='East', start=22, end=30)],
