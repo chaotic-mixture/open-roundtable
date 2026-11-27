@@ -76,8 +76,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == 'audit':
-            from examples.peer_node import audit_rules
-            from .schedule_expert import check
+            from .schedule_expert import audit_rules, check
             spec = json.loads(args.input.read_bytes())
             rules = audit_rules(spec)
             if rules is None:
