@@ -60,7 +60,9 @@ With the same English briefs and nine rosters, preference-guided search raised t
 
 For 508, expanding the search bought four points without moving another shift. For 502, five points cost one extra changed shift. On both rosters the model passed over the better candidate. The rule arm used nine calls and nine credits in each run, with member call time rising from 0.33 to 1.24 seconds.
 
-With expanded candidates, model selection earned 27 points and changed 96 shifts. It used 18 calls, 18 credits, 14,664 input tokens, 99 output tokens and 5.26 seconds of member call time. The default scored 31 with 90 changed shifts. All 27 selections passed the hard constraints. Each configuration ran once, so the measured times do not establish a speed advantage.
+With expanded candidates, model selection earned 27 points and changed 96 shifts. It used 18 calls, 18 credits, 14,664 input tokens, 99 output tokens and 5.26 seconds of member call time. The default scored 31 with 90 changed shifts. All 27 selections passed the hard constraints.
+
+A second run in a fresh ledger used identical rosters, candidate lists and model requests. The model selected the same ID on all nine rosters, including the missed improvements on 502 and 508. Token counts and charges matched the first run. Model-arm member call time was 4.11 seconds on the repeat. Both ledgers passed offline verification across all 54 rows. This establishes repeatability for these fixed inputs on the tested local model. Performance on other rosters or differently worded requests remains open.
 
 ```sh
 python -m examples.preference_benchmark reports/preferences-en-expanded --language en --expand --model qwen3.5:9b
