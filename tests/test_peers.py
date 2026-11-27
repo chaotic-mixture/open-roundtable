@@ -94,6 +94,7 @@ class PeerRecoveryTests(unittest.TestCase):
             root = Path(tmp)
             (root/'node.json').write_text('{"name":"B","model":"fixture"}')
             spec = json.loads((Path(__file__).resolve().parents[1]/'examples'/'consult_input.json').read_bytes())
+            spec['search_nodes'] = 1
             body = dict(sender='A', recipient='B', source='public', spec=spec)
             request = dict(body, id=digest(body))
             db.execute("INSERT INTO peers VALUES ('A','http://127.0.0.1:8001')")
@@ -296,6 +297,10 @@ class PeerRecoveryTests(unittest.TestCase):
                 self.assertTrue(fresh)
                 validate_receipt(request, receipt)
                 self.assertEqual(receipt['outcome'], dict(state='NO_PLAN', feasibility=status, nodes=nodes))
+                for bad_status, visits in [('infeasible', budget + 1), ('unknown', budget - 1)]:
+                    changed = receipt['outcome'] | dict(feasibility=bad_status, nodes=visits)
+                    with self.assertRaisesRegex(ValueError, 'invalid feasibility receipt'):
+                        validate_receipt(request, receipt | dict(outcome=changed))
                 self.assertEqual(json.loads(cli(root, 'dispatch-status', request['id'], '--checkpoint').stdout),
                                  dict(job=request['id'], attempts=[], has_consultation_receipt=True,
                                       no_plan=dict(feasibility=status, nodes=nodes)))

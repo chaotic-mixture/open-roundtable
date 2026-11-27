@@ -547,8 +547,14 @@ def validate_receipt(request, receipt):
             raise ValueError('invalid audit receipt')
         return
     if isinstance(outcome, dict) and outcome.get('state') == 'NO_PLAN':
+        spec = request.get('spec')
+        if not isinstance(spec, dict):
+            raise ValueError('missing feasibility request')
+        budget = spec.get('search_nodes', 10000)
         if (charge != 0 or outcome.get('feasibility') not in ('infeasible', 'unknown')
-                or type(outcome.get('nodes')) is not int or outcome['nodes'] < 0):
+                or type(budget) is not int or budget < 1 or type(outcome.get('nodes')) is not int
+                or not 0 <= outcome['nodes'] <= budget
+                or (outcome['feasibility'] == 'unknown' and outcome['nodes'] != budget)):
             raise ValueError('invalid feasibility receipt')
         return
     if not isinstance(outcome, dict) or outcome.get('state') not in ('ACTIVE','PAUSED','RESOLVED'):
