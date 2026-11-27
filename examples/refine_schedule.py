@@ -84,6 +84,9 @@ def feasibility(rows, accepts, budget):
     domains=[sorted(range(169-r[2]),key=lambda h:abs(h-r[1])) for r in rows]
     starts=[]
     visits=0
+    worker_indices = {}
+    for index, (key, _, _) in enumerate(rows):
+        worker_indices.setdefault(key[1], []).append(index)
 
     def search():
         nonlocal visits
@@ -97,12 +100,18 @@ def feasibility(rows, accepts, budget):
             if visits>=budget:
                 raise StopIteration
             visits+=1
-            # Overlap cannot be repaired by inserting more shifts. A short rest
-            # gap might be filled by another shift, so check rest only at leaves.
+            # Overlap cannot be repaired by inserting more shifts.
             if any((key[1]==rows[j][0][1] or key[2]==rows[j][0][2])
                    and h<s+rows[j][2] and s<h+duration for j,s in enumerate(starts)):
                 continue
             starts.append(h)
+            indices = worker_indices[key[1]]
+            if i == indices[-1] and i < len(rows)-1 and len(indices) > 1:
+                # Only this worker's own later shifts could fill a short gap.
+                tokens = schedule([rows[j] for j in indices], [starts[j] for j in indices])
+                if any(check(tokens, rules='RL').values()):
+                    starts.pop()
+                    continue
             result=search()
             starts.pop()
             if result is not None:
