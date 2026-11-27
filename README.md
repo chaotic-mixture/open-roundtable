@@ -102,6 +102,12 @@ python -m examples.peer_node runtime/A reconcile B B-for-A.json
 
 For a single settled job with matching receipts, expect `{"matched": 1, "differences": []}`. The statement carries job IDs, provider names, test credits and receipt hashes. A missing entry, a pending job or a different receipt produces a difference and a nonzero exit status. If both sides report the job as pending, zero posted credits alone cannot tell you whether inference ran.
 
+If the receiver stopped during inference, run `python -m examples.peer_node runtime/A account` on A and the corresponding command with `runtime/B` on B. Look for the same `job` ID under `pending_jobs` on both sides and check its `consumer` and `provider`. In the interruption test, the model service received one request before B stopped. After restart and retry, both accounts still listed the job as pending with zero posted credits. Offline reconciliation returned `matched: 0` and the reason `pending at both nodes`. Keep that job open for investigation. Reproduce this fault window locally with:
+
+```sh
+python -m unittest tests.test_peers.PeerRecoveryTests.test_restart_after_model_dispatch_without_receipt_keeps_job_pending
+```
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.
