@@ -963,7 +963,9 @@ if __name__=='__main__':
     feedback.add_argument('outcome', choices=['useful','not-useful'])
     feedback.add_argument('observation_file', type=Path)
     commands.add_parser('quality').add_argument('provider')
-    commands.add_parser('dispatch-status', help='read model attempt states from a local job journal').add_argument('job')
+    dispatch = commands.add_parser('dispatch-status', help='read model attempt states from a local job journal')
+    dispatch.add_argument('job')
+    dispatch.add_argument('--checkpoint', action='store_true', help='also check for a saved consultation receipt for this job')
     access = commands.add_parser('permission')
     access.add_argument('peer')
     access.add_argument('mode', choices=['allow', 'revoke'])
@@ -984,10 +986,16 @@ if __name__=='__main__':
         path = args.directory / (args.job + '.sqlite3')
         try:
             with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as journal:
+                journal.execute('BEGIN')
                 rows = journal.execute('SELECT status,response IS NOT NULL FROM attempts ORDER BY id').fetchall()
+                report = dict(job=args.job, attempts=[dict(status=s, has_response=bool(r)) for s,r in rows])
+                if args.checkpoint:
+                    table = journal.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='peer_receipt'").fetchone()
+                    report['has_consultation_receipt'] = bool(table and journal.execute(
+                        'SELECT 1 FROM peer_receipt WHERE id=? AND result IS NOT NULL', (args.job,)).fetchone())
         except sqlite3.Error:
             parser.error('unable to read a model dispatch journal for this job')
-        print(json.dumps(dict(job=args.job, attempts=[dict(status=s, has_response=bool(r)) for s,r in rows])))
+        print(json.dumps(report))
     elif args.action=='serve':
         serve(args.directory,args.port,args.interrupt_after_commit,args.interrupt_before_receipt)
     else:

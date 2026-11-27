@@ -132,6 +132,8 @@ python -m unittest tests.test_peers.PeerRecoveryTests.test_restart_after_model_d
 
 On the provider, run `python -m examples.peer_node runtime/B dispatch-status JOB_ID` with the job ID from the account. The command opens the consultation database read-only and reports the status of each attempt and whether a response was saved. In the interruption test it reports one `dispatching` attempt with `has_response: false` after the retry. The journal records dispatch intent before network I/O. Only the test service's independent request count confirms that this particular call reached it.
 
+Add `--checkpoint` to inspect the attempt and the consultation receipt in the same database snapshot. A saved model response and a saved consultation receipt are separate milestones. `has_consultation_receipt` reports whether the provider saved a receipt for this job; use the two-node verifier to check its contents and reconcile the charge.
+
 ### Reconcile receipts online
 
 With mutual TLS configured on both nodes, A can compare its ledger with B's over the network. On B, add `"statement_partners": ["A"]` to the existing `node.json` and restart B's service. This authorizes A to read their shared statement. Consultation grants and quotas are managed separately.

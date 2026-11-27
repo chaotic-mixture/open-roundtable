@@ -200,6 +200,7 @@ class PeerRecoveryTests(unittest.TestCase):
             journal_uri = (b / f'{key}.sqlite3').resolve().as_uri() + '?mode=ro'
             self.assertEqual(json.loads(cli(b, 'dispatch-status', key).stdout),
                              dict(job=key, attempts=[dict(status='dispatching', has_response=False)]))
+            self.assertFalse(json.loads(cli(b, 'dispatch-status', key, '--checkpoint').stdout)['has_consultation_receipt'])
             with closing(sqlite3.connect(journal_uri, uri=True)) as journal:
                 self.assertEqual(journal.execute('SELECT status,response IS NOT NULL FROM attempts').fetchall(),
                                  [('dispatching', 0)])
@@ -524,6 +525,7 @@ class PeerRecoveryTests(unittest.TestCase):
             key = result['request_id']
             dispatch = json.loads(cli(folder/'B', 'dispatch-status', key).stdout)
             self.assertEqual(dispatch, dict(job=key, attempts=[dict(status='returned', has_response=True)]))
+            self.assertTrue(json.loads(cli(folder/'B', 'dispatch-status', key, '--checkpoint').stdout)['has_consultation_receipt'])
             missing = '0' * 64
             unknown = cli(folder/'B', 'dispatch-status', missing, ok=False)
             self.assertEqual(unknown.returncode, 2)
