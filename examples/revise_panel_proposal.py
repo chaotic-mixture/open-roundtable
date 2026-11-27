@@ -13,6 +13,10 @@ from open_roundtable.core import Kernel
 
 
 def revise(source, destination):
+    if source.is_dir():
+        from examples.two_node_demo import audit
+        recovered = audit(source)
+        source = source / 'B' / (recovered['request_id'] + '.sqlite3')
     with tempfile.TemporaryDirectory(dir=destination.parent) as tmp:
         snapshot = Path(tmp)/'revision.sqlite3'
         with closing(sqlite3.connect(source.resolve().as_uri()+'?mode=ro', uri=True)) as original:
@@ -55,7 +59,7 @@ def revise(source, destination):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('source', type=Path)
+    parser.add_argument('source', type=Path, help='paused consultation ledger or completed two-node recovery directory')
     parser.add_argument('destination', type=Path)
     args = parser.parse_args()
     print(json.dumps(revise(args.source,args.destination)))
