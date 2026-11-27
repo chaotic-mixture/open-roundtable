@@ -522,6 +522,12 @@ class PeerRecoveryTests(unittest.TestCase):
             with closing(ledger(folder/'B')) as db:
                 self.assertEqual(db.execute("SELECT remaining FROM grant_limits WHERE name='A'").fetchone(), (0,))
             key = result['request_id']
+            dispatch = json.loads(cli(folder/'B', 'dispatch-status', key).stdout)
+            self.assertEqual(dispatch, dict(job=key, attempts=[dict(status='returned', has_response=True)]))
+            missing = '0' * 64
+            unknown = cli(folder/'B', 'dispatch-status', missing, ok=False)
+            self.assertEqual(unknown.returncode, 2)
+            self.assertFalse((folder/'B'/f'{missing}.sqlite3').exists())
             note = folder / 'note.txt'
             note.write_text('private-practice-observation')
             self.assertIsNone(json.loads(cli(folder/'A','quality','B').stdout)['useful_fraction'])
