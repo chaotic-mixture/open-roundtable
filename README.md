@@ -169,6 +169,17 @@ On the provider, run `python -m examples.peer_node runtime/B dispatch-status JOB
 
 Add `--checkpoint` to inspect the attempt and the consultation receipt in the same database snapshot. A saved model response and a saved consultation receipt are separate milestones. `has_consultation_receipt` reports whether the provider saved a receipt for this job; use the two-node verifier to check its contents and reconcile the charge.
 
+#### Investigate a repair request that returned no plan
+
+On the provider, keep the job journal (`JOB_ID.sqlite3`) and its matching `network.sqlite3` together in the node directory. With the services stopped, run `python -m examples.peer_node runtime/B dispatch-status JOB_ID --checkpoint`. For a saved `NO_PLAN` result, this command reads both files, checks the receipt against the original request and reports `no_plan.feasibility` and `no_plan.nodes`. A valid result has an empty `attempts` list and a saved receipt.
+
+| Feasibility | What to do next |
+| --- | --- |
+| `infeasible` | The provider ruled out a hard-rule repair. Review the shifts, workers or rooms before sharing a revised request. A capacity proof may use zero search nodes. |
+| `unknown` | The provider exhausted the requested search budget. To try a larger search, increase `search_nodes`, review the provider's admission limit and share the revised request. |
+
+Either outcome uses one admission quota slot on first acceptance and zero model calls or credits. Replaying the identical request while its source is still shared and its grant remains valid retrieves the saved receipt. A revised request gets a new ID and requires fresh admission.
+
 For a repair that ended before model selection, inspect `no_plan.feasibility`. An `infeasible` result means the expert ruled out a schedule under the submitted constraints. An `unknown` result leaves feasibility open; a new request with a larger search budget may find a plan. The `nodes` field counts search nodes visited. Replaying the same request returns its saved result.
 
 To increase that budget, change the positive integer `search_nodes` in the scheduling request (default 10,000), then review and share the revised public record before sending it. This value limits the expert's exact search. For example, in a direct search for two four-hour shifts originally starting at hour 8 in the same room with different workers, a budget of 1 returned `unknown`. A budget of 100 found starts at hours 8 and 4 after visiting 9 nodes. This example measures the search routine; the ordinary repair workflow tries its candidate generator first.
