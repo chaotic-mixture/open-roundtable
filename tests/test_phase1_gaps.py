@@ -140,6 +140,24 @@ class GapTests(unittest.TestCase):
                     self.assertEqual(source.read_bytes(), before)
                     api.assert_not_called()
 
+    def test_returned_tool_request_falls_back_without_a_model_vote(self):
+        source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.en.json'
+        reply = provider('/api/chat')
+        reply['message'] = dict(content='{"plan":1}', tool_calls=[dict(name='inspect')])
+        with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api', return_value=reply) as model:
+            direct, nested = (Path(tmp)/name for name in ('direct.db', 'nested.db'))
+            for path, delegated in ((direct, False), (nested, True)):
+                consult(source, path, 'fixture', nested=delegated)
+            self.assertEqual(model.call_count, 2)
+            report = compare(direct, nested)
+            self.assertTrue(report['same_schedule'])
+            for mode in ('direct', 'nested'):
+                result = report[mode]
+                self.assertTrue(result['used_fallback'])
+                self.assertEqual((result['selected'], result['votes'], result['state'], result['credits']),
+                                 (0, {'expert': 1}, 'PAUSED', 2))
+            self.assertIsNone(report['nested']['settled_credits'])
+
     def test_paired_panel_settlement(self):
         source = Path(__file__).resolve().parents[1] / 'examples' / 'consult_input.json'
         with tempfile.TemporaryDirectory() as tmp, patch('examples.user_consult.api', side_effect=provider):
