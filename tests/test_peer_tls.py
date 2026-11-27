@@ -84,7 +84,7 @@ class PeerTLSTests(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write(json.dumps(dict(model='fixture', done=True, done_reason='stop',
                         prompt_eval_count=19, eval_count=7,
-                        message=dict(role='assistant', content='{"plan":0}'))).encode())
+                        message=dict(role='assistant', content='{"plan":1}'))).encode())
 
             model = stack.enter_context(HTTPServer(('127.0.0.1',0), Model))
             threading.Thread(target=model.serve_forever,daemon=True).start()
@@ -98,8 +98,14 @@ class PeerTLSTests(unittest.TestCase):
 
             with patch.dict(os.environ, ROUNDTABLE_OLLAMA_PORT=str(model.server_port)), patch(
                     'examples.two_node_demo.share_public', side_effect=publish):
-                result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True)
+                result = run(folder, 'fixture', 'before-receipt', credentials=credentials, bind_offer=True,
+                             language='en', with_criteria=True)
             self.assertEqual(audit(folder), result)
+            self.assertEqual(result['state'], 'PAUSED')
+            with closing(ledger(folder/'A')) as db:
+                receipt = json.loads(db.execute('SELECT result FROM jobs').fetchone()[0])
+            self.assertEqual(receipt['outcome']['criteria_met'], [False, True])
+            self.assertEqual(receipt['outcome']['state'], 'PAUSED')
             self.assertEqual(result['private_stores_checked'], ['A', 'B', 'directory'])
             self.assertEqual((result['remaining_at_disconnect'], result['remaining_after_replay']), (0, 0))
             checkpoint = folder/'interruption.json'
