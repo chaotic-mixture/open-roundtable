@@ -28,7 +28,7 @@ To see what the additional call bought on each roster, run the offline compariso
 python -m examples.summarize_detection examples/paired_501_metrics.csv
 ```
 
-Each comparison subtracts the single participant's result from the roundtable's. Negative values for missed findings or false positives mean fewer errors. Seeds 502 and 505 gained missed findings relative to the tool, and seed 503 gained a false positive. The other six matched the tool at one additional credit each. If a run stopped mid-roster, the report lists the missing arms for that roster.
+Each comparison subtracts the single participant's result from the roundtable's. Negative values for missed findings or false positives mean fewer errors. The by_rule breakdown shows that, relative to the tool, the roundtable missed one excessive continuous-work block on seed 502 and two on seed 505. On seed 503 it reported one extra worker overlap. The other six matched the tool at one additional credit each. If a run stopped mid-roster, the report lists the missing arms for that roster.
 
 For an interrupted run, pass its saved design to include planned rosters with zero recorded results. All three arms appear as missing for those rosters.
 

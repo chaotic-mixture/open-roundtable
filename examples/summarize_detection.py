@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from examples.benchmark_consult import ARMS
+from examples.auto_consult import RULES
 
 
 def summarize(rows, design=None):
@@ -37,6 +38,15 @@ def summarize(rows, design=None):
             for field in ('missed', 'extra', 'calls', 'credits', 'input_tokens', 'output_tokens'):
                 delta[field] = int(arms['table'][field]) - int(arms[baseline][field])
             delta['seconds'] = float(arms['table']['seconds']) - float(arms[baseline]['seconds'])
+            rule_fields = [f'{rule}_{metric}' for rule in RULES for metric in ('missed', 'extra')]
+            if all(field in arms['table'] and field in arms[baseline] for field in rule_fields):
+                delta['by_rule'] = {}
+                for rule in RULES:
+                    changes = {}
+                    for metric in ('missed', 'extra'):
+                        field = f'{rule}_{metric}'
+                        changes[metric] = int(arms['table'][field]) - int(arms[baseline][field])
+                    delta['by_rule'][rule] = changes
             comparisons.append(dict(shifts=shifts, seed=seed, baseline=baseline, table_minus_baseline=delta))
     return dict(comparisons=comparisons, incomplete=incomplete)
 
