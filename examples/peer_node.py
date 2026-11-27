@@ -1135,7 +1135,10 @@ if __name__=='__main__':
             elif args.action == 'quality':
                 result = practice_feedback(args.directory, db, provider=args.provider)
             elif args.action in ('statement','reconcile'):
-                local = partner_statement(args.directory,db,args.partner)
+                try:
+                    local = partner_statement(args.directory,db,args.partner)
+                except (sqlite3.Error, OSError, ValueError, KeyError, TypeError) as error:
+                    parser.error(f'Cannot read local statement: {error}')
                 if args.action == 'statement':
                     with args.file.open('xb') as output:
                         output.write(packed(local))

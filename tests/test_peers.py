@@ -216,6 +216,21 @@ class PeerRecoveryTests(unittest.TestCase):
             self.assertEqual(scan_statement(root, db, 'B'), expected)
             self.assertEqual(partner_statement(root, db, 'B'), expected)
 
+    def test_invalid_archived_statement_reports_input_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'node.json').write_text('{"name":"A"}')
+            database = root/'network.sqlite3'
+            output = root/'statement.json'
+            for contents in (b'', b'invalid database'):
+                database.write_bytes(contents)
+                for action in ('statement', 'reconcile'):
+                    result = cli(root, action, 'B', str(output), '--read-only', ok=False)
+                    self.assertEqual((result.returncode, result.stdout), (2, b''))
+                    self.assertIn(b'Cannot read local statement', result.stderr)
+                    self.assertFalse(output.exists())
+                    self.assertEqual(database.read_bytes(), contents)
+
     def test_offline_statement_cli_matches_non_ascii_nodes_and_bom(self):
         request = dict(sender='圆桌', recipient='Council', source='synthetic', spec={})
         key = digest(request)
