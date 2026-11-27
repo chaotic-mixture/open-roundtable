@@ -303,7 +303,8 @@ def main():
     limit.add_argument('--model')
     commands.add_parser('preview-private').add_argument('source')
     commands.add_parser('summary-origin').add_argument('source')
-    commands.add_parser('private-status', help='count private records with current or pending summaries')
+    status = commands.add_parser('private-status', help='count private records with current or pending summaries')
+    status.add_argument('--by-mode', action='store_true', help='group all pending records by effective maintenance mode')
     batch = commands.add_parser('maintain-pending', help='maintain a bounded batch of pending private records')
     batch.add_argument('--limit', required=True, type=int)
     batch.add_argument('--preview', action='store_true', help='count records by maintenance mode without advancing the batch')
@@ -348,9 +349,18 @@ def main():
                     origin['reported_model'] = reported
                 print(json.dumps(origin))
         elif args.action=='private-status':
-            with closing(connect(root, 'private')) as db:
+            with closing(connect(root, 'private')) as db, db:
+                db.execute('BEGIN')
                 total, ready = db.execute('SELECT count(*), count(summary) FROM records').fetchone()
-            print(json.dumps(dict(total=total, ready=ready, pending=total-ready)))
+                report = dict(total=total, ready=ready, pending=total-ready)
+                if args.by_mode:
+                    counts = dict(sealed=0, local=0, api=0)
+                    groups = db.execute('''SELECT min(r.source), count(*) FROM records r
+                        LEFT JOIN record_limits l USING(source) WHERE r.summary IS NULL GROUP BY l.mode''')
+                    for source, count in groups:
+                        counts[effective_policy(db, source)['mode']] += count
+                    report['pending_by_mode'] = counts
+            print(json.dumps(report))
         elif args.action=='maintain-private':
             maintain(root,args.source)
         elif args.action=='maintain-pending':

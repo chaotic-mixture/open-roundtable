@@ -211,6 +211,8 @@ The private store starts in `sealed` mode. Its policy controls how a record's su
 
 For example, to allow local-model maintenance by default while keeping the example's `profile` record sealed, set its individual limit first:
 
+Before changing the policy, `python -m open_roundtable.data runtime/store-demo private-status --by-mode` reports how many pending records currently use each mode. Run it again after a change to compare the counts. The command reads the whole backlog without sending record contents or advancing maintenance.
+
 ```sh
 python -m open_roundtable.data runtime/store-demo record-limit profile sealed
 python -m open_roundtable.data runtime/store-demo policy local --model qwen3.5:9b

@@ -174,9 +174,9 @@ class DataTests(unittest.TestCase):
             self.assertEqual(api.call_args.args[1]['messages'][-1]['content'], ' private   content ')
 
     def test_private_status_tracks_current_summaries_without_exposing_contents(self):
-        def status():
+        def status(*options):
             output = StringIO()
-            with patch('sys.argv', ['data', str(self.root), 'private-status']), redirect_stdout(output):
+            with patch('sys.argv', ['data', str(self.root), 'private-status', *options]), redirect_stdout(output):
                 data.main()
             return json.loads(output.getvalue())
 
@@ -190,6 +190,13 @@ class DataTests(unittest.TestCase):
             self.assertEqual(status(), ready)
             data.ingest(self.root, 'private', [dict(source='profile', body='updated')])
             self.assertEqual(status(), pending)
+            data.configure(self.root, 'api', 'test', 'https://example.org/chat')
+            data.ingest(self.root, 'private', [dict(source='other', body='synthetic')])
+            data.limit_record(self.root, 'profile', 'sealed')
+            self.assertEqual(status('--by-mode'), dict(total=2, ready=0, pending=2,
+                             pending_by_mode=dict(sealed=1, local=0, api=1)))
+            data.configure(self.root, 'sealed')
+            self.assertEqual(status('--by-mode')['pending_by_mode'], dict(sealed=2, local=0, api=0))
 
     def setUp(self):
         port = patch.dict('os.environ', ROUNDTABLE_OLLAMA_PORT='11434')
