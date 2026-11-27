@@ -22,7 +22,7 @@ ENGLISH_CASES = {
 }
 
 
-def run(language='zh', model='qwen3.5:9b'):
+def run(language='en', model='qwen3.5:9b'):
     cases = {'en': ENGLISH_CASES, 'zh': CASES}[language]
     with TemporaryDirectory() as folder:
         root = Path(folder) / 'synthetic'
@@ -45,7 +45,7 @@ def run(language='zh', model='qwen3.5:9b'):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--language', choices=('en', 'zh'), default='zh', help='language of the synthetic records')
+    parser.add_argument('--language', choices=('en', 'zh'), default='en', help='language of the synthetic records (default: en)')
     parser.add_argument('--model', default='qwen3.5:9b', help='installed local Ollama model')
     args = parser.parse_args()
     run(args.language, args.model)

@@ -254,7 +254,9 @@ python -m open_roundtable.data runtime/store-demo policy sealed
 
 For `profile`, the preview reports `store: api`, `mode: sealed` and a null destination. If you preview another private record that inherits the store policy before the final command, its destination shows the API origin. The final command restores sealed maintenance for the whole store. When you choose to perform API maintenance, provide the service credential through `ROUNDTABLE_API_KEY` if required.
 
-To inspect the quality of local-model maintenance, run `python -m examples.private_summary_cases --language en` with Ollama serving `qwen3.5:9b`. The example creates a temporary private store and prints each synthetic source alongside its saved summary. Check whose preference is known, whether both conditions on a late shift survive, and whether a pending pilot remains tentative. Use `--language zh` for the original Chinese cases.
+To inspect the quality of local-model maintenance, run `python -m examples.private_summary_cases` with Ollama serving `qwen3.5:9b`. The example creates a temporary private store and prints each synthetic source alongside its saved summary. Check whose preference is known, whether both conditions on a late shift survive, and whether a pending pilot remains tentative. Use `--language zh` for the original Chinese cases.
+
+In one English run with `qwen3.5:9b`, the late-shift summary preserved both conditions (Friday and a colleague handling pickup). The pilot summary kept the current roster and the conditional change, but omitted the explicit statement that approval was pending. The preference summary attributed early shifts to Jo and kept Lee's preference unknown, but introduced the pronoun “his” for Lee. These observations cover one summary per synthetic record.
 
 Each output row includes the requested `model`, the service's `reported_model` when available, and the maintenance `mode` read back from SQLite. In a local English run on 2026-11-27, all three rows recorded `qwen3.5:9b` for both model fields. The summaries preserved Jo's ownership of the preference and both conditions on Chen's late shifts. The pilot summary retained pending approval and the tentative change, but its “otherwise” phrasing made the current roster's present status less explicit. These observations cover one generation per record in that run.
 
@@ -340,7 +342,7 @@ python -m open_roundtable.data runtime/customer-a public-feed
 
 本机 `qwen3.5:9b` 混合批次实测使用两条合成记录。一条记录描述虚构协调员偏好周二上午开会，另一条仅允许封闭整理。预览得到 sealed 1、local 1、api 0；执行后完成 2 条，再次执行选中 0 条。SQLite 中的模型摘要保留了周二上午和协调员角色，省略了“虚构”这一限定；封闭记录的结果只合并了多余空白。此例验证本机维护流程，摘要保真度仍需按用途核对。
 
-在本机 Ollama 提供 `qwen3.5:9b` 时，运行 `python -m examples.private_summary_cases` 可逐条比较三条中文合成记录与私库实际保存的摘要。调整摘要提示后，每条各测一次：偏好归属样本保留了小周喜欢早班和转述者小林偏好未知；晚班例外保留了周五与同事接孩子两个必要条件；试点样本保留了尚未获批、排班照旧以及获批后也只是可能变更。三条结果按原文人工核对，样本量不足以估计整体准确率。
+在本机 Ollama 提供 `qwen3.5:9b` 时，运行 `python -m examples.private_summary_cases --language zh` 可逐条比较三条中文合成记录与私库实际保存的摘要。调整摘要提示后，每条各测一次：偏好归属样本保留了小周喜欢早班和转述者小林偏好未知；晚班例外保留了周五与同事接孩子两个必要条件；试点样本保留了尚未获批、排班照旧以及获批后也只是可能变更。三条结果按原文人工核对，样本量不足以估计整体准确率。
 
 批量维护前可用 `--preview` 查看各权限模式下的记录数。正式执行会逐条核对当前权限；个别模型请求失败时继续处理同批其他记录，并以退出码 2 报告部分失败。下次运行从上次选取的位置继续。用 `summary-origin SOURCE` 可查询当前摘要实际使用的模式和模型名；旧摘要的来源信息可能为空。
 
