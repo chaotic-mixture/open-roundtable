@@ -13,6 +13,8 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     demo = commands.add_parser('demo', help='run the synthetic SQLite state-machine demonstration')
     demo.add_argument('--db', required=True, help='path for a new SQLite database')
+    audit = commands.add_parser('audit', help='check a schedule-audit-v1 request offline')
+    audit.add_argument('input', type=Path, help='JSON file containing the audit request')
     consult = commands.add_parser('consult', help='submit a weekly roster and plain-language preferences')
     consult.add_argument('input',type=Path)
     consult.add_argument('--db',required=True,type=Path)
@@ -73,7 +75,16 @@ def main():
             command.add_argument('ballot',choices=['yes','no'])
     args = parser.parse_args()
     try:
-        if args.command=='consult':
+        if args.command == 'audit':
+            from examples.peer_node import audit_rules
+            from .schedule_expert import check
+            spec = json.loads(args.input.read_bytes())
+            rules = audit_rules(spec)
+            if rules is None:
+                raise ValueError('expected a schedule-audit-v1 request')
+            findings = check(spec['shifts'], rules=rules)
+            result = dict(state='AUDITED', findings={key: sorted(values) for key, values in findings.items()})
+        elif args.command=='consult':
             from examples.user_consult import consult
             result=consult(args.input,args.db,args.model,nested=args.nested)
         elif args.command=='verify-batch':

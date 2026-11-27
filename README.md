@@ -35,6 +35,14 @@ Explicitly revoking the grant also closes the receipt-retry path for that peer. 
 
 ### Repair a schedule with your own preferences
 
+To check a roster locally before sharing it, save the following request as `audit.json` and run `python -m open_roundtable audit audit.json`. The offline command reads the file and prints findings using the same validator and scheduling expert as a receiving node.
+
+```json
+{"operation":"schedule-audit-v1","rules":["R","V"],"shifts":["Axv:22-26","Bxu:29-33"]}
+```
+
+Each shift starts with its ID, worker and room, followed by start and end hours from the beginning of the week. Here the expert reports `x@26-29` under minimum rest (`R`): worker x has only three hours between shifts. The room-overlap findings (`V`) are empty.
+
 The [English scheduling request](examples/consult_input.en.json) assigns Alex two overlapping shifts in the same room. Copy the file and edit the shift IDs, workers, rooms and times. Times are integer hours from the start of the scheduling week. Write the tradeoff in `preference`. The optional `criteria` array lists machine-checkable conditions in priority order. This example counts from midnight at the start of Saturday, so hour 18 meets the pickup deadline. A `delta` of zero means keeping the original start time.
 
 The model receives your request, including the original preference text, alongside the verified candidate schedules. The expert scores the conditions you explicitly put in `criteria`. For each condition, name a shift ID, choose a field below and give inclusive integer bounds `min` and `max`.
